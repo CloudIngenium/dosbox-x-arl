@@ -47,8 +47,21 @@ public:
 	void setRTS(bool val) override;
 	void setDTR(bool val) override;
 	void handleUpperEvent(uint16_t type) override;
+	bool arlTraceIsEnabled() const override;
+	std::string arlTraceStatus() override;
+	void arlTraceMark(const char *message) override;
+	bool arlTraceRotate() override;
+	void arlTraceUartEvent(const char *direction, const char *reg,
+	                       Bitu port, uint8_t value,
+	                       const SerialTraceSnapshot &snapshot) override;
 
 private:
+	enum ArlTraceLevel {
+		ARL_TRACE_BASIC = 0,
+		ARL_TRACE_UART = 1,
+		ARL_TRACE_FULL = 2
+	};
+
 	COMPORT comport;
 
 	Bitu rx_state = 0;
@@ -64,8 +77,13 @@ private:
 
 	std::string realport_name;
 	std::string arltrace_path;
+	std::string arltrace_session;
 	FILE *arltrace_fp = nullptr;
 	uint32_t arltrace_start_tick = 0;
+	uint32_t arltrace_last_io_tick = 0;
+	uint32_t arltrace_last_hang_tick = 0;
+	Bitu arltrace_hang_ms = 0;
+	ArlTraceLevel arltrace_level = ARL_TRACE_BASIC;
 
 	int trace_baudrate = 0;
 	uint8_t trace_bytelength = 0;
@@ -75,8 +93,18 @@ private:
 	bool trace_dtr = false;
 	bool trace_break = false;
 	int trace_modem_status = -1;
+	bool trace_have_tx = false;
+	bool trace_have_rx = false;
+	uint8_t trace_last_tx = 0;
+	uint8_t trace_last_rx = 0;
+	uint8_t trace_last_rx_error = 0;
+	Bitu trace_tx_count = 0;
+	Bitu trace_rx_count = 0;
+	Bitu trace_tx_errors = 0;
+	std::string trace_last_error;
 
 	void traceOpen(const std::string &path);
+	bool traceOpenCurrentPath();
 	void traceCommonFields(const char *event);
 	void traceJsonString(const char *value);
 	void traceMessage(const char *event, const char *message);
@@ -85,6 +113,11 @@ private:
 	                 uint8_t bytelength, bool accepted);
 	void traceModemStatus(int status);
 	void traceControlLines(const char *event);
+	void traceSnapshot(const char *event, const SerialTraceSnapshot &snapshot);
+	void traceHostState(const char *event);
+	void traceHangSnapshot();
+	std::string traceRotatePath() const;
+	const char *traceLevelName() const;
 	const char *traceAscii(uint8_t val, char *buffer, size_t buffer_size);
 
 #if SERIAL_DEBUG

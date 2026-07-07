@@ -110,10 +110,23 @@ CSerial * serialports[9] = {
 uint16_t serial_baseaddr[9] = {0,0,0,0,0,0,0,0,0};
 bool serialMouseEmulated = false;
 
+static const char *SERIAL_RegName(CSerial *serial, Bitu index, bool write)
+{
+	static const char* const read_names[] =
+		{"RHR","IER","ISR","LCR","MCR","LSR","MSR","SPR","DLL","DLM"};
+	static const char* const write_names[] =
+		{"THR","IER","FCR","LCR","MCR","LSR","MSR","SPR","DLL","DLM"};
+
+	Bitu debugindex = index;
+	if (serial && (index < 2) && (serial->LCR & LCR_DIVISOR_Enable_MASK))
+		debugindex += 8;
+	return write ? write_names[debugindex] : read_names[debugindex];
+}
+
 static Bitu SERIAL_Read (Bitu port, Bitu iolen) {
     (void)iolen;//UNUSED
 	Bitu i=10;
-	Bitu retval;
+	Bitu retval = 0xff;
 	Bitu index = port & 0x7;
     if ((port&0xff8) == 0) return 0xff;
     for (int k=0; k<9; k++)
@@ -152,15 +165,14 @@ static Bitu SERIAL_Read (Bitu port, Bitu iolen) {
 	}
 
 #if SERIAL_DEBUG
-	const char* const dbgtext[]=
-		{"RHR","IER","ISR","LCR","MCR","LSR","MSR","SPR","DLL","DLM"};
 	if(serialports[i]->dbg_register) {
-		if((index<2) && ((serialports[i]->LCR)&LCR_DIVISOR_Enable_MASK))
-			index += 8;
 		serialports[i]->log_ser(serialports[i]->dbg_register,
-			"read  0x%2x from %s.",retval,dbgtext[index]);
+			"read  0x%2x from %s.",retval,SERIAL_RegName(serialports[i], index, false));
 	}
 #endif
+	serialports[i]->arlTraceUartEvent("uart_read", SERIAL_RegName(serialports[i], index, false),
+	                                  port, (uint8_t)retval,
+	                                  serialports[i]->getTraceSnapshot());
 	return retval;	
 }
 static void SERIAL_Write (Bitu port, Bitu val, Bitu) {
@@ -176,41 +188,40 @@ static void SERIAL_Write (Bitu port, Bitu val, Bitu) {
 	if (!serialports[i]) return;
 
 #if SERIAL_DEBUG
-		const char* const dbgtext[]={"THR","IER","FCR",
-			"LCR","MCR","!LSR","MSR","SPR","DLL","DLM"};
 		if(serialports[i]->dbg_register) {
-			Bitu debugindex=index;
-			if((index<2) && ((serialports[i]->LCR)&LCR_DIVISOR_Enable_MASK))
-				debugindex += 8;
 			serialports[i]->log_ser(serialports[i]->dbg_register,
-				"write 0x%2x to %s.",val,dbgtext[debugindex]);
+				"write 0x%2x to %s.",val,SERIAL_RegName(serialports[i], index, true));
 		}
 #endif
 	switch (index) {
 		case THR_OFFSET:
 			serialports[i]->Write_THR ((uint8_t)val);
-			return;
+			break;
 		case IER_OFFSET:
 			serialports[i]->Write_IER ((uint8_t)val);
-			return;
+			break;
 		case FCR_OFFSET:
 			serialports[i]->Write_FCR ((uint8_t)val);
-			return;
+			break;
 		case LCR_OFFSET:
 			serialports[i]->Write_LCR ((uint8_t)val);
-			return;
+			break;
 		case MCR_OFFSET:
 			serialports[i]->Write_MCR ((uint8_t)val);
-			return;
+			break;
 		case MSR_OFFSET:
 			serialports[i]->Write_MSR ((uint8_t)val);
-			return;
+			break;
 		case SPR_OFFSET:
 			serialports[i]->Write_SPR ((uint8_t)val);
-			return;
+			break;
 		default:
 			serialports[i]->Write_reserved ((uint8_t)val, port & 0x7);
+			break;
 	}
+	serialports[i]->arlTraceUartEvent("uart_write", SERIAL_RegName(serialports[i], index, true),
+	                                  port, (uint8_t)val,
+	                                  serialports[i]->getTraceSnapshot());
 }
 #if SERIAL_DEBUG
 void CSerial::log_ser(bool active, char const* format,...) {
@@ -230,6 +241,67 @@ void CSerial::log_ser(bool active, char const* format,...) {
 	}
 }
 #endif
+
+bool CSerial::arlTraceIsEnabled() const
+{
+	return false;
+}
+
+std::string CSerial::arlTraceStatus()
+{
+	return "";
+}
+
+void CSerial::arlTraceMark(const char *message)
+{
+	(void)message;
+}
+
+bool CSerial::arlTraceRotate()
+{
+	return false;
+}
+
+void CSerial::arlTraceUartEvent(const char *direction, const char *reg,
+                                Bitu port, uint8_t value,
+                                const SerialTraceSnapshot &snapshot)
+{
+	(void)direction;
+	(void)reg;
+	(void)port;
+	(void)value;
+	(void)snapshot;
+}
+
+SerialTraceSnapshot CSerial::getTraceSnapshot()
+{
+	SerialTraceSnapshot snapshot;
+	if (rxfifo) {
+		snapshot.rx_fifo_usage = rxfifo->getUsage();
+		snapshot.rx_fifo_free = rxfifo->getFree();
+	}
+	if (txfifo) {
+		snapshot.tx_fifo_usage = txfifo->getUsage();
+		snapshot.tx_fifo_free = txfifo->getFree();
+	}
+	snapshot.errors_in_fifo = errors_in_fifo;
+	snapshot.rx_interrupt_threshold = rx_interrupt_threshold;
+	snapshot.framing_errors = framingErrors;
+	snapshot.parity_errors = parityErrors;
+	snapshot.overrun_errors = overrunErrors;
+	snapshot.tx_overrun_errors = txOverrunErrors;
+	snapshot.overrun_if0 = overrunIF0;
+	snapshot.break_errors = breakErrors;
+	snapshot.ier = IER;
+	snapshot.isr = ISR;
+	snapshot.lcr = LCR;
+	snapshot.lsr = LSR;
+	snapshot.fcr = FCR;
+	snapshot.waiting_interrupts = waiting_interrupts;
+	snapshot.irq_active = irq_active;
+	snapshot.loopback = loopback;
+	return snapshot;
+}
 
 void CSerial::changeLineProperties() {
 	// update the event wait time
@@ -1648,9 +1720,111 @@ void SERIAL::Run()
 	for (int x=0; x<9; x++) showPort(x);
 }
 
+class ARLTRACE : public Program {
+public:
+	void Run() override;
+
+private:
+	void ShowHelp();
+	bool HasActiveTrace();
+	std::string GetArgumentsFrom(int first_index);
+};
+
+void ARLTRACE::ShowHelp()
+{
+	WriteOut("ARL serial trace diagnostic command.\n\n"
+	         "ARLTRACE STATUS\n"
+	         "ARLTRACE MARK text\n"
+	         "ARLTRACE ROTATE\n\n"
+	         "STATUS shows trace file, last TX/RX, modem lines, and last error.\n"
+	         "MARK inserts a manual event in the active trace.\n"
+	         "ROTATE closes the current trace and opens a timestamped file.\n");
+}
+
+bool ARLTRACE::HasActiveTrace()
+{
+	for (int port = 0; port < 9; port++) {
+		if (serialports[port] && serialports[port]->arlTraceIsEnabled())
+			return true;
+	}
+	return false;
+}
+
+std::string ARLTRACE::GetArgumentsFrom(int first_index)
+{
+	std::string result;
+	for (int i = first_index; cmd->FindCommand(i, temp_line); i++) {
+		if (!result.empty())
+			result += " ";
+		result += temp_line;
+	}
+	return result;
+}
+
+void ARLTRACE::Run()
+{
+	if (cmd->FindExist("-?", false) || cmd->FindExist("/?", false)) {
+		ShowHelp();
+		return;
+	}
+
+	std::string action = "STATUS";
+	if (cmd->FindCommand(1, temp_line))
+		action = temp_line;
+
+	if (!strcasecmp(action.c_str(), "STATUS")) {
+		if (!HasActiveTrace()) {
+			WriteOut("No active ARL trace ports.\n");
+			return;
+		}
+		for (int port = 0; port < 9; port++) {
+			if (serialports[port] && serialports[port]->arlTraceIsEnabled()) {
+				const std::string status = serialports[port]->arlTraceStatus();
+				WriteOut("%s", status.c_str());
+			}
+		}
+		return;
+	}
+
+	if (!strcasecmp(action.c_str(), "MARK")) {
+		const std::string message = GetArgumentsFrom(2);
+		int count = 0;
+		for (int port = 0; port < 9; port++) {
+			if (serialports[port] && serialports[port]->arlTraceIsEnabled()) {
+				serialports[port]->arlTraceMark(message.c_str());
+				count++;
+			}
+		}
+		WriteOut("ARL trace mark written to %d port(s).\n", count);
+		return;
+	}
+
+	if (!strcasecmp(action.c_str(), "ROTATE")) {
+		int ok = 0;
+		int tried = 0;
+		for (int port = 0; port < 9; port++) {
+			if (serialports[port] && serialports[port]->arlTraceIsEnabled()) {
+				tried++;
+				if (serialports[port]->arlTraceRotate())
+					ok++;
+			}
+		}
+		WriteOut("ARL trace rotated on %d of %d active port(s).\n", ok, tried);
+		return;
+	}
+
+	WriteOut("Unknown ARLTRACE command: %s\n\n", action.c_str());
+	ShowHelp();
+}
+
 void SERIAL_ProgramStart(Program **make)
 {
 	*make = new SERIAL;
+}
+
+void ARLTRACE_ProgramStart(Program **make)
+{
+	*make = new ARLTRACE;
 }
 
 void runSerial(const char *str) {

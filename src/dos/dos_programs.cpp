@@ -8079,6 +8079,7 @@ void MIXER_ProgramStart(Program * * make);
 void REDOS_ProgramStart(Program * * make);
 void SHELL_ProgramStart(Program * * make);
 void SERIAL_ProgramStart(Program * * make);
+void ARLTRACE_ProgramStart(Program * * make);
 #if !defined(OSFREE)
 void CONFIG_ProgramStart(Program * * make);
 #endif
@@ -10232,6 +10233,7 @@ void Add_VFiles(bool usecp) {
 # endif
 	PROGRAMS_MakeFile("MIXER.COM",MIXER_ProgramStart,"/SYSTEM/");
 	PROGRAMS_MakeFile("SERIAL.COM", SERIAL_ProgramStart,"/SYSTEM/");
+	PROGRAMS_MakeFile("ARLTRACE.COM", ARLTRACE_ProgramStart,"/SYSTEM/");
 	PROGRAMS_MakeFile("PARALLEL.COM", PARALLEL_ProgramStart,"/SYSTEM/");
 	if (IS_DOSV)
 		PROGRAMS_MakeFile("VTEXT.COM", VTEXT_ProgramStart,"/TEXTUTIL/");

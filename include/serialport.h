@@ -23,6 +23,8 @@
 #include "inout.h"
 #include "programs.h"
 
+#include <string>
+
 // set this to 1 for serial debugging in release mode
 #define SERIAL_DBG_FORCED 1
 
@@ -126,6 +128,29 @@ enum SerialTypesE {
 	SERIAL_TYPE_NULL_MODEM,
 #endif
 	SERIAL_TYPE_COUNT
+};
+
+struct SerialTraceSnapshot {
+	Bitu rx_fifo_usage = 0;
+	Bitu tx_fifo_usage = 0;
+	Bitu rx_fifo_free = 0;
+	Bitu tx_fifo_free = 0;
+	Bitu errors_in_fifo = 0;
+	Bitu rx_interrupt_threshold = 0;
+	Bitu framing_errors = 0;
+	Bitu parity_errors = 0;
+	Bitu overrun_errors = 0;
+	Bitu tx_overrun_errors = 0;
+	Bitu overrun_if0 = 0;
+	Bitu break_errors = 0;
+	uint8_t ier = 0;
+	uint8_t isr = 0;
+	uint8_t lcr = 0;
+	uint8_t lsr = 0;
+	uint8_t fcr = 0;
+	uint8_t waiting_interrupts = 0;
+	bool irq_active = false;
+	bool loopback = false;
 };
 
 class CSerial {
@@ -263,6 +288,15 @@ public:
 
 	void registerDOSDevice();
 	void unregisterDOSDevice();
+
+	virtual bool arlTraceIsEnabled() const;
+	virtual std::string arlTraceStatus();
+	virtual void arlTraceMark(const char *message);
+	virtual bool arlTraceRotate();
+	virtual void arlTraceUartEvent(const char *direction, const char *reg,
+	                               Bitu port, uint8_t value,
+	                               const SerialTraceSnapshot &snapshot);
+	SerialTraceSnapshot getTraceSnapshot();
 
 private:
 

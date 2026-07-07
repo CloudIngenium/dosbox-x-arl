@@ -161,6 +161,49 @@ void SERIAL_getErrorString(char* buffer, size_t length) {
 	LocalFree(sysmessagebuffer);
 }
 
+bool SERIAL_getHostState(COMPORT port, SERIAL_host_state* state) {
+	if (!port || !state) return false;
+	memset(state, 0, sizeof(*state));
+
+	DCB dcb;
+	dcb.DCBlength = sizeof(dcb);
+	if (!GetCommState(port->porthandle, &dcb)) return false;
+
+	COMMTIMEOUTS timeouts;
+	if (!GetCommTimeouts(port->porthandle, &timeouts)) return false;
+
+	DWORD modem_status = 0;
+	GetCommModemStatus(port->porthandle, &modem_status);
+
+	state->available = true;
+	state->baudrate = (int)dcb.BaudRate;
+	state->length = (int)dcb.ByteSize;
+	state->stopbits = (dcb.StopBits == TWOSTOPBITS) ? SERIAL_2STOP :
+	                  (dcb.StopBits == ONE5STOPBITS) ? SERIAL_15STOP :
+	                  SERIAL_1STOP;
+	switch (dcb.Parity) {
+	case ODDPARITY: state->parity = 'o'; break;
+	case EVENPARITY: state->parity = 'e'; break;
+	case MARKPARITY: state->parity = 'm'; break;
+	case SPACEPARITY: state->parity = 's'; break;
+	default: state->parity = 'n'; break;
+	}
+	state->out_cts_flow = dcb.fOutxCtsFlow ? true : false;
+	state->out_dsr_flow = dcb.fOutxDsrFlow ? true : false;
+	state->dsr_sensitivity = dcb.fDsrSensitivity ? true : false;
+	state->out_x = dcb.fOutX ? true : false;
+	state->in_x = dcb.fInX ? true : false;
+	state->abort_on_error = dcb.fAbortOnError ? true : false;
+	state->dtr_control = (int)dcb.fDtrControl;
+	state->rts_control = (int)dcb.fRtsControl;
+	state->read_interval_timeout = (unsigned long)timeouts.ReadIntervalTimeout;
+	state->read_total_timeout_multiplier = (unsigned long)timeouts.ReadTotalTimeoutMultiplier;
+	state->read_total_timeout_constant = (unsigned long)timeouts.ReadTotalTimeoutConstant;
+	state->write_total_timeout_multiplier = (unsigned long)timeouts.WriteTotalTimeoutMultiplier;
+	state->write_total_timeout_constant = (unsigned long)timeouts.WriteTotalTimeoutConstant;
+	state->modem_status = (int)modem_status;
+	return true;
+}
 
 void SERIAL_setDTR(COMPORT port, bool value) {
 	EscapeCommFunction(port->porthandle, value ? SETDTR:CLRDTR);
@@ -368,6 +411,52 @@ void SERIAL_getErrorString(char* buffer, size_t length) {
 	
 }
 
+static int SERIAL_baudFromPosix(speed_t baud)
+{
+	switch (baud) {
+	case B115200: return 115200;
+	case B57600: return 57600;
+	case B38400: return 38400;
+	case B19200: return 19200;
+	case B9600: return 9600;
+	case B4800: return 4800;
+	case B2400: return 2400;
+	case B1200: return 1200;
+	case B600: return 600;
+	case B300: return 300;
+	case B110: return 110;
+	default: return 0;
+	}
+}
+
+bool SERIAL_getHostState(COMPORT port, SERIAL_host_state* state) {
+	if (!port || !state) return false;
+	memset(state, 0, sizeof(*state));
+
+	termios termInfo;
+	if (tcgetattr(port->porthandle, &termInfo) == -1) return false;
+
+	state->available = true;
+	state->baudrate = SERIAL_baudFromPosix(cfgetospeed(&termInfo));
+	switch (termInfo.c_cflag & CSIZE) {
+	case CS5: state->length = 5; break;
+	case CS6: state->length = 6; break;
+	case CS7: state->length = 7; break;
+	default: state->length = 8; break;
+	}
+	state->stopbits = (termInfo.c_cflag & CSTOPB) ? SERIAL_2STOP : SERIAL_1STOP;
+	if (!(termInfo.c_cflag & PARENB)) state->parity = 'n';
+	else if (termInfo.c_cflag & CMSPAR) state->parity = (termInfo.c_cflag & PARODD) ? 'm' : 's';
+	else state->parity = (termInfo.c_cflag & PARODD) ? 'o' : 'e';
+#ifdef CRTSCTS
+	state->out_cts_flow = (termInfo.c_cflag & CRTSCTS) ? true : false;
+#endif
+	state->out_x = (termInfo.c_iflag & IXON) ? true : false;
+	state->in_x = (termInfo.c_iflag & IXOFF) ? true : false;
+	state->modem_status = SERIAL_getmodemstatus(port);
+	return true;
+}
+
 int SERIAL_getmodemstatus(COMPORT port) {
 	long flags = 0;
 	ioctl (port->porthandle, TIOCMGET, &flags);
@@ -573,6 +662,14 @@ cleanup_error:
 void SERIAL_getErrorString(char* buffer, size_t length) {
 	sprintf(buffer, "TODO: error handling is not fun");
 }
+
+bool SERIAL_getHostState(COMPORT port, SERIAL_host_state* state) {
+	(void)port;
+	if (!state) return false;
+	memset(state, 0, sizeof(*state));
+	return false;
+}
+
 void SERIAL_close(COMPORT port) {
 	ULONG ulParmLen = sizeof(DCBINFO);
 	// restore original DCB, close handle, free the COMPORT struct

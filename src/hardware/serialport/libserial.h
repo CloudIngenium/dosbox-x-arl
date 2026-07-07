@@ -20,9 +20,32 @@
 
 typedef struct _COMPORT *COMPORT;
 
+struct SERIAL_host_state {
+	bool available;
+	int baudrate;
+	char parity;
+	int stopbits;
+	int length;
+	bool out_cts_flow;
+	bool out_dsr_flow;
+	bool dsr_sensitivity;
+	bool out_x;
+	bool in_x;
+	bool abort_on_error;
+	int dtr_control;
+	int rts_control;
+	unsigned long read_interval_timeout;
+	unsigned long read_total_timeout_multiplier;
+	unsigned long read_total_timeout_constant;
+	unsigned long write_total_timeout_multiplier;
+	unsigned long write_total_timeout_constant;
+	int modem_status;
+};
+
 bool SERIAL_open(const char* portname, COMPORT* port);
 void SERIAL_close(COMPORT port);
 void SERIAL_getErrorString(char* buffer, size_t length);
+bool SERIAL_getHostState(COMPORT port, SERIAL_host_state* state);
 
 #define SERIAL_1STOP 1
 #define SERIAL_2STOP 2
