@@ -64,6 +64,22 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-Content tests.log
 
+      - name: Validate ARL toolkit scripts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Analyze-ArlTrace.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Start-ArlTraceRun.ps1)) | Out-Null
+          pwsh -NoProfile -File contrib\arl\Analyze-ArlTrace.ps1 `
+            -TracePath contrib\arl\fixtures\sample-trace.ndjson `
+            -OutDir arl-toolkit-test
+          Get-Content arl-toolkit-test\summary.md
+          pwsh -NoProfile -File contrib\arl\Start-ArlTraceRun.ps1 `
+            -Session impact `
+            -RunRoot "$PWD\arl-toolkit-run" `
+            -DosboxExe "$PWD\missing-dosbox.exe" `
+            -NoLaunch
+
       - name: Package ARL artifact
         shell: bash
         run: |
@@ -74,7 +90,7 @@ jobs:
           exe_path="$PWD/bin/x64/Release SDL2/dosbox-x.exe"
 
           rm -rf "$package_root"
-          mkdir -p "$arl_root" "$package_root/arl-patches"
+          mkdir -p "$arl_root/contrib/arl" "$package_root/arl-patches"
 
           cp "$exe_path" "$arl_root/dosbox-x-arl.exe"
           cp COPYING "$arl_root/COPYING"
@@ -82,14 +98,12 @@ jobs:
           cp dosbox-x.reference.conf "$arl_root/dosbox-x.reference.conf"
           cp dosbox-x.reference.full.conf "$arl_root/dosbox-x.reference.full.conf"
           cp docs/ARL-TRACE.md "$arl_root/ARL-TRACE.md"
+          cp -R contrib/arl/. "$arl_root/contrib/arl/"
           cp contrib/arl/dosbox-arl-trace.conf "$arl_root/dosbox-arl-trace.conf"
 
           ./scripts/arl-export-patch-stack.sh "$UPSTREAM_TAG" "$package_root/arl-patches"
 
-          sha256sum \
-            "$arl_root/dosbox-x-arl.exe" \
-            "$arl_root/dosbox-arl-trace.conf" \
-            "$arl_root/ARL-TRACE.md" \
+          find "$arl_root" -type f -print0 | sort -z | xargs -0 sha256sum \
             > "$package_root/SHA256SUMS.txt"
 
           {
