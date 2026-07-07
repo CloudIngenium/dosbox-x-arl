@@ -109,6 +109,18 @@ and tag:
 git tag -a arltrace-vYYYY.MM.DD-N -m "ARL trace build YYYY.MM.DD-N"
 ```
 
+## CI Artifact
+
+`.github/workflows/arl-trace-win64.yml` builds a Windows x64 SDL2 artifact. The
+artifact contains:
+
+- `DOSBox-X-ARL/dosbox-x-arl.exe`
+- `DOSBox-X-ARL/dosbox-arl-trace.conf`
+- `DOSBox-X-ARL/ARL-TRACE.md`
+- `BUILD-MANIFEST.txt`
+- `SHA256SUMS.txt`
+- `arl-patches/*.patch` plus `arl-patches/manifest.txt`
+
 ## Acceptance
 
 The ARL path is accepted when either:

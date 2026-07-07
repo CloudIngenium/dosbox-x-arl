@@ -1,0 +1,106 @@
+name: ARL trace Windows x64
+
+on:
+  push:
+    branches:
+      - arl-trace
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  UPSTREAM_TAG: dosbox-x-v2026.07.02
+
+jobs:
+  build-win64-sdl2:
+    name: Build ARL trace Win64 SDL2
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Check out source
+        # actions/checkout v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+
+      - name: Set up MSYS2
+        # msys2/setup-msys2 v2
+        uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            autoconf
+            automake
+            git
+            make
+            mingw-w64-x86_64-libslirp
+            mingw-w64-x86_64-libtool
+            mingw-w64-x86_64-nasm
+            mingw-w64-x86_64-toolchain
+
+      - name: Verify upstream base
+        run: |
+          git rev-parse "$UPSTREAM_TAG"
+          git log --oneline --decorate -5
+
+      - name: Build DOSBox-X ARL SDL2
+        run: |
+          ./build-mingw-sdl2
+          strip -s src/dosbox-x.exe
+
+      - name: Smoke test DOSBox-X binary
+        run: |
+          timeout 180s src/dosbox-x.exe -tests -set waitonerror=false -set logfile=tests.log
+          cat tests.log
+
+      - name: Package ARL artifact
+        run: |
+          timestamp="$(date -u +%Y%m%d%H%M%S)"
+          short_sha="$(git rev-parse --short=12 HEAD)"
+          package_root="$PWD/package"
+          arl_root="$package_root/DOSBox-X-ARL"
+
+          rm -rf "$package_root"
+          mkdir -p "$arl_root" "$package_root/arl-patches"
+
+          cp src/dosbox-x.exe "$arl_root/dosbox-x-arl.exe"
+          cp COPYING "$arl_root/COPYING"
+          cp README.md "$arl_root/README.md"
+          cp dosbox-x.reference.conf "$arl_root/dosbox-x.reference.conf"
+          cp dosbox-x.reference.full.conf "$arl_root/dosbox-x.reference.full.conf"
+          cp docs/ARL-TRACE.md "$arl_root/ARL-TRACE.md"
+          cp contrib/arl/dosbox-arl-trace.conf "$arl_root/dosbox-arl-trace.conf"
+
+          ./scripts/arl-export-patch-stack.sh "$UPSTREAM_TAG" "$package_root/arl-patches"
+
+          sha256sum \
+            "$arl_root/dosbox-x-arl.exe" \
+            "$arl_root/dosbox-arl-trace.conf" \
+            "$arl_root/ARL-TRACE.md" \
+            > "$package_root/SHA256SUMS.txt"
+
+          {
+            echo "upstream_tag=$UPSTREAM_TAG"
+            echo "upstream_base_commit=$(git rev-parse "$UPSTREAM_TAG")"
+            echo "head_commit=$(git rev-parse HEAD)"
+            echo "build_utc=$timestamp"
+            echo "artifact_layout=DOSBox-X-ARL/dosbox-x-arl.exe"
+            echo
+            echo "arl_patch_commits:"
+            git log --reverse --format='  %H %s' "$UPSTREAM_TAG..HEAD"
+          } > "$package_root/BUILD-MANIFEST.txt"
+
+          echo "ARL_ARTIFACT_NAME=dosbox-x-arl-${UPSTREAM_TAG#dosbox-x-v}-${short_sha}" >> "$GITHUB_ENV"
+
+      - name: Upload ARL artifact
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ${{ env.ARL_ARTIFACT_NAME }}
+          path: package
