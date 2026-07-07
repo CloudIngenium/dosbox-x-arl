@@ -25,6 +25,9 @@
 
 #if C_DIRECTSERIAL
 
+#include <cstdio>
+#include <string>
+
 #define DIRECTSERIAL_AVAILIBLE
 #include "serialport.h"
 
@@ -58,6 +61,31 @@ private:
 	Bitu rx_retry_max;	// how many POLL_EVENTS to wait before causing
 						// an overrun error.
 	bool doReceive();
+
+	std::string realport_name;
+	std::string arltrace_path;
+	FILE *arltrace_fp = nullptr;
+	uint32_t arltrace_start_tick = 0;
+
+	int trace_baudrate = 0;
+	uint8_t trace_bytelength = 0;
+	uint8_t trace_stopbits = SERIAL_1STOP;
+	char trace_parity = 'n';
+	bool trace_rts = false;
+	bool trace_dtr = false;
+	bool trace_break = false;
+	int trace_modem_status = -1;
+
+	void traceOpen(const std::string &path);
+	void traceCommonFields(const char *event);
+	void traceJsonString(const char *value);
+	void traceMessage(const char *event, const char *message);
+	void traceByte(const char *event, uint8_t val, uint8_t error);
+	void traceConfig(int baudrate, char parity, uint8_t stopbits,
+	                 uint8_t bytelength, bool accepted);
+	void traceModemStatus(int status);
+	void traceControlLines(const char *event);
+	const char *traceAscii(uint8_t val, char *buffer, size_t buffer_size);
 
 #if SERIAL_DEBUG
 	bool dbgmsg_poll_block = false;

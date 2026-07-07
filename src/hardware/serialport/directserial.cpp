@@ -26,11 +26,188 @@
 #include "directserial.h"
 #include "misc_util.h"
 #include "pic.h"
+#include "timer.h"
 
 #include "libserial.h"
 
+#include <ctime>
+#include <cstring>
+
 /* This is a serial passthrough class.  Its amazingly simple to */
 /* write now that the serial ports themselves were abstracted out */
+
+void CDirectSerial::traceOpen(const std::string &path)
+{
+	arltrace_path = path;
+	arltrace_start_tick = GetTicks();
+	arltrace_fp = fopen(arltrace_path.c_str(), "ab");
+	if (!arltrace_fp) {
+		LOG_MSG("Serial%d: ARL trace file \"%s\" could not be opened.",
+		        (int)COMNUMBER, arltrace_path.c_str());
+		return;
+	}
+
+	traceMessage("trace_open", "ARL directserial trace enabled");
+}
+
+void CDirectSerial::traceJsonString(const char *value)
+{
+	fputc('"', arltrace_fp);
+	if (value) {
+		for (const unsigned char *p = (const unsigned char *)value; *p; p++) {
+			switch (*p) {
+			case '\\': fputs("\\\\", arltrace_fp); break;
+			case '"':  fputs("\\\"", arltrace_fp); break;
+			case '\b': fputs("\\b", arltrace_fp); break;
+			case '\f': fputs("\\f", arltrace_fp); break;
+			case '\n': fputs("\\n", arltrace_fp); break;
+			case '\r': fputs("\\r", arltrace_fp); break;
+			case '\t': fputs("\\t", arltrace_fp); break;
+			default:
+				if (*p < 0x20) fprintf(arltrace_fp, "\\u%04x", (unsigned)*p);
+				else fputc((int)*p, arltrace_fp);
+				break;
+			}
+		}
+	}
+	fputc('"', arltrace_fp);
+}
+
+void CDirectSerial::traceCommonFields(const char *event)
+{
+	const uint32_t now = GetTicks();
+	const uint32_t elapsed_ms = now - arltrace_start_tick;
+	const long long epoch_ms = (long long)time(nullptr) * 1000LL;
+
+	fprintf(arltrace_fp,
+	        "{\"epoch_ms\":%lld,\"elapsed_ms\":%u,\"pic_ms\":%.3f,"
+	        "\"guest_com\":\"COM%d\",\"serial\":%d,\"realport\":",
+	        epoch_ms, (unsigned int)elapsed_ms, (double)PIC_FullIndex(),
+	        (int)COMNUMBER, (int)COMNUMBER);
+	traceJsonString(realport_name.c_str());
+	fputs(",\"event\":", arltrace_fp);
+	traceJsonString(event);
+}
+
+void CDirectSerial::traceMessage(const char *event, const char *message)
+{
+	if (!arltrace_fp) return;
+
+	traceCommonFields(event);
+	fputs(",\"message\":", arltrace_fp);
+	traceJsonString(message);
+	fputs("}\n", arltrace_fp);
+	fflush(arltrace_fp);
+}
+
+const char *CDirectSerial::traceAscii(uint8_t val, char *buffer, size_t buffer_size)
+{
+	if (buffer_size < 2) return "";
+
+	switch (val) {
+	case '\r': strncpy(buffer, "\\r", buffer_size); break;
+	case '\n': strncpy(buffer, "\\n", buffer_size); break;
+	case '\t': strncpy(buffer, "\\t", buffer_size); break;
+	case 0x00: strncpy(buffer, "\\0", buffer_size); break;
+	default:
+		buffer[0] = (val >= 0x20 && val <= 0x7e) ? (char)val : '.';
+		buffer[1] = 0;
+		break;
+	}
+	buffer[buffer_size - 1] = 0;
+	return buffer;
+}
+
+void CDirectSerial::traceByte(const char *event, uint8_t val, uint8_t error)
+{
+	if (!arltrace_fp) return;
+
+	char ascii[8];
+	traceCommonFields(event);
+	fprintf(arltrace_fp,
+	        ",\"baud\":%d,\"data_bits\":%u,\"parity\":\"%c\","
+	        "\"stop_bits\":%u,\"byte_dec\":%u,\"byte_hex\":\"%02X\","
+	        "\"ascii\":",
+	        trace_baudrate, (unsigned int)trace_bytelength, trace_parity,
+	        (unsigned int)trace_stopbits, (unsigned int)val, (unsigned int)val);
+	traceJsonString(traceAscii(val, ascii, sizeof(ascii)));
+	fprintf(arltrace_fp,
+	        ",\"rx_error_bits\":%u,\"rx_break\":%s,\"rx_framing\":%s,"
+	        "\"rx_parity\":%s,\"rx_overrun\":%s,\"rts\":%s,\"dtr\":%s,"
+	        "\"cts\":%s,\"dsr\":%s,\"dcd\":%s,\"ri\":%s,\"break\":%s}\n",
+	        (unsigned int)error,
+	        (error & SERIAL_BREAK_ERR) ? "true" : "false",
+	        (error & SERIAL_FRAMING_ERR) ? "true" : "false",
+	        (error & SERIAL_PARITY_ERR) ? "true" : "false",
+	        (error & SERIAL_OVERRUN_ERR) ? "true" : "false",
+	        trace_rts ? "true" : "false",
+	        trace_dtr ? "true" : "false",
+	        getCTS() ? "true" : "false",
+	        getDSR() ? "true" : "false",
+	        getCD() ? "true" : "false",
+	        getRI() ? "true" : "false",
+	        trace_break ? "true" : "false");
+	fflush(arltrace_fp);
+}
+
+void CDirectSerial::traceConfig(int baudrate, char parity, uint8_t stopbits,
+                                uint8_t bytelength, bool accepted)
+{
+	trace_baudrate = baudrate;
+	trace_parity = parity;
+	trace_stopbits = stopbits;
+	trace_bytelength = bytelength;
+
+	if (!arltrace_fp) return;
+
+	traceCommonFields("config");
+	fprintf(arltrace_fp,
+	        ",\"baud\":%d,\"data_bits\":%u,\"parity\":\"%c\","
+	        "\"stop_bits\":%u,\"accepted\":%s}\n",
+	        trace_baudrate, (unsigned int)trace_bytelength, trace_parity,
+	        (unsigned int)trace_stopbits, accepted ? "true" : "false");
+	fflush(arltrace_fp);
+}
+
+void CDirectSerial::traceModemStatus(int status)
+{
+	if (status == trace_modem_status) return;
+	trace_modem_status = status;
+
+	if (!arltrace_fp) return;
+
+	traceCommonFields("modem");
+	fprintf(arltrace_fp,
+	        ",\"cts\":%s,\"dsr\":%s,\"dcd\":%s,\"ri\":%s,"
+	        "\"raw_status\":%d,\"rts\":%s,\"dtr\":%s,\"break\":%s}\n",
+	        (status & SERIAL_CTS) ? "true" : "false",
+	        (status & SERIAL_DSR) ? "true" : "false",
+	        (status & SERIAL_CD) ? "true" : "false",
+	        (status & SERIAL_RI) ? "true" : "false",
+	        status,
+	        trace_rts ? "true" : "false",
+	        trace_dtr ? "true" : "false",
+	        trace_break ? "true" : "false");
+	fflush(arltrace_fp);
+}
+
+void CDirectSerial::traceControlLines(const char *event)
+{
+	if (!arltrace_fp) return;
+
+	traceCommonFields(event);
+	fprintf(arltrace_fp,
+	        ",\"rts\":%s,\"dtr\":%s,\"cts\":%s,\"dsr\":%s,"
+	        "\"dcd\":%s,\"ri\":%s,\"break\":%s}\n",
+	        trace_rts ? "true" : "false",
+	        trace_dtr ? "true" : "false",
+	        getCTS() ? "true" : "false",
+	        getDSR() ? "true" : "false",
+	        getCD() ? "true" : "false",
+	        getRI() ? "true" : "false",
+	        trace_break ? "true" : "false");
+	fflush(arltrace_fp);
+}
 
 CDirectSerial::CDirectSerial (Bitu id, CommandLine* cmd)
 					:CSerial (id, cmd) {
@@ -43,6 +220,7 @@ CDirectSerial::CDirectSerial (Bitu id, CommandLine* cmd)
 
 	std::string tmpstring;
 	if(!cmd->FindStringBegin("realport:",tmpstring,false)) return;
+	realport_name = tmpstring;
 
 	LOG_MSG ("Serial%d: Opening %s", (int)(COMNUMBER), tmpstring.c_str());
 	if(!SERIAL_open(tmpstring.c_str(), &comport)) {
@@ -52,6 +230,11 @@ CDirectSerial::CDirectSerial (Bitu id, CommandLine* cmd)
 			(int)(COMNUMBER), tmpstring.c_str());
 		LOG_MSG("%s",errorbuffer);
 		return;
+	}
+
+	std::string trace_path;
+	if (cmd->FindStringBegin("arltrace:", trace_path, false)) {
+		traceOpen(trace_path);
 	}
 
 	// rxdelay: How many milliseconds to wait before causing an
@@ -65,10 +248,16 @@ CDirectSerial::CDirectSerial (Bitu id, CommandLine* cmd)
 	CSerial::Init_Registers();
 	InstallationSuccessful = true;
 	rx_state = D_RX_IDLE;
+	traceMessage("open", "directserial opened");
 	setEvent(SERIAL_POLLING_EVENT, 1); // millisecond receive tick
 }
 
 CDirectSerial::~CDirectSerial () {
+	traceMessage("close", "directserial closing");
+	if(arltrace_fp) {
+		fclose(arltrace_fp);
+		arltrace_fp = nullptr;
+	}
 	if(comport) SERIAL_close(comport);
 	// We do not use own events so we don't have to clear them.
 }
@@ -269,7 +458,10 @@ void CDirectSerial::handleUpperEvent(uint16_t type) {
 bool CDirectSerial::doReceive() {
 	int value = SERIAL_getextchar(comport);
 	if(value) {
-		receiveByteEx((uint8_t)(value&0xff),(uint8_t)((value&0xff00)>>8));
+		const uint8_t data = (uint8_t)(value&0xff);
+		const uint8_t error = (uint8_t)((value&0xff00)>>8);
+		traceByte("rx", data, error);
+		receiveByteEx(data,error);
 		return true;
 	}
 	return false;
@@ -302,7 +494,9 @@ void CDirectSerial::updatePortConfig (uint16_t divider, uint8_t lcr) {
 		else stopbits = SERIAL_2STOP;
 	} else stopbits = SERIAL_1STOP;
 
-	if(!SERIAL_setCommParameters(comport, (int)baudrate, (char)parity, (char)stopbits, (char)bytelength)) {
+	const bool accepted = SERIAL_setCommParameters(comport, (int)baudrate, (char)parity, (char)stopbits, (char)bytelength);
+	traceConfig((int)baudrate, (char)parity, stopbits, bytelength, accepted);
+	if(!accepted) {
 #if SERIAL_DEBUG
 		log_ser(dbg_aux,"Serial port settings not supported by host." );
 #endif
@@ -314,6 +508,7 @@ void CDirectSerial::updatePortConfig (uint16_t divider, uint8_t lcr) {
 
 void CDirectSerial::updateMSR () {
 	int new_status = SERIAL_getmodemstatus(comport);
+	traceModemStatus(new_status);
 
 	setCTS((new_status&SERIAL_CTS)? true:false);
 	setDSR((new_status&SERIAL_DSR)? true:false);
@@ -322,8 +517,11 @@ void CDirectSerial::updateMSR () {
 }
 
 void CDirectSerial::transmitByte (uint8_t val, bool first) {
-	if(!SERIAL_sendchar(comport, (char)val))
+	traceByte("tx", val, 0);
+	if(!SERIAL_sendchar(comport, (char)val)) {
+		traceMessage("tx_error", "COM port write failed");
 		LOG_MSG("Serial%d: COM port error: write failed!", (int)COMNUMBER);
+	}
 	if(first) setEvent(SERIAL_THR_EVENT, bytetime/8);
 	else setEvent(SERIAL_TX_EVENT, bytetime);
 }
@@ -331,21 +529,30 @@ void CDirectSerial::transmitByte (uint8_t val, bool first) {
 
 // setBreak(val) switches break on or off
 void CDirectSerial::setBreak (bool value) {
+	trace_break = value;
 	SERIAL_setBREAK(comport,value);
+	traceControlLines("break");
 }
 
 // updateModemControlLines(mcr) sets DTR and RTS. 
 void CDirectSerial::setRTSDTR(bool rts, bool dtr) {
+	trace_rts = rts;
+	trace_dtr = dtr;
 	SERIAL_setRTS(comport,rts);
 	SERIAL_setDTR(comport,dtr);
+	traceControlLines("control");
 }
 
 void CDirectSerial::setRTS(bool val) {
+	trace_rts = val;
 	SERIAL_setRTS(comport,val);
+	traceControlLines("control");
 }
 
 void CDirectSerial::setDTR(bool val) {
+	trace_dtr = val;
 	SERIAL_setDTR(comport,val);
+	traceControlLines("control");
 }
 
 #endif
