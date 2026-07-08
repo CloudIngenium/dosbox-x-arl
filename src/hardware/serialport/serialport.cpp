@@ -170,9 +170,12 @@ static Bitu SERIAL_Read (Bitu port, Bitu iolen) {
 			"read  0x%2x from %s.",retval,SERIAL_RegName(serialports[i], index, false));
 	}
 #endif
-	serialports[i]->arlTraceUartEvent("uart_read", SERIAL_RegName(serialports[i], index, false),
-	                                  port, (uint8_t)retval,
-	                                  serialports[i]->getTraceSnapshot());
+	if (index != RHR_OFFSET || (serialports[i]->LCR & LCR_DIVISOR_Enable_MASK)) {
+		serialports[i]->arlTraceUartEvent("uart_read",
+		                                  SERIAL_RegName(serialports[i], index, false),
+		                                  port, (uint8_t)retval,
+		                                  serialports[i]->getTraceSnapshot());
+	}
 	return retval;	
 }
 static void SERIAL_Write (Bitu port, Bitu val, Bitu) {
@@ -219,9 +222,12 @@ static void SERIAL_Write (Bitu port, Bitu val, Bitu) {
 			serialports[i]->Write_reserved ((uint8_t)val, port & 0x7);
 			break;
 	}
-	serialports[i]->arlTraceUartEvent("uart_write", SERIAL_RegName(serialports[i], index, true),
-	                                  port, (uint8_t)val,
-	                                  serialports[i]->getTraceSnapshot());
+	if (index != THR_OFFSET || (serialports[i]->LCR & LCR_DIVISOR_Enable_MASK)) {
+		serialports[i]->arlTraceUartEvent("uart_write",
+		                                  SERIAL_RegName(serialports[i], index, true),
+		                                  port, (uint8_t)val,
+		                                  serialports[i]->getTraceSnapshot());
+	}
 }
 #if SERIAL_DEBUG
 void CSerial::log_ser(bool active, char const* format,...) {
@@ -586,7 +592,7 @@ void CSerial::Write_THR (uint8_t data) {
 		changeLineProperties();
 	} else {
 		// write to THR
-        clear (TX_PRIORITY);
+		clear (TX_PRIORITY);
 
 		if(LSR & LSR_TX_EMPTY_MASK)
 		{	// we were idle before
@@ -624,6 +630,7 @@ void CSerial::Write_THR (uint8_t data) {
 				}
 			}
 		}
+		arlTraceUartEvent("uart_write", "THR", 0, data, getTraceSnapshot());
 	}
 }
 
@@ -654,6 +661,7 @@ Bitu CSerial::Read_RHR () {
 		if(rxfifo->getUsage()<rx_interrupt_threshold)clear(RX_PRIORITY);
 		removeEvent(SERIAL_RX_TIMEOUT_EVENT);
 		if(!rxfifo->isEmpty()) setEvent(SERIAL_RX_TIMEOUT_EVENT,bytetime*4.0f);
+		arlTraceUartEvent("uart_read", "RHR", 0, data, getTraceSnapshot());
 		return data;
 	}
 }
