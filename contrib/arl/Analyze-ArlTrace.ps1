@@ -322,7 +322,16 @@ $lastRx = Get-LastEvent { param($e) (Get-PropValue $e "event") -eq "rx" }
 $lastRhrRead = Get-LastEvent { param($e)
     (Get-PropValue $e "event") -eq "uart_read" -and (Get-PropValue $e "register") -eq "RHR"
 }
+$lastThrWrite = Get-LastEvent { param($e)
+    (Get-PropValue $e "event") -eq "uart_write" -and (Get-PropValue $e "register") -eq "THR"
+}
+$lastUartEvent = Get-LastEvent { param($e)
+    (Get-PropValue $e "event") -eq "uart_read" -or (Get-PropValue $e "event") -eq "uart_write"
+}
 $lastEvent = if ($events.Count -gt 0) { $events[$events.Count - 1] } else { $null }
+
+$lastRxAfterLastRhrMs = $null
+$lastRxAfterLastUartMs = $null
 
 $reasons = New-Object System.Collections.Generic.List[string]
 
@@ -351,8 +360,18 @@ if ($hangs.Count -gt 0 -and $null -ne $lastTx) {
 if ($null -ne $lastRx -and $uartEvents.Count -gt 0) {
     $lastRxMs = [int](Get-PropValue $lastRx "elapsed_ms" 0)
     $lastReadMs = if ($null -ne $lastRhrRead) { [int](Get-PropValue $lastRhrRead "elapsed_ms" 0) } else { -1 }
+    $lastUartMs = if ($null -ne $lastUartEvent) { [int](Get-PropValue $lastUartEvent "elapsed_ms" 0) } else { -1 }
+    if ($lastReadMs -ge 0) {
+        $lastRxAfterLastRhrMs = $lastRxMs - $lastReadMs
+    }
+    if ($lastUartMs -ge 0) {
+        $lastRxAfterLastUartMs = $lastRxMs - $lastUartMs
+    }
     if ($lastRxMs -gt $lastReadMs) {
         $reasons.Add("rx_received_but_guest_did_not_read")
+    }
+    if ($null -ne $lastRxAfterLastRhrMs -and $lastRxAfterLastRhrMs -ge $IdleAfterTxMs) {
+        $reasons.Add("rx_continues_after_guest_rhr_reads_stop")
     }
 }
 if ($reasons.Count -eq 0 -and $hangs.Count -gt 0) {
@@ -379,6 +398,10 @@ $suspect = [pscustomobject]@{
     last_tx = $lastTx
     last_rx = $lastRx
     last_uart_rhr_read = $lastRhrRead
+    last_uart_thr_write = $lastThrWrite
+    last_uart_event = $lastUartEvent
+    last_rx_after_last_rhr_ms = $lastRxAfterLastRhrMs
+    last_rx_after_last_uart_ms = $lastRxAfterLastUartMs
     last_event = $lastEvent
     classification = @($reasons)
 }
@@ -392,7 +415,11 @@ if ([string]::IsNullOrWhiteSpace($classificationText)) { $classificationText = "
 
 $lastTxText = if ($lastTx) { "line $($lastTx.line), elapsed_ms $($lastTx.elapsed_ms), byte $($lastTx.byte_hex)" } else { "none" }
 $lastRxText = if ($lastRx) { "line $($lastRx.line), elapsed_ms $($lastRx.elapsed_ms), byte $($lastRx.byte_hex), error $($lastRx.rx_error_bits)" } else { "none" }
+$lastRhrText = if ($lastRhrRead) { "line $($lastRhrRead.line), elapsed_ms $($lastRhrRead.elapsed_ms), value $($lastRhrRead.value_hex)" } else { "none" }
+$lastThrText = if ($lastThrWrite) { "line $($lastThrWrite.line), elapsed_ms $($lastThrWrite.elapsed_ms), value $($lastThrWrite.value_hex)" } else { "none" }
 $lastEventText = if ($lastEvent) { "line $($lastEvent.line), elapsed_ms $($lastEvent.elapsed_ms), event $($lastEvent.event)" } else { "none" }
+$rxVsRhrText = if ($null -ne $lastRxAfterLastRhrMs) { "$lastRxAfterLastRhrMs ms" } else { "n/a" }
+$rxVsUartText = if ($null -ne $lastRxAfterLastUartMs) { "$lastRxAfterLastUartMs ms" } else { "n/a" }
 
 $summaryLines = @(
     "# ARL Trace Summary",
@@ -418,6 +445,10 @@ $summaryLines = @(
     "",
     "- Last TX: $lastTxText",
     "- Last RX: $lastRxText",
+    "- Last guest RHR read: $lastRhrText",
+    "- Last guest THR write: $lastThrText",
+    "- Last RX after last RHR read: $rxVsRhrText",
+    "- Last RX after last UART event: $rxVsUartText",
     "- Last event: $lastEventText",
     "",
     "## Outputs",

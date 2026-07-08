@@ -11,6 +11,31 @@ must not be treated as a replacement for the real ARL until protocol bytes are
 confirmed from lab traces. Do not add manual ICS command senders, synchronize, or
 reset helpers.
 
+## Current Lab Build
+
+As of 2026-07-08, the HP bench PC (`LABORATORIO-ARL`) is using ARL trace build
+`96994b1`:
+
+- `C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe`
+- `C:\ARL\DOSBox-X-ARL\dosbox-x-arl-96994b1.exe`
+- SHA256:
+  `499A1F9D992F28CD022429F6F2CCAAFA0F03D898F68B606B7659CA29819571DA`
+- previous backup:
+  `C:\ARL\DOSBox-X-ARL\dosbox-x-arl-b1f648f.exe`
+
+The public desktop shortcut `ARL IMPACT+ UARTDATA TRACE` launches
+`Launch-ArlImpactUartDataTrace.ps1`, which uses `arltracelevel:uartdata`,
+`cycles=fixed 12000`, `rxdelay:1000`, and COM5.
+
+Build `96994b1` moved THR/RHR `uartdata` tracing to `CSerial::Write_THR()` and
+`CSerial::Read_RHR()`. That matters because IMPACT can use BIOS/INT14 paths that
+do not necessarily pass through the I/O-port wrappers where earlier builds
+logged UART data-register access.
+
+Do not use `10.30.1.6` for this lab PC; that address was observed to be a
+different Linux host. Use `LABORATORIO-ARL` / `10.5.18.101` for SSH access when
+reachable.
+
 ## Branches
 
 - `upstream-master` tracks `joncampbell123/dosbox-x` `master` and is treated as
@@ -115,6 +140,29 @@ Keep the current lab serial settings while diagnosing:
 
 The pass/fail gate is post-spark completion: IMPACT must exit the busy state and
 rewrite `C:\ARL\IMPLUS\INTERFAC.DAT`.
+
+### 2026-07-08 Post-Spark Finding
+
+Run `C:\ARL\diagnostics\sample-analysis-20260708-131347\serial.ndjson` captured
+the symptom where "Please Run Sample" stopped blinking but IMPACT did not load
+analysis values on screen.
+
+Key facts from that trace:
+
+- ARL/Windows/DOSBox received post-spark result bytes.
+- RX continued with `rx_error_bits=0`.
+- `INTERFAC.DAT` did not update.
+- The ARL repeatedly returned numeric result lines after `we 252` and `#rd 246`.
+- Earlier `uartdata` instrumentation only saw guest RHR/THR activity near the
+  initial status read, so it could not prove whether IMPACT consumed the later
+  post-spark bytes.
+
+The next controlled burn must use build `96994b1` or later. If that build shows
+RX continuing for several seconds after the last guest `RHR` read, classify the
+failure as "ARL data reaches DOSBox, but IMPACT stops consuming it." If it shows
+guest `RHR` reads consuming the result bytes but no screen/`INTERFAC.DAT` update,
+classify the failure as an IMPACT result parsing/state-machine problem rather
+than a Windows serial receive problem.
 
 ## Safe ARL Emulator
 
@@ -223,6 +271,7 @@ Automatic classifications include:
 
 - `arl_silent_after_tx`
 - `rx_received_but_guest_did_not_read`
+- `rx_continues_after_guest_rhr_reads_stop`
 - `fifo_or_uart_error`
 - `modem_line_drop_or_low`
 - `baud_or_parity_rejected`
@@ -232,6 +281,18 @@ Automatic classifications include:
 `protocol-candidates.*` groups TX/RX bytes into candidate transactions using a
 configurable idle gap. Use it to populate emulator profile rules after comparing
 IMPACT, TICS, and known-good native FreeDOS captures.
+
+For post-spark diagnosis, check these fields in `suspect.json` and `summary.md`:
+
+- `last_rx_after_last_rhr_ms`
+- `last_rx_after_last_uart_ms`
+- `last_uart_rhr_read`
+- `last_uart_thr_write`
+
+Large positive deltas mean bytes are still arriving from the host side after the
+guest stopped reading the UART data register. With build `96994b1` or later,
+that is stronger evidence than earlier builds because THR/RHR logging is emitted
+inside the common serial register methods.
 
 ## Update Workflow
 
