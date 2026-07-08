@@ -73,6 +73,8 @@ jobs:
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Start-ArlEmulator.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Analyze-LatestArlTrace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactStabilityTrace.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactCycles6000Trace.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactCycles10000Trace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactSafeSerialTrace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactUartDataTrace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Preserve-ArlTraceRun.ps1)) | Out-Null
@@ -158,6 +160,10 @@ jobs:
           cp -R contrib/arl/. "$arl_root/contrib/arl/"
           cp contrib/arl/dosbox-arl-trace.conf "$arl_root/dosbox-arl-trace.conf"
           cp contrib/arl/Launch-ArlImpactStabilityTrace.ps1 "$arl_root/Launch-ArlImpactStabilityTrace.ps1"
+          cp contrib/arl/Launch-ArlImpactCycles6000Trace.ps1 "$arl_root/Launch-ArlImpactCycles6000Trace.ps1"
+          cp contrib/arl/Launch-ArlImpactCycles6000Trace.cmd "$arl_root/Launch-ArlImpactCycles6000Trace.cmd"
+          cp contrib/arl/Launch-ArlImpactCycles10000Trace.ps1 "$arl_root/Launch-ArlImpactCycles10000Trace.ps1"
+          cp contrib/arl/Launch-ArlImpactCycles10000Trace.cmd "$arl_root/Launch-ArlImpactCycles10000Trace.cmd"
           cp contrib/arl/Launch-ArlImpactSafeSerialTrace.ps1 "$arl_root/Launch-ArlImpactSafeSerialTrace.ps1"
           cp contrib/arl/Launch-ArlImpactSafeSerialTrace.cmd "$arl_root/Launch-ArlImpactSafeSerialTrace.cmd"
           cp contrib/arl/Launch-ArlImpactUartDataTrace.ps1 "$arl_root/Launch-ArlImpactUartDataTrace.ps1"

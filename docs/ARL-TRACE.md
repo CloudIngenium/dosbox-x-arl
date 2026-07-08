@@ -61,6 +61,18 @@ The next tuning step is `ARL IMPACT+ RX4000 TRACE`, which keeps the same
 from 3000 to 4000. This tests whether a modest grace window helps without the
 long blocked-UART behavior observed at 10000.
 
+After the UARTDATA evidence showed that valid rows can be received and read but
+still rejected by IMPACT, the next lab matrix should hold `rxdelay:3000`
+constant and vary only CPU timing. Use one burn per DOSBox launch:
+
+- `Launch-ArlImpactStabilityTrace.ps1`: `cycles=fixed 8000`, `rxdelay:3000`
+- `Launch-ArlImpactCycles6000Trace.ps1`: `cycles=fixed 6000`, `rxdelay:3000`
+- `Launch-ArlImpactCycles10000Trace.ps1`: `cycles=fixed 10000`, `rxdelay:3000`
+
+Before each burn, close DOSBox-X, confirm no `dosbox` process remains, and have
+the operator reinitialize ARL/ICS. A passing run is a result row followed by
+`#em`, `INTERFAC.DAT` update, and LPT capture/print job if IMPACT reaches print.
+
 Later 2026-07-08 runs with both `rxdelay:3000` and `rxdelay:4000` reproduced the
 same post-result loop: IMPACT sent `#rd 246`, the ARL returned repeated numeric
 result rows at 2400 baud, and IMPACT kept sending `?` without sending `#em`.
@@ -177,6 +189,8 @@ C:\ARL\DOSBox-X-ARL\Start-ArlTraceRun.ps1 -Session impact
 C:\ARL\DOSBox-X-ARL\Start-ArlTraceRun.ps1 -Session tics
 C:\ARL\DOSBox-X-ARL\Start-ArlTraceRun.ps1 -Session sample-analysis
 C:\ARL\DOSBox-X-ARL\Launch-ArlImpactStabilityTrace.ps1
+C:\ARL\DOSBox-X-ARL\Launch-ArlImpactCycles6000Trace.ps1
+C:\ARL\DOSBox-X-ARL\Launch-ArlImpactCycles10000Trace.ps1
 ```
 
 Each run creates `C:\ARL\diagnostics\<session>-<timestamp>\` with:
@@ -236,8 +250,9 @@ Keep the current lab serial settings while diagnosing:
 
 - ARL cable on `COM5`
 - WCH FIFO disabled or minimized in Device Manager
-- `cycles = fixed 12000`
-- `rxdelay:1000` as the first trace run
+- `cycles = fixed 8000` as baseline, then 6000 and 10000 only as single-variable tests
+- `rxdelay:3000` for the current matrix
+- `arltracelevel:basic` for normal burns; `uartdata` only for short proof captures
 
 The pass/fail gate is post-spark completion: IMPACT must exit the busy state and
 rewrite `C:\ARL\IMPLUS\INTERFAC.DAT`.
