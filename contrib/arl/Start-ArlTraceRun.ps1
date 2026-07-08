@@ -13,7 +13,7 @@ param(
     [string]$EmulatorProfilePath = (Join-Path $PSScriptRoot "profiles\arl3460-baseline.json"),
     [int]$RxDelay = 1000,
     [int]$Cycles = 12000,
-    [ValidateSet("basic", "uart", "full")]
+    [ValidateSet("basic", "uartdata", "uart", "full")]
     [string]$TraceLevel = "basic",
     [int]$HangMs = 15000,
     [string]$RunRoot = "C:\ARL\diagnostics",

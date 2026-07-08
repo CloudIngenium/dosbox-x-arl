@@ -349,6 +349,7 @@ const char *CDirectSerial::traceLevelName() const
 	switch (arltrace_level) {
 	case ARL_TRACE_FULL: return "full";
 	case ARL_TRACE_UART: return "uart";
+	case ARL_TRACE_UARTDATA: return "uartdata";
 	default: return "basic";
 	}
 }
@@ -423,7 +424,13 @@ void CDirectSerial::arlTraceUartEvent(const char *direction, const char *reg,
                                       Bitu port, uint8_t value,
                                       const SerialTraceSnapshot &snapshot)
 {
-	if (!arltrace_fp || arltrace_level < ARL_TRACE_UART) return;
+	if (!arltrace_fp || arltrace_level < ARL_TRACE_UARTDATA) return;
+
+	const bool is_data_register =
+	        (direction && reg &&
+	         ((strcmp(direction, "uart_read") == 0 && strcmp(reg, "RHR") == 0) ||
+	          (strcmp(direction, "uart_write") == 0 && strcmp(reg, "THR") == 0)));
+	if (arltrace_level == ARL_TRACE_UARTDATA && !is_data_register) return;
 
 	traceCommonFields(direction);
 	fprintf(arltrace_fp,
@@ -492,6 +499,7 @@ CDirectSerial::CDirectSerial (Bitu id, CommandLine* cmd)
 			ch = (char)tolower((unsigned char)ch);
 		if (trace_level == "full") arltrace_level = ARL_TRACE_FULL;
 		else if (trace_level == "uart") arltrace_level = ARL_TRACE_UART;
+		else if (trace_level == "uartdata") arltrace_level = ARL_TRACE_UARTDATA;
 		else arltrace_level = ARL_TRACE_BASIC;
 	}
 	getBituSubstring("arltracehangms:", &arltrace_hang_ms, cmd);

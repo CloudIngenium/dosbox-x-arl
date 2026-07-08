@@ -34,12 +34,15 @@ serial1 = directserial realport:COM5 rxdelay:1000 arltracelevel:basic arltracese
 
 - `arltrace:<file>` appends one NDJSON event per line. Omitting it preserves
   upstream `directserial` behavior.
-- `arltracelevel:basic|uart|full` controls detail. `basic` records TX/RX,
-  config, modem lines, and errors. `uart` adds guest UART register reads/writes.
-  `full` adds host serial DCB, timeout, and modem-control snapshots.
-  Use `basic` for normal lab runs. Use `uart` or `full` only for short,
-  controlled windows because a disconnected or waiting DOS program can poll UART
-  registers fast enough to create multi-GB traces.
+- `arltracelevel:basic|uartdata|uart|full` controls detail. `basic` records
+  TX/RX, config, modem lines, and errors. `uartdata` adds only guest UART data
+  register access (`THR` writes and `RHR` reads), which is the preferred mode
+  for short post-spark IMPACT diagnosis. `uart` adds every guest UART register
+  read/write. `full` adds host serial DCB, timeout, and modem-control snapshots.
+  Use `basic` for normal lab runs. Use `uartdata` for controlled diagnostic
+  burns. Use `uart` or `full` only for very short windows because a disconnected
+  or waiting DOS program can poll UART registers fast enough to create multi-GB
+  traces.
 - `arltracesession:<label>` labels the run, for example `impact`, `tics`,
   `status-only`, or `sample-analysis`.
 - `arltracehangms:<ms>` emits `hang_snapshot` when no relevant TX/RX occurs for
@@ -53,7 +56,9 @@ Trace v2 includes:
 - baud rate, data bits, parity, and stop bits requested by the DOS program
 - RX error bits for break, framing, parity, and overrun
 - RTS, DTR, CTS, DSR, DCD, RI, and break state
+- guest UART data-register access for THR/RHR in `uartdata`
 - guest UART register access for THR/RHR, IER, ISR/FCR, LCR, MCR, LSR, MSR, SPR
+  in `uart` and `full`
 - FIFO usage, IRQ state, `rx_state`, `rx_retry`, and error counters
 - Windows host DCB, timeouts, flow-control flags, and modem status in `full`
 

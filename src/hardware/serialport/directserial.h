@@ -58,8 +58,9 @@ public:
 private:
 	enum ArlTraceLevel {
 		ARL_TRACE_BASIC = 0,
-		ARL_TRACE_UART = 1,
-		ARL_TRACE_FULL = 2
+		ARL_TRACE_UARTDATA = 1,
+		ARL_TRACE_UART = 2,
+		ARL_TRACE_FULL = 3
 	};
 
 	COMPORT comport;
