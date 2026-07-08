@@ -4,7 +4,8 @@ param(
     [int]$RxDelay = 3000,
     [string]$PrinterName = "EPSON LX-350",
     [switch]$NoAutoPrintLpt,
-    [switch]$NoLptFormFeed
+    [switch]$NoLptFormFeed,
+    [switch]$NoLaunch
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,24 +28,26 @@ if (-not (Test-Path -Path $DosboxExe -PathType Leaf)) {
     }
 }
 
-$args = @(
-    "-Session", "sample-analysis",
-    "-DosboxExe", $DosboxExe,
-    "-TraceLevel", "basic",
-    "-Cycles", "$Cycles",
-    "-RxDelay", "$RxDelay",
-    "-HangMs", "30000"
-)
+$runArgs = @{
+    Session = "sample-analysis"
+    DosboxExe = $DosboxExe
+    TraceLevel = "basic"
+    Cycles = $Cycles
+    RxDelay = $RxDelay
+    HangMs = 30000
+}
 
 if (-not $NoAutoPrintLpt) {
-    $args += @(
-        "-AutoPrintLpt",
-        "-PrinterName", $PrinterName,
-        "-LptIdleMs", "2500"
-    )
+    $runArgs.AutoPrintLpt = $true
+    $runArgs.PrinterName = $PrinterName
+    $runArgs.LptIdleMs = 2500
     if ($NoLptFormFeed) {
-        $args += "-NoLptFormFeed"
+        $runArgs.NoLptFormFeed = $true
     }
 }
 
-& $launcher @args
+if ($NoLaunch) {
+    $runArgs.NoLaunch = $true
+}
+
+& $launcher @runArgs
