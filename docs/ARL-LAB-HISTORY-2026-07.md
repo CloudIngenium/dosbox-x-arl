@@ -191,6 +191,12 @@ Findings and fixes:
   auto-print/capture watcher behavior.
 - `Start-ArlTraceRun.ps1` was fixed to generate a proper PowerShell array for
   watcher arguments.
+- On `2026-07-08 16:43`, the HP still had stale `.ps1` toolkit copies and
+  reproduced the `ParentPid` parsing error in
+  `sample-analysis-20260708-163002\lpt-watch.err.log`. The corrected
+  `contrib/arl/*.ps1` scripts were recopied to `C:\ARL\DOSBox-X-ARL\`, and a
+  smoke test of `Watch-ArlLptCapture.ps1` with a fake parent PID exited cleanly
+  without the parameter error.
 
 Expected behavior after the fix:
 
