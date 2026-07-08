@@ -9,6 +9,8 @@ param(
 
     [string]$CaptureName = "LPTCAP.PRN",
 
+    [switch]$AppendFormFeed,
+
     [switch]$Send
 )
 
@@ -50,6 +52,15 @@ if ($null -eq $printer) {
 
 $capture = Get-Item -Path $CapturePath
 $previewBytes = [System.IO.File]::ReadAllBytes($capture.FullName)
+$printBytes = $previewBytes
+if ($AppendFormFeed -and ($printBytes.Length -eq 0 -or $printBytes[$printBytes.Length - 1] -ne 12)) {
+    $withFormFeed = New-Object byte[] ($printBytes.Length + 1)
+    if ($printBytes.Length -gt 0) {
+        [Array]::Copy($printBytes, $withFormFeed, $printBytes.Length)
+    }
+    $withFormFeed[$withFormFeed.Length - 1] = 12
+    $printBytes = $withFormFeed
+}
 $previewLength = [Math]::Min(300, $previewBytes.Length)
 $preview = ""
 if ($previewLength -gt 0) {
@@ -66,6 +77,9 @@ if ($previewLength -gt 0) {
 Write-Host "Capture: $($capture.FullName)"
 Write-Host "Bytes: $($capture.Length)"
 Write-Host "Printer: $($printer.Name) on $($printer.PortName)"
+if ($AppendFormFeed -and $printBytes.Length -ne $previewBytes.Length) {
+    Write-Host "Print bytes: $($printBytes.Length) (appended form feed)"
+}
 Write-Host "Preview:"
 Write-Host $preview
 
@@ -156,5 +170,5 @@ if (-not ([System.Management.Automation.PSTypeName]"ArlRawPrinter").Type) {
     Add-Type -TypeDefinition $source
 }
 
-[ArlRawPrinter]::SendBytes($printer.Name, "ARL IMPACT+ LPT capture", $previewBytes)
-Write-Host "Sent $($previewBytes.Length) RAW bytes to $($printer.Name)."
+[ArlRawPrinter]::SendBytes($printer.Name, "ARL IMPACT+ LPT capture", $printBytes)
+Write-Host "Sent $($printBytes.Length) RAW bytes to $($printer.Name)."

@@ -106,9 +106,14 @@ jobs:
             -SpoolDir "$PWD\arl-lpt-watch-test\print-jobs" `
             -ParentPid 999999 `
             -IdleMs 100 `
-            -PollMs 50
+            -PollMs 50 `
+            -AppendFormFeed
           if (-not (Get-ChildItem arl-lpt-watch-test\print-jobs -Filter *.prn)) {
             throw 'LPT watcher did not spool a print job'
+          }
+          $manifest = Get-ChildItem arl-lpt-watch-test\print-jobs -Filter *.json | Select-Object -First 1 | Get-Content -Raw | ConvertFrom-Json
+          if (-not $manifest.append_form_feed) {
+            throw 'LPT watcher manifest did not record append_form_feed'
           }
           pwsh -NoProfile -File contrib\arl\Start-ArlEmulator.ps1 `
             -ProfilePath contrib\arl\profiles\arl3460-baseline.json `

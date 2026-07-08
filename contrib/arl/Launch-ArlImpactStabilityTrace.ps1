@@ -3,7 +3,8 @@ param(
     [int]$Cycles = 8000,
     [int]$RxDelay = 3000,
     [string]$PrinterName = "EPSON LX-350",
-    [switch]$NoAutoPrintLpt
+    [switch]$NoAutoPrintLpt,
+    [switch]$NoLptFormFeed
 )
 
 $ErrorActionPreference = "Stop"
@@ -41,6 +42,9 @@ if (-not $NoAutoPrintLpt) {
         "-PrinterName", $PrinterName,
         "-LptIdleMs", "2500"
     )
+    if ($NoLptFormFeed) {
+        $args += "-NoLptFormFeed"
+    }
 }
 
 & $launcher @args

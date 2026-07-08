@@ -16,6 +16,8 @@ param(
 
     [int]$MinBytes = 1,
 
+    [switch]$AppendFormFeed,
+
     [switch]$Send
 )
 
@@ -74,6 +76,7 @@ Write-Log "Watching LPT capture: $CapturePath"
 Write-Log "Spool directory: $SpoolDir"
 Write-Log "Printer: $PrinterName"
 Write-Log "Send enabled: $Send"
+Write-Log "Append form feed: $AppendFormFeed"
 if ($ParentPid -gt 0) {
     Write-Log "Parent DOSBox PID: $ParentPid"
 }
@@ -129,6 +132,7 @@ while ($true) {
                 sha256 = $hash.Hash
                 printer_name = $PrinterName
                 send_enabled = [bool]$Send
+                append_form_feed = [bool]$AppendFormFeed
                 parent_pid = if ($ParentPid -gt 0) { $ParentPid } else { $null }
             }
             $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path $manifestPath -Encoding UTF8
@@ -136,7 +140,15 @@ while ($true) {
             if ($Send) {
                 Write-Log "Sending $jobPath to $PrinterName"
                 try {
-                    & $PrintScriptPath -CapturePath $jobPath -PrinterName $PrinterName -Send *>&1 |
+                    $printArgs = @(
+                        "-CapturePath", $jobPath,
+                        "-PrinterName", $PrinterName,
+                        "-Send"
+                    )
+                    if ($AppendFormFeed) {
+                        $printArgs += "-AppendFormFeed"
+                    }
+                    & $PrintScriptPath @printArgs *>&1 |
                         Set-Content -Path $printLogPath -Encoding UTF8
                     Write-Log "Printed $jobPath"
                 } catch {

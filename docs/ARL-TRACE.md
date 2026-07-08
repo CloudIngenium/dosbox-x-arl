@@ -181,7 +181,9 @@ When `Start-ArlTraceRun.ps1` is launched with `-AutoPrintLpt`, it starts
 `Watch-ArlLptCapture.ps1` alongside DOSBox-X. The watcher keeps `LPTCAP.PRN` as
 the full raw capture, copies each stable append window to `print-jobs\*.prn`,
 writes JSON/SHA256 metadata for later processing, and sends that job to
-`Print-ArlLptCapture.ps1 -Send`.
+`Print-ArlLptCapture.ps1 -Send`. Auto-print appends a form-feed byte only to
+the bytes sent to the Epson so matrix-printer pages eject immediately; the
+captured `LPTCAP.PRN` and saved `print-jobs\*.prn` remain unchanged.
 
 Keep the current lab serial settings while diagnosing:
 
@@ -246,7 +248,8 @@ The same run also captured `LPTCAP.PRN` with a complete ASCII IMPACT report.
 The HP bench PC validated dry-run printing to `EPSON LX-350` on `USB001`;
 `Watch-ArlLptCapture.ps1` now preserves each stable append as
 `print-jobs\*.prn` plus JSON/SHA256 metadata before optionally sending the raw
-bytes to the printer.
+bytes to the printer. That real report had no form-feed byte, so the toolkit
+adds form-feed on send by default while preserving the raw capture on disk.
 
 ## Safe ARL Emulator
 

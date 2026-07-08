@@ -21,6 +21,7 @@ param(
     [string]$PrinterName = "EPSON LX-350",
     [int]$LptIdleMs = 2500,
     [int]$LptPollMs = 500,
+    [switch]$NoLptFormFeed,
     [switch]$Wait,
     [switch]$NoLaunch
 )
@@ -158,6 +159,7 @@ $metadata = [pscustomobject]@{
     printer_name = if ($AutoPrintLpt) { $PrinterName } else { $null }
     lpt_idle_ms = if ($AutoPrintLpt) { $LptIdleMs } else { $null }
     lpt_spool_dir = if ($AutoPrintLpt) { $lptSpoolDir } else { $null }
+    lpt_append_form_feed = if ($AutoPrintLpt) { -not [bool]$NoLptFormFeed } else { $null }
 }
 $metadata | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-ArlPath $runDir "run-metadata.json") -Encoding UTF8
 
@@ -213,6 +215,9 @@ if ($AutoPrintLpt -and -not $usesEmulator) {
         "-PollMs", "$LptPollMs",
         "-Send"
     )
+    if (-not $NoLptFormFeed) {
+        $watcherArgs += "-AppendFormFeed"
+    }
     $watcherProcess = Start-Process -FilePath $powerShellExe `
         -ArgumentList $watcherArgs `
         -RedirectStandardOutput $lptWatchLogPath `
