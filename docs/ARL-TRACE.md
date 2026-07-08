@@ -41,6 +41,15 @@ It keeps the same low-overhead trace and `cycles=fixed 8000`, but raises
 tests whether IMPACT needs a longer grace window after post-spark result bursts
 before DOSBox-X forces receive/overrun behavior.
 
+The 2026-07-08 `SAFE SERIAL TRACE` run
+`C:\ARL\diagnostics\sample-analysis-20260708-154724` did not improve the
+analysis path. IMPACT showed no accepted readings, while the trace showed
+`TX bytes: 788`, `RX bytes: 10694`, no RX framing/parity/overrun errors, and a
+single `#rd 246` result transaction followed by 104 `?` polls. The ARL repeated
+a parseable numeric result row, but IMPACT never sent `#em`. Treat
+`rxdelay:10000` as worse than the current `rxdelay:3000` stability profile
+unless later evidence contradicts this.
+
 Build `96994b1` moved THR/RHR `uartdata` tracing to `CSerial::Write_THR()` and
 `CSerial::Read_RHR()`. That matters because IMPACT can use BIOS/INT14 paths that
 do not necessarily pass through the I/O-port wrappers where earlier builds
