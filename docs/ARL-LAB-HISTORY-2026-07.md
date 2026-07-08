@@ -796,3 +796,60 @@ LPT note:
   recopied to `C:\ARL\DOSBox-X-ARL\`.
 - A smoke test with `-ExecutionPolicy Bypass` confirmed the corrected watcher
   accepts `-SpoolDir` and exits cleanly when the parent PID is gone.
+
+## 2026-07-08 17:46 CYCLES6000 Multi-Burn Failure
+
+Same run folder:
+
+```text
+C:\ARL\diagnostics\sample-analysis-20260708-173311
+```
+
+Operator sequence:
+
+- Approximately two burns in `AL / AL`.
+- Then switched to `AL / SS-413BD`.
+- Four SS-413BD burns displayed correctly.
+- The fifth SS-413BD burn stuck with the prior four rows still on screen.
+
+Analyzer output:
+
+- `#rd=8`, `#em=7`, `?=95`.
+- RX errors: zero.
+- TX errors: zero.
+- Trace did not show a Windows receive loss; it showed a valid result row
+  repeated while IMPACT sent `?`.
+- `result-transaction-comparison.md` classified candidate 33 as a post-result
+  poll loop.
+- The repeated row was:
+
+```text
+21.146,2.417,0.590,0.246,0.560,11.943,0.531,8.926,0.420,15.152,2.828,2.012,2.352,0.769,8.926 231
+```
+
+Checksum check:
+
+- Claimed checksum: `231`.
+- Computed checksum: `231`.
+- Therefore the rejected row is checksum-valid.
+
+Interpretation:
+
+- This is not a silent ARL, missing RX, or bad-checksum failure.
+- `6000/3000` is still the best observed setting, but it can fall into an
+  IMPACT acceptance loop after several successful burns.
+- The next parameter test should keep `rxdelay=3000` and sweep cycles near
+  6000 rather than jumping back to `10000`.
+
+Next launchers added:
+
+- `ARL IMPACT+ CYCLES5000 TRACE` (`cycles=fixed 5000`, `rxdelay:3000`).
+- `ARL IMPACT+ CYCLES7000 TRACE` (`cycles=fixed 7000`, `rxdelay:3000`).
+
+Recommended test order:
+
+1. Close the stuck DOSBox-X window to stop the `?` loop.
+2. Restart/reinitialize the ARL/ICS side if the lab procedure allows it.
+3. Run `CYCLES5000 TRACE` on the same SS-413BD workflow and try five burns.
+4. If 5000 fails, run `CYCLES7000 TRACE` under the same workflow.
+5. Only after those two tests, revisit `rxdelay` changes.
