@@ -16,6 +16,8 @@ param(
     [ValidateSet("basic", "uartdata", "uart", "full")]
     [string]$TraceLevel = "basic",
     [int]$HangMs = 15000,
+    [ValidateRange(0, 4096)]
+    [int]$TraceMaxMb = 64,
     [string]$RunRoot = "C:\ARL\diagnostics",
     [switch]$AutoPrintLpt,
     [string]$PrinterName = "EPSON LX-350",
@@ -87,7 +89,8 @@ if ($usesEmulator) {
     $serialLine = "serial1 = nullmodem server:$EmulatorHost port:$EmulatorPort transparent:1 rxdelay:$RxDelay"
     $serialComment = "# Emulator session: nullmodem over localhost. This never opens $ComPort."
 } else {
-    $serialLine = "serial1 = directserial realport:$ComPort rxdelay:$RxDelay arltracelevel:$TraceLevel arltracesession:$Session arltracehangms:$HangMs arltrace:$tracePath"
+    $traceLimitOption = if ($TraceMaxMb -gt 0) { " arltracemaxmb:$TraceMaxMb" } else { "" }
+    $serialLine = "serial1 = directserial realport:$ComPort rxdelay:$RxDelay arltracelevel:$TraceLevel arltracesession:$Session arltracehangms:$HangMs$traceLimitOption arltrace:$tracePath"
     $serialComment = "# Direct ARL session: opens the real Windows serial port."
 }
 
@@ -159,6 +162,7 @@ $metadata = [pscustomobject]@{
     cycles = $Cycles
     trace_level = if ($usesEmulator) { $null } else { $TraceLevel }
     hang_ms = $HangMs
+    trace_max_mb = if ($usesEmulator) { $null } else { $TraceMaxMb }
     lpt_capture = $lptPath
     auto_print_lpt = [bool]$AutoPrintLpt
     printer_name = if ($AutoPrintLpt) { $PrinterName } else { $null }

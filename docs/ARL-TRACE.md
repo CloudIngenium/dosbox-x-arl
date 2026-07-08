@@ -119,6 +119,10 @@ serial1 = directserial realport:COM5 rxdelay:1000 arltracelevel:basic arltracese
   `status-only`, or `sample-analysis`.
 - `arltracehangms:<ms>` emits `hang_snapshot` when no relevant TX/RX occurs for
   the configured interval.
+- `arltracemaxmb:<mb>` closes the trace after the file reaches the configured
+  size limit. `Start-ArlTraceRun.ps1` uses `64` MB by default so a stuck polling
+  loop preserves evidence without filling the disk. Use `0` only for short,
+  supervised captures where an unlimited trace is intentional.
 
 Trace v2 includes:
 

@@ -49,6 +49,7 @@ bool CDirectSerial::traceOpenCurrentPath()
 	arltrace_start_tick = GetTicks();
 	arltrace_last_io_tick = arltrace_start_tick;
 	arltrace_last_hang_tick = arltrace_start_tick;
+	arltrace_limit_reached = false;
 	arltrace_fp = fopen(arltrace_path.c_str(), "ab");
 	if (!arltrace_fp) {
 		LOG_MSG("Serial%d: ARL trace file \"%s\" could not be opened.",
@@ -103,6 +104,34 @@ void CDirectSerial::traceCommonFields(const char *event)
 	traceJsonString(event);
 }
 
+void CDirectSerial::traceFlush()
+{
+	if (!arltrace_fp) return;
+	fflush(arltrace_fp);
+	traceCheckLimit();
+}
+
+void CDirectSerial::traceCheckLimit()
+{
+	if (!arltrace_fp || !arltrace_max_bytes || arltrace_limit_reached) return;
+
+	const long offset = ftell(arltrace_fp);
+	if (offset < 0 || (unsigned long long)offset < arltrace_max_bytes) return;
+
+	arltrace_limit_reached = true;
+	traceCommonFields("trace_limit");
+	fprintf(arltrace_fp,
+	        ",\"message\":\"ARL trace size limit reached; closing trace\","
+	        "\"current_bytes\":%ld,\"max_bytes\":%llu}\n",
+	        offset, arltrace_max_bytes);
+	fflush(arltrace_fp);
+	fclose(arltrace_fp);
+	arltrace_fp = nullptr;
+	trace_last_error = "trace_limit";
+	LOG_MSG("Serial%d: ARL trace size limit reached; trace file closed.",
+	        (int)COMNUMBER);
+}
+
 void CDirectSerial::traceMessage(const char *event, const char *message)
 {
 	if (!arltrace_fp) return;
@@ -111,7 +140,7 @@ void CDirectSerial::traceMessage(const char *event, const char *message)
 	fputs(",\"message\":", arltrace_fp);
 	traceJsonString(message);
 	fputs("}\n", arltrace_fp);
-	fflush(arltrace_fp);
+	traceFlush();
 }
 
 const char *CDirectSerial::traceAscii(uint8_t val, char *buffer, size_t buffer_size)
@@ -173,7 +202,7 @@ void CDirectSerial::traceByte(const char *event, uint8_t val, uint8_t error)
 	        getCD() ? "true" : "false",
 	        getRI() ? "true" : "false",
 	        trace_break ? "true" : "false");
-	fflush(arltrace_fp);
+	traceFlush();
 }
 
 void CDirectSerial::traceConfig(int baudrate, char parity, uint8_t stopbits,
@@ -192,7 +221,7 @@ void CDirectSerial::traceConfig(int baudrate, char parity, uint8_t stopbits,
 	        "\"stop_bits\":%u,\"accepted\":%s}\n",
 	        trace_baudrate, (unsigned int)trace_bytelength, trace_parity,
 	        (unsigned int)trace_stopbits, accepted ? "true" : "false");
-	fflush(arltrace_fp);
+	traceFlush();
 	traceHostState("host_config");
 }
 
@@ -215,7 +244,7 @@ void CDirectSerial::traceModemStatus(int status)
 	        trace_rts ? "true" : "false",
 	        trace_dtr ? "true" : "false",
 	        trace_break ? "true" : "false");
-	fflush(arltrace_fp);
+	traceFlush();
 }
 
 void CDirectSerial::traceControlLines(const char *event)
@@ -233,7 +262,7 @@ void CDirectSerial::traceControlLines(const char *event)
 	        getCD() ? "true" : "false",
 	        getRI() ? "true" : "false",
 	        trace_break ? "true" : "false");
-	fflush(arltrace_fp);
+	traceFlush();
 }
 
 void CDirectSerial::traceSnapshot(const char *event, const SerialTraceSnapshot &snapshot)
@@ -267,7 +296,7 @@ void CDirectSerial::traceSnapshot(const char *event, const SerialTraceSnapshot &
 	        snapshot.loopback ? "true" : "false",
 	        (unsigned int)trace_tx_count, (unsigned int)trace_rx_count,
 	        (unsigned int)trace_tx_errors);
-	fflush(arltrace_fp);
+	traceFlush();
 }
 
 void CDirectSerial::traceHostState(const char *event)
@@ -310,7 +339,7 @@ void CDirectSerial::traceHostState(const char *event)
 	        state.write_total_timeout_multiplier,
 	        state.write_total_timeout_constant,
 	        state.modem_status);
-	fflush(arltrace_fp);
+	traceFlush();
 }
 
 void CDirectSerial::traceHangSnapshot()
@@ -462,7 +491,7 @@ void CDirectSerial::arlTraceUartEvent(const char *direction, const char *reg,
 	        (unsigned int)snapshot.fcr, (unsigned int)snapshot.waiting_interrupts,
 	        snapshot.irq_active ? "true" : "false",
 	        snapshot.loopback ? "true" : "false");
-	fflush(arltrace_fp);
+	traceFlush();
 }
 
 CDirectSerial::CDirectSerial (Bitu id, CommandLine* cmd)
@@ -504,6 +533,10 @@ CDirectSerial::CDirectSerial (Bitu id, CommandLine* cmd)
 	}
 	getBituSubstring("arltracehangms:", &arltrace_hang_ms, cmd);
 	if (arltrace_hang_ms > 3600000) arltrace_hang_ms = 3600000;
+	Bitu arltrace_max_mb = 0;
+	getBituSubstring("arltracemaxmb:", &arltrace_max_mb, cmd);
+	if (arltrace_max_mb > 4096) arltrace_max_mb = 4096;
+	arltrace_max_bytes = (unsigned long long)arltrace_max_mb * 1024ULL * 1024ULL;
 
 	if (cmd->FindStringBegin("arltrace:", trace_path, false)) {
 		traceOpen(trace_path);
