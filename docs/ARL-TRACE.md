@@ -11,6 +11,10 @@ must not be treated as a replacement for the real ARL until protocol bytes are
 confirmed from lab traces. Do not add manual ICS command senders, synchronize, or
 reset helpers.
 
+For the chronological lab handoff log, including tests, hypotheses, failed
+paths, trace evidence, and next steps, read
+[`ARL-LAB-HISTORY-2026-07.md`](./ARL-LAB-HISTORY-2026-07.md).
+
 ## Current Lab Build
 
 As of 2026-07-08, the HP bench PC (`LABORATORIO-ARL`) is using ARL trace build
