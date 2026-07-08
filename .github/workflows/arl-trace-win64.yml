@@ -158,6 +158,7 @@ jobs:
           cp contrib/arl/Launch-ArlImpactStabilityTrace.ps1 "$arl_root/Launch-ArlImpactStabilityTrace.ps1"
           cp contrib/arl/Launch-ArlImpactSafeSerialTrace.ps1 "$arl_root/Launch-ArlImpactSafeSerialTrace.ps1"
           cp contrib/arl/Launch-ArlImpactSafeSerialTrace.cmd "$arl_root/Launch-ArlImpactSafeSerialTrace.cmd"
+          cp contrib/arl/Launch-ArlImpactRx4000Trace.cmd "$arl_root/Launch-ArlImpactRx4000Trace.cmd"
           cp contrib/arl/Preserve-ArlTraceRun.ps1 "$arl_root/Preserve-ArlTraceRun.ps1"
           cp contrib/arl/Print-ArlLptCapture.ps1 "$arl_root/Print-ArlLptCapture.ps1"
           cp contrib/arl/Watch-ArlLptCapture.ps1 "$arl_root/Watch-ArlLptCapture.ps1"

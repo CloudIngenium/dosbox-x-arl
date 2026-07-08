@@ -50,6 +50,11 @@ a parseable numeric result row, but IMPACT never sent `#em`. Treat
 `rxdelay:10000` as worse than the current `rxdelay:3000` stability profile
 unless later evidence contradicts this.
 
+The next tuning step is `ARL IMPACT+ RX4000 TRACE`, which keeps the same
+`cycles=fixed 8000` and low-overhead trace but raises `rxdelay` only slightly
+from 3000 to 4000. This tests whether a modest grace window helps without the
+long blocked-UART behavior observed at 10000.
+
 Build `96994b1` moved THR/RHR `uartdata` tracing to `CSerial::Write_THR()` and
 `CSerial::Read_RHR()`. That matters because IMPACT can use BIOS/INT14 paths that
 do not necessarily pass through the I/O-port wrappers where earlier builds
