@@ -35,6 +35,10 @@ function Join-ArlPath([string]$Base, [string]$Child) {
     return Join-Path $Base $Child
 }
 
+function Quote-PowerShellLiteral([string]$Value) {
+    return "'" + $Value.Replace("'", "''") + "'"
+}
+
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $runDir = Join-ArlPath $RunRoot "$Session-$stamp"
 New-Item -ItemType Directory -Force -Path $runDir | Out-Null
@@ -47,6 +51,7 @@ $lptPath = Join-ArlPath $runDir "LPTCAP.PRN"
 $lptSpoolDir = Join-ArlPath $runDir "print-jobs"
 $lptWatchLogPath = Join-ArlPath $runDir "lpt-watch.log"
 $lptWatchErrPath = Join-ArlPath $runDir "lpt-watch.err.log"
+$lptWatchLaunchPath = Join-ArlPath $runDir "lpt-watch-launch.ps1"
 $interfacPath = Join-ArlPath $ImplusPath "INTERFAC.DAT"
 $usesEmulator = $Session -eq "impact-emulator" -or $Session -eq "tics-emulator"
 $usesTics = $Session -eq "tics" -or $Session -eq "tics-emulator"
@@ -160,6 +165,7 @@ $metadata = [pscustomobject]@{
     lpt_idle_ms = if ($AutoPrintLpt) { $LptIdleMs } else { $null }
     lpt_spool_dir = if ($AutoPrintLpt) { $lptSpoolDir } else { $null }
     lpt_append_form_feed = if ($AutoPrintLpt) { -not [bool]$NoLptFormFeed } else { $null }
+    lpt_watcher_launch = if ($AutoPrintLpt) { $lptWatchLaunchPath } else { $null }
 }
 $metadata | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-ArlPath $runDir "run-metadata.json") -Encoding UTF8
 
@@ -203,9 +209,6 @@ $watcherProcess = $null
 if ($AutoPrintLpt -and -not $usesEmulator) {
     $powerShellExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
     $watcherArgs = @(
-        "-NoProfile",
-        "-ExecutionPolicy", "Bypass",
-        "-File", $watcherScriptPath,
         "-CapturePath", $lptPath,
         "-PrinterName", $PrinterName,
         "-SpoolDir", $lptSpoolDir,
@@ -218,8 +221,22 @@ if ($AutoPrintLpt -and -not $usesEmulator) {
     if (-not $NoLptFormFeed) {
         $watcherArgs += "-AppendFormFeed"
     }
+
+    $watcherLaunch = @(
+        '$ErrorActionPreference = "Stop"',
+        '$watcherArgs = @('
+    )
+    foreach ($arg in $watcherArgs) {
+        $watcherLaunch += "    $(Quote-PowerShellLiteral $arg)"
+    }
+    $watcherLaunch += @(
+        ')',
+        "& $(Quote-PowerShellLiteral $watcherScriptPath) @watcherArgs"
+    )
+    $watcherLaunch | Set-Content -Path $lptWatchLaunchPath -Encoding UTF8
+
     $watcherProcess = Start-Process -FilePath $powerShellExe `
-        -ArgumentList $watcherArgs `
+        -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $lptWatchLaunchPath) `
         -RedirectStandardOutput $lptWatchLogPath `
         -RedirectStandardError $lptWatchErrPath `
         -WindowStyle Hidden `
