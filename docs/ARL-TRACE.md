@@ -137,6 +137,7 @@ Each run creates `C:\ARL\diagnostics\<session>-<timestamp>\` with:
 - `serial.ndjson`
 - `dosbox.log`
 - `run-metadata.json`
+- `LPTCAP.PRN` if IMPACT prints to LPT1
 - copied `INTERFAC.DAT.after` when `-Wait` is used and the file exists
 
 Preserve important runs before cleanup or repeated retries:
@@ -149,6 +150,30 @@ C:\ARL\DOSBox-X-ARL\Preserve-ArlTraceRun.ps1 `
 
 The preserved copy includes a manifest and `SHA256SUMS.txt` under
 `C:\ARL\diagnostics\preserved\`.
+
+The lab profile intentionally captures LPT1 to `LPTCAP.PRN` instead of printing
+directly:
+
+```ini
+parallel1 = file append:C:\ARL\diagnostics\<run>\LPTCAP.PRN timeout:2000
+```
+
+This preserves the raw IMPACT report. To print a captured report after
+confirming it is the desired run:
+
+```powershell
+C:\ARL\DOSBox-X-ARL\Print-ArlLptCapture.ps1 `
+  -RunPath C:\ARL\diagnostics\sample-analysis-YYYYMMDD-HHMMSS
+
+C:\ARL\DOSBox-X-ARL\Print-ArlLptCapture.ps1 `
+  -RunPath C:\ARL\diagnostics\sample-analysis-YYYYMMDD-HHMMSS `
+  -PrinterName "EPSON LX-350" `
+  -Send
+```
+
+The first command is a dry run and shows a preview. The second sends the raw
+captured bytes to the installed Windows printer. On 2026-07-08 the HP bench PC
+had `EPSON LX-350` installed on `USB001`.
 
 Keep the current lab serial settings while diagnosing:
 

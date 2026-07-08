@@ -74,6 +74,7 @@ jobs:
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Analyze-LatestArlTrace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactStabilityTrace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Preserve-ArlTraceRun.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Print-ArlLptCapture.ps1)) | Out-Null
           pwsh -NoProfile -File contrib\arl\Analyze-ArlTrace.ps1 `
             -TracePath contrib\arl\fixtures\sample-trace.ndjson `
             -OutDir arl-toolkit-test
@@ -131,6 +132,7 @@ jobs:
           cp contrib/arl/dosbox-arl-trace.conf "$arl_root/dosbox-arl-trace.conf"
           cp contrib/arl/Launch-ArlImpactStabilityTrace.ps1 "$arl_root/Launch-ArlImpactStabilityTrace.ps1"
           cp contrib/arl/Preserve-ArlTraceRun.ps1 "$arl_root/Preserve-ArlTraceRun.ps1"
+          cp contrib/arl/Print-ArlLptCapture.ps1 "$arl_root/Print-ArlLptCapture.ps1"
 
           ./scripts/arl-export-patch-stack.sh "$UPSTREAM_TAG" "$package_root/arl-patches"
 
