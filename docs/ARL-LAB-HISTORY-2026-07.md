@@ -433,6 +433,76 @@ Conclusion:
   - clean post-result loop at 2400 baud with valid repeated rows; and
   - dirty/recovery status-read failure at 9600 baud after closing mid-loop.
 
+### Run `sample-analysis-20260708-163002`
+
+Profile:
+
+- `ARL IMPACT+ UARTDATA TRACE`.
+- `rxdelay:3000`, `cycles=fixed 8000`, `arltracelevel:uartdata`.
+
+Symptom:
+
+- The burn finished at the ARL, but IMPACT stayed on "Please Run Sample" and did
+  not show the analysis values.
+
+Trace facts:
+
+- Active DOSBox process used:
+  `C:\ARL\diagnostics\sample-analysis-20260708-163002\dosbox-sample-analysis.conf`.
+- `serial.ndjson` was 8.55 MB, 19,263 trace lines.
+- TX/RX summary:
+  - `tx=753`.
+  - `rx=7220`.
+  - guest UART `THR=753`.
+  - guest UART `RHR=7220`.
+  - `rx_after_rd=6983`.
+  - `rhr_after_rd=6983`.
+- Error/FIFO summary:
+  - `rx_error_bits=0` for all 7,220 RX bytes.
+  - `max_errors_in_fifo=0`.
+  - `max_overrun_errors=0`.
+- Protocol summary:
+  - IMPACT sent one `#rd 246`.
+  - The ARL returned a valid numeric row beginning with `#`.
+  - IMPACT then sent 70 `?` retries.
+  - The ARL repeated the same numeric result row after each `?`.
+  - IMPACT never sent `#em`.
+- Result row seen repeatedly:
+
+  ```text
+  #16.884,2.592,0.581,0.288,0.606,12.364,1.082,13.719,0.805,12.794,2.742,5.244,2.478,0.963,13.719 113
+  ```
+
+- Checksum was valid using the same rule as accepted rows: modulo-256 of the
+  ASCII payload without leading `#`, including the trailing space before the
+  checksum.
+- `INTERFAC.DAT` did not update; it remained at `2026-07-08 15:05:43`.
+- `TELEX.DAT` and `IMPACT.INI` were touched at launch time
+  (`2026-07-08 16:30:22`) but no accepted analysis file write occurred.
+
+Comparison to mixed-good run `sample-analysis-20260708-145951`:
+
+- Accepted transactions:
+  - `#rd 246`.
+  - ARL result row.
+  - IMPACT sends `#em 242` about 60 ms later.
+  - IMPACT continues with `pa`, `#m1`, `cl`, `dc`, `m2`, `we`.
+- Rejected/stuck transactions:
+  - `#rd 246`.
+  - ARL result row.
+  - IMPACT sends `?` within a few milliseconds.
+  - ARL repeats the same row.
+  - No `#em`.
+
+Conclusion:
+
+- This trace rejects the theory that Windows/DOSBox receives bytes but fails to
+  deliver them to the DOS guest during the main loop.
+- Host RX and guest `RHR` reads matched exactly in the loop.
+- The clean failure is now best described as: IMPACT receives a syntactically
+  valid result row, rejects it at the application/protocol state level, sends
+  `?`, and never transitions to `#em`.
+
 ## Protocol Discoveries
 
 Command checksum:
@@ -448,15 +518,23 @@ Important implication:
 
 - The ARL is not obviously returning corrupt ASCII result rows during the
   repeated-result loop.
-- If IMPACT rejects them, the reason may be UART timing/state, expected result
-  sequence, missing terminator, prior state, or an IMPACT parser/state-machine
-  condition not visible from `basic` trace alone.
+- If IMPACT rejects them, the reason is now more likely an IMPACT/ICS
+  state-machine or expected-result condition than host RX loss.
 
 Accepted-result discriminator:
 
 - Good result transactions include `#em` after `#rd`.
 - Stuck result transactions do not include `#em`.
 - The repeated `?` polling loop is the signature of a not-accepted result.
+
+UART delivery discriminator:
+
+- `sample-analysis-20260708-163002` proved host RX and guest UART `RHR` reads
+  matched exactly during the repeated-result loop.
+- That means the current clean failure is not "DOSBox received bytes but IMPACT
+  did not read them".
+- The failed packet is read by IMPACT and then rejected quickly enough that
+  IMPACT sends `?` within a few milliseconds of receiving the row.
 
 Baud/state discriminator:
 
@@ -523,7 +601,7 @@ Evidence:
 
 ### H7: IMPACT receives bytes but does not accept the result
 
-Status: current leading hypothesis.
+Status: strongly supported and current leading hypothesis.
 
 Evidence:
 
@@ -531,6 +609,8 @@ Evidence:
 - No RX errors in clean post-result loops.
 - Good transactions send `#em`; bad transactions do not.
 - `INTERFAC.DAT` does not update in bad transactions.
+- In `sample-analysis-20260708-163002`, host RX bytes and guest `RHR` reads
+  matched exactly (`7220` each), so IMPACT had access to the returned bytes.
 
 ### H8: Closing DOSBox mid-loop leaves ARL/ICS in a dirty state
 
@@ -552,9 +632,11 @@ There appear to be two related but distinct states:
 1. Main post-result loop:
    - IMPACT reaches analysis result read.
    - ARL sends valid numeric rows at 2400 baud.
+   - DOSBox receives those bytes and the DOS guest reads them from `RHR`.
    - IMPACT sends repeated `?`.
    - IMPACT never sends `#em`.
    - No RX framing/parity/overrun errors in the clean examples.
+   - `INTERFAC.DAT` does not update.
 
 2. Dirty restart/status state:
    - Happens after closing DOSBox/IMPACT during the post-result loop.
@@ -563,10 +645,9 @@ There appear to be two related but distinct states:
    - This likely means ARL/ICS was not reinitialized back to the status protocol
      state.
 
-The next useful data is not another `basic` trace. The next useful data is a
-short `uartdata` trace that proves whether IMPACT stops reading guest `RHR`,
-reads all bytes but rejects the packet, or sees an emulated UART error/status
-condition before it would send `#em`.
+The `uartdata` trace answered the previous open question: IMPACT reads the
+returned bytes from the guest UART. The next useful work is to determine what
+condition makes IMPACT choose `?` instead of `#em`.
 
 ## Current Next Test Protocol
 
@@ -576,16 +657,28 @@ Before the next burn:
 - Confirm no DOSBox-X process is active.
 - Clear/reinitialize the ARL/ICS state with the operator. Do not assume
   restarting IMPACT alone is enough.
-- Use `AL / AL` for the next controlled test.
+- Use `AL / AL` for the next controlled test unless the operator explicitly
+  needs another curve.
 
 Run:
 
-- Launch `ARL IMPACT+ UARTDATA TRACE`.
-- Do one burn only.
+- Prefer `ARL IMPACT+ UARTDATA TRACE` for one more controlled single-burn test
+  if disk space allows; otherwise use `ARL IMPACT+ STABILITY TRACE`.
+- Do one burn only per launch.
 - If it succeeds, record the run folder and do not immediately change multiple
   variables.
 - If "Please Run Sample" keeps blinking more than 60 to 90 seconds after the
   ARL finished, close DOSBox-X to stop trace growth and preserve the run folder.
+
+Recommended next variables to test, one at a time:
+
+- `cycles=fixed 6000` with `rxdelay:3000`.
+- `cycles=fixed 10000` with `rxdelay:3000`.
+- Fresh ARL/ICS state before each run, avoiding repeated restarts after a stuck
+  loop without operator-side reinitialization.
+- Same exact sample/curve sequence after a full ARL/ICS reset to check whether
+  accepted versus rejected rows correlate with instrument state rather than
+  DOSBox timing.
 
 Expected output:
 
@@ -607,12 +700,14 @@ C:\ARL\DOSBox-X-ARL\Compare-ArlResultTransactions.ps1 `
 
 Questions to answer:
 
-- During the loop, do host `rx` bytes continue?
-- During the loop, does guest `RHR` reading continue?
-- Do `rx_count` and guest `RHR` reads match?
-- Are there emulated UART FIFO/overrun/framing/parity counters?
-- Does the trace show IMPACT reading the complete row and then still not sending
-  `#em`?
+- Does changing CPU timing change the moment IMPACT chooses `?` versus `#em`?
+- Does a fresh ARL/ICS state allow the first result row to be accepted
+  consistently?
+- Do failed rows always have valid checksum and the same 15-value shape as
+  accepted rows?
+- Does the loop begin after a particular IMPACT command sequence before `#rd`
+  (`pa`, `#m1`, `cl`, `dc`, `m2`, `we`)?
+- Does `INTERFAC.DAT` update only on transactions where `#em` appears?
 
 ## If Work Resumes Later
 
@@ -645,6 +740,7 @@ Do not forget:
 - A status-read hang after closing DOSBox mid-loop may be dirty ARL/ICS state,
   not a new COM configuration failure.
 - `#em` after `#rd` is the key accepted-result signal.
-- The next controlled diagnostic should be `UARTDATA TRACE`, not another basic
-  trace.
-
+- `UARTDATA TRACE` showed host RX and guest `RHR` reads match exactly in the
+  clean loop.
+- The clean loop is now an IMPACT/ICS acceptance problem, not a proven Windows
+  RX delivery problem.
