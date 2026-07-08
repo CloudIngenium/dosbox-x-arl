@@ -259,6 +259,12 @@ Run the analyzer after each diagnostic session:
 C:\ARL\DOSBox-X-ARL\Analyze-ArlTrace.ps1 -TracePath C:\ARL\diagnostics\impact-20260707-123000\serial.ndjson
 ```
 
+Or analyze the newest trace without typing the timestamped folder:
+
+```powershell
+C:\ARL\DOSBox-X-ARL\contrib\arl\Analyze-LatestArlTrace.ps1 -Session sample-analysis
+```
+
 It writes:
 
 - `summary.md`
