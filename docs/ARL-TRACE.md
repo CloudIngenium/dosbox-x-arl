@@ -4,9 +4,12 @@ This fork keeps the ARL 3460 work as a small observability patch stack on top of
 upstream DOSBox-X. The current base is the normal upstream release
 `DOSBox-X 2026.07.02` at tag `dosbox-x-v2026.07.02`.
 
-Scope is intentionally limited: trace, status, manual marks, rotation, and
-offline analysis. Do not add replay, ARL emulation, or manual ICS command senders
-until the lab has enough traces to identify the first failure.
+Scope is intentionally conservative: trace, status, manual marks, rotation,
+offline analysis, and a safe localhost-only emulator harness. The emulator is a
+bench tool for IMPACT/TICS state-machine testing; it does not open COM5 and it
+must not be treated as a replacement for the real ARL until protocol bytes are
+confirmed from lab traces. Do not add manual ICS command senders, synchronize, or
+reset helpers.
 
 ## Branches
 
@@ -105,6 +108,49 @@ Keep the current lab serial settings while diagnosing:
 The pass/fail gate is post-spark completion: IMPACT must exit the busy state and
 rewrite `C:\ARL\IMPLUS\INTERFAC.DAT`.
 
+## Safe ARL Emulator
+
+The V1 emulator is external to DOSBox-X. It listens on localhost TCP and DOSBox-X
+connects through `nullmodem`, so no real Windows serial port is opened.
+
+Start the emulator first:
+
+```powershell
+C:\ARL\DOSBox-X-ARL\Start-ArlEmulator.ps1 `
+  -Mode happy-path `
+  -ProfilePath C:\ARL\DOSBox-X-ARL\profiles\arl3460-baseline.json `
+  -LogPath C:\ARL\diagnostics\impact-emulator\emulator.ndjson
+```
+
+Then start IMPACT or TICS against the emulator:
+
+```powershell
+C:\ARL\DOSBox-X-ARL\Start-ArlTraceRun.ps1 -Session impact-emulator
+C:\ARL\DOSBox-X-ARL\Start-ArlTraceRun.ps1 -Session tics-emulator
+```
+
+The generated emulator config uses:
+
+```ini
+serial1 = nullmodem server:127.0.0.1 port:3460 transparent:1 rxdelay:1000
+```
+
+Static configs are also provided:
+
+- `dosbox-impact-emulator.conf`
+- `dosbox-tics-emulator.conf`
+
+Emulator modes:
+
+- `happy-path`: responds from the profile.
+- `silent-after-spark`: suppresses `analysis-result` responses.
+- `delayed-result`: delays `analysis-result` responses.
+- `line-drop`: closes the TCP nullmodem connection at `analysis-result`.
+- `bad-response`: returns NAK-style bad bytes from the profile.
+
+The default `profiles\arl3460-baseline.json` is synthetic. Replace its
+responses only with bytes confirmed by real `serial.ndjson` traces.
+
 ## TICS Diagnosis
 
 Use TICS separately from IMPACT to validate the ACS/ICS link. Close IMPACT before
@@ -139,6 +185,8 @@ It writes:
 - `summary.md`
 - `timeline.csv`
 - `suspect.json`
+- `protocol-candidates.md`
+- `protocol-candidates.json`
 
 Automatic classifications include:
 
@@ -149,6 +197,10 @@ Automatic classifications include:
 - `baud_or_parity_rejected`
 - `write_failed`
 - `hang_without_clear_serial_fault`
+
+`protocol-candidates.*` groups TX/RX bytes into candidate transactions using a
+configurable idle gap. Use it to populate emulator profile rules after comparing
+IMPACT, TICS, and known-good native FreeDOS captures.
 
 ## Update Workflow
 
@@ -189,6 +241,7 @@ artifact contains:
 - `DOSBox-X-ARL/contrib/arl/*.conf`
 - `DOSBox-X-ARL/contrib/arl/*.ps1`
 - `DOSBox-X-ARL/contrib/arl/fixtures/*.ndjson`
+- `DOSBox-X-ARL/contrib/arl/profiles/*.json`
 - `DOSBox-X-ARL/ARL-TRACE.md`
 - `BUILD-MANIFEST.txt`
 - `SHA256SUMS.txt`

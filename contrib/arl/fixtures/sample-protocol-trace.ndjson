@@ -1,0 +1,16 @@
+{"epoch_ms":1783450000000,"elapsed_ms":0,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"trace_open","message":"synthetic protocol fixture"}
+{"epoch_ms":1783450000010,"elapsed_ms":10,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"mark","message":"tics-tl"}
+{"epoch_ms":1783450000011,"elapsed_ms":11,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"tx","byte_dec":84,"byte_hex":"54","ascii":"T"}
+{"epoch_ms":1783450000012,"elapsed_ms":12,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"tx","byte_dec":76,"byte_hex":"4C","ascii":"L"}
+{"epoch_ms":1783450000040,"elapsed_ms":40,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"rx","byte_dec":6,"byte_hex":"06","ascii":"."}
+{"epoch_ms":1783450001600,"elapsed_ms":1600,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"mark","message":"tics-ve"}
+{"epoch_ms":1783450001601,"elapsed_ms":1601,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"tx","byte_dec":86,"byte_hex":"56","ascii":"V"}
+{"epoch_ms":1783450001602,"elapsed_ms":1602,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"tx","byte_dec":69,"byte_hex":"45","ascii":"E"}
+{"epoch_ms":1783450001640,"elapsed_ms":1640,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"rx","byte_dec":65,"byte_hex":"41","ascii":"A"}
+{"epoch_ms":1783450001641,"elapsed_ms":1641,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"rx","byte_dec":82,"byte_hex":"52","ascii":"R"}
+{"epoch_ms":1783450001642,"elapsed_ms":1642,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"rx","byte_dec":76,"byte_hex":"4C","ascii":"L"}
+{"epoch_ms":1783450001643,"elapsed_ms":1643,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"rx","byte_dec":13,"byte_hex":"0D","ascii":"."}
+{"epoch_ms":1783450003200,"elapsed_ms":3200,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"mark","message":"analysis-request"}
+{"epoch_ms":1783450003201,"elapsed_ms":3201,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"tx","byte_dec":65,"byte_hex":"41","ascii":"A"}
+{"epoch_ms":1783450003202,"elapsed_ms":3202,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"tx","byte_dec":78,"byte_hex":"4E","ascii":"N"}
+{"epoch_ms":1783450004700,"elapsed_ms":4700,"guest_com":"COM1","serial":1,"session":"fixture-protocol","level":"full","realport":"COM5","event":"hang_snapshot","message":"synthetic post-spark wait"}

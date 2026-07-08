@@ -4,7 +4,9 @@ param(
 
     [string]$OutDir = "",
 
-    [int]$IdleAfterTxMs = 5000
+    [int]$IdleAfterTxMs = 5000,
+
+    [int]$TransactionGapMs = 750
 )
 
 $ErrorActionPreference = "Stop"
@@ -53,18 +55,216 @@ function Get-LastEvent([scriptblock]$Predicate) {
     return $null
 }
 
+function ConvertTo-TraceByte($Value) {
+    if ($null -eq $Value) { return $null }
+    if ($Value -is [string]) {
+        $text = $Value.Trim()
+        if ($text.StartsWith("0x", [System.StringComparison]::OrdinalIgnoreCase)) {
+            $text = $text.Substring(2)
+        }
+        $text = ($text -replace '[^0-9A-Fa-f]', '')
+        if ([string]::IsNullOrWhiteSpace($text)) { return $null }
+        return [Convert]::ToInt32($text, 16) -band 0xff
+    }
+    return ([int]$Value) -band 0xff
+}
+
+function Get-EventByte($Event) {
+    foreach ($name in @("byte_dec", "value_dec", "byte_hex", "value_hex")) {
+        $value = Get-PropValue $Event $name
+        if ($null -ne $value) {
+            $byte = ConvertTo-TraceByte $value
+            if ($null -ne $byte) { return $byte }
+        }
+    }
+    return $null
+}
+
+function Get-PrintableByte([int]$Byte) {
+    switch ($Byte) {
+        9 { return "\t" }
+        10 { return "\n" }
+        13 { return "\r" }
+        default {
+            if ($Byte -ge 32 -and $Byte -le 126) {
+                return [char]$Byte
+            }
+            return "."
+        }
+    }
+}
+
+function Format-HexBytes([System.Collections.IEnumerable]$Bytes) {
+    $parts = foreach ($byte in $Bytes) { "{0:X2}" -f ([int]$byte -band 0xff) }
+    return ($parts -join " ")
+}
+
+function Format-AsciiBytes([System.Collections.IEnumerable]$Bytes) {
+    $parts = foreach ($byte in $Bytes) { Get-PrintableByte ([int]$byte) }
+    return ($parts -join "")
+}
+
+function Get-CommandGuess([string]$Ascii, [string]$Hex) {
+    if ($Ascii -match "TL") { return "tics-link-test" }
+    if ($Ascii -match "VE") { return "tics-version" }
+    if ($Ascii -match "SI") { return "status-si" }
+    if ($Ascii -match "RS") { return "status-rs" }
+    if (-not [string]::IsNullOrWhiteSpace($Ascii.Trim("."))) {
+        $text = $Ascii
+        if ($text.Length -gt 40) { $text = $text.Substring(0, 40) + "..." }
+        return "ascii:$text"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Hex)) {
+        return "hex:$Hex"
+    }
+    return "unknown"
+}
+
+function New-ProtocolCandidate($Index, $Items) {
+    if ($Items.Count -eq 0) { return $null }
+
+    $txBytes = New-Object System.Collections.Generic.List[int]
+    $rxBytes = New-Object System.Collections.Generic.List[int]
+    $marks = New-Object System.Collections.Generic.List[string]
+    $hangCount = 0
+
+    foreach ($item in $Items) {
+        $eventName = Get-PropValue $item "event"
+        if ($eventName -eq "tx" -or $eventName -eq "rx") {
+            $byte = Get-EventByte $item
+            if ($null -ne $byte) {
+                if ($eventName -eq "tx") { $txBytes.Add($byte) }
+                else { $rxBytes.Add($byte) }
+            }
+        } elseif ($eventName -eq "mark") {
+            $message = Get-PropValue $item "message"
+            if (-not [string]::IsNullOrWhiteSpace($message)) {
+                $marks.Add($message)
+            }
+        } elseif ($eventName -eq "hang_snapshot") {
+            $hangCount++
+        }
+    }
+
+    $first = $Items[0]
+    $last = $Items[$Items.Count - 1]
+    $startMs = [int](Get-PropValue $first "elapsed_ms" 0)
+    $endMs = [int](Get-PropValue $last "elapsed_ms" $startMs)
+    $txHex = Format-HexBytes $txBytes
+    $rxHex = Format-HexBytes $rxBytes
+    $txAscii = Format-AsciiBytes $txBytes
+    $rxAscii = Format-AsciiBytes $rxBytes
+
+    return [pscustomobject]@{
+        index = $Index
+        start_line = Get-PropValue $first "line"
+        end_line = Get-PropValue $last "line"
+        start_elapsed_ms = $startMs
+        end_elapsed_ms = $endMs
+        duration_ms = ($endMs - $startMs)
+        session = Get-PropValue $first "session"
+        realport = Get-PropValue $first "realport"
+        event_count = $Items.Count
+        tx_count = $txBytes.Count
+        rx_count = $rxBytes.Count
+        mark_count = $marks.Count
+        hang_snapshot_count = $hangCount
+        tx_hex = $txHex
+        tx_ascii = $txAscii
+        rx_hex = $rxHex
+        rx_ascii = $rxAscii
+        marks = @($marks)
+        command_guess = Get-CommandGuess $txAscii $txHex
+        response_guess = if ($rxBytes.Count -gt 0) { Get-CommandGuess $rxAscii $rxHex } else { "none" }
+    }
+}
+
+function Write-ProtocolWorkbook {
+    $interestingNames = @("tx", "rx", "mark", "hang_snapshot")
+    $interesting = @($events | Where-Object {
+        $interestingNames -contains (Get-PropValue $_ "event") -and
+        $null -ne (Get-PropValue $_ "elapsed_ms")
+    } | Sort-Object { [int](Get-PropValue $_ "elapsed_ms" 0) }, { [int](Get-PropValue $_ "line" 0) })
+
+    $candidates = New-Object System.Collections.Generic.List[object]
+    $current = New-Object System.Collections.Generic.List[object]
+    $lastMs = $null
+
+    foreach ($item in $interesting) {
+        $elapsed = [int](Get-PropValue $item "elapsed_ms" 0)
+        if ($current.Count -gt 0 -and $null -ne $lastMs -and (($elapsed - $lastMs) -gt $TransactionGapMs)) {
+            $candidate = New-ProtocolCandidate ($candidates.Count + 1) $current
+            if ($null -ne $candidate) { $candidates.Add($candidate) }
+            $current = New-Object System.Collections.Generic.List[object]
+        }
+        $current.Add($item)
+        $lastMs = $elapsed
+    }
+
+    if ($current.Count -gt 0) {
+        $candidate = New-ProtocolCandidate ($candidates.Count + 1) $current
+        if ($null -ne $candidate) { $candidates.Add($candidate) }
+    }
+
+    $candidateArray = @($candidates.ToArray())
+    $protocol = [pscustomobject]@{
+        trace_path = (Resolve-Path $TracePath).Path
+        transaction_gap_ms = $TransactionGapMs
+        candidate_count = $candidates.Count
+        candidates = $candidateArray
+    }
+
+    $protocolJsonPath = Join-Path $OutDir "protocol-candidates.json"
+    $protocolMdPath = Join-Path $OutDir "protocol-candidates.md"
+    $protocol | ConvertTo-Json -Depth 12 | Set-Content -Path $protocolJsonPath -Encoding UTF8
+
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add("# ARL Protocol Candidates")
+    $lines.Add("")
+    $lines.Add("Trace: $TracePath")
+    $lines.Add("")
+    $lines.Add("Transaction gap: $TransactionGapMs ms")
+    $lines.Add("")
+    $lines.Add("| # | ms | TX hex | TX ascii | RX hex | RX ascii | Guess | Marks |")
+    $lines.Add("|---|---:|---|---|---|---|---|---|")
+    foreach ($candidate in $candidates) {
+        $marks = ($candidate.marks -join "; ")
+        $txHexText = $candidate.tx_hex
+        $txAsciiText = $candidate.tx_ascii
+        $rxHexText = $candidate.rx_hex
+        $rxAsciiText = $candidate.rx_ascii
+        $lines.Add("| $($candidate.index) | $($candidate.start_elapsed_ms)-$($candidate.end_elapsed_ms) | ``$txHexText`` | ``$txAsciiText`` | ``$rxHexText`` | ``$rxAsciiText`` | $($candidate.command_guess) / $($candidate.response_guess) | $marks |")
+    }
+    if ($candidates.Count -eq 0) {
+        $lines.Add("| none | 0 |  |  |  |  | no serial TX/RX candidates |  |")
+    }
+    $lines.Add("")
+    $lines.Add("Use these candidates to populate `contrib/arl/profiles/arl3460-baseline.json` only after confirming the bytes against a real lab run.")
+    $lines | Set-Content -Path $protocolMdPath -Encoding UTF8
+
+    return [pscustomobject]@{
+        json = $protocolJsonPath
+        markdown = $protocolMdPath
+        count = $candidates.Count
+    }
+}
+
 $timeline = foreach ($e in $events) {
     [pscustomobject]@{
         line = Get-PropValue $e "line"
         elapsed_ms = Get-PropValue $e "elapsed_ms"
+        source = Get-PropValue $e "source"
         event = Get-PropValue $e "event"
         session = Get-PropValue $e "session"
+        mode = Get-PropValue $e "mode"
         guest_com = Get-PropValue $e "guest_com"
         realport = Get-PropValue $e "realport"
         byte_hex = Get-PropValue $e "byte_hex"
         ascii = Get-PropValue $e "ascii"
         register = Get-PropValue $e "register"
         value_hex = Get-PropValue $e "value_hex"
+        rule = Get-PropValue $e "rule"
+        phase = Get-PropValue $e "phase"
         rx_error_bits = Get-PropValue $e "rx_error_bits"
         rts = Get-PropValue $e "rts"
         dtr = Get-PropValue $e "dtr"
@@ -82,6 +282,7 @@ $timeline = foreach ($e in $events) {
 
 $timelinePath = Join-Path $OutDir "timeline.csv"
 $timeline | Export-Csv -Path $timelinePath -NoTypeInformation
+$protocolWorkbook = Write-ProtocolWorkbook
 
 $tx = @($events | Where-Object { (Get-PropValue $_ "event") -eq "tx" })
 $rx = @($events | Where-Object { (Get-PropValue $_ "event") -eq "rx" })
@@ -90,6 +291,9 @@ $uartReads = @($events | Where-Object {
 })
 $uartWrites = @($events | Where-Object {
     (Get-PropValue $_ "event") -eq "uart_write" -and (Get-PropValue $_ "register") -eq "THR"
+})
+$uartEvents = @($events | Where-Object {
+    (Get-PropValue $_ "event") -eq "uart_read" -or (Get-PropValue $_ "event") -eq "uart_write"
 })
 $hangs = @($events | Where-Object { (Get-PropValue $_ "event") -eq "hang_snapshot" })
 $txErrors = @($events | Where-Object { (Get-PropValue $_ "event") -eq "tx_error" })
@@ -144,7 +348,7 @@ if ($hangs.Count -gt 0 -and $null -ne $lastTx) {
         $reasons.Add("arl_silent_after_tx")
     }
 }
-if ($null -ne $lastRx) {
+if ($null -ne $lastRx -and $uartEvents.Count -gt 0) {
     $lastRxMs = [int](Get-PropValue $lastRx "elapsed_ms" 0)
     $lastReadMs = if ($null -ne $lastRhrRead) { [int](Get-PropValue $lastRhrRead "elapsed_ms" 0) } else { -1 }
     if ($lastRxMs -gt $lastReadMs) {
@@ -167,6 +371,7 @@ $suspect = [pscustomobject]@{
     uart_thr_write_count = $uartWrites.Count
     uart_rhr_read_count = $uartReads.Count
     hang_snapshot_count = $hangs.Count
+    protocol_candidate_count = $protocolWorkbook.count
     first_rejected_config = if ($configRejected.Count) { $configRejected[0] } else { $null }
     first_write_failure = if ($txErrors.Count) { $txErrors[0] } else { $null }
     first_fifo_or_uart_error = if ($overruns.Count) { $overruns[0] } else { $null }
@@ -203,6 +408,7 @@ $summaryLines = @(
     "- Guest THR writes: $($uartWrites.Count)",
     "- Guest RHR reads: $($uartReads.Count)",
     "- Hang snapshots: $($hangs.Count)",
+    "- Protocol candidates: $($protocolWorkbook.count)",
     "",
     "## Classification",
     "",
@@ -217,10 +423,14 @@ $summaryLines = @(
     "## Outputs",
     "",
     "- Timeline CSV: $timelinePath",
+    "- Protocol candidates MD: $($protocolWorkbook.markdown)",
+    "- Protocol candidates JSON: $($protocolWorkbook.json)",
     "- Suspect JSON: $suspectPath"
 )
 $summaryLines | Set-Content -Path $summaryPath -Encoding UTF8
 
 Write-Host "Wrote $summaryPath"
 Write-Host "Wrote $timelinePath"
+Write-Host "Wrote $($protocolWorkbook.markdown)"
+Write-Host "Wrote $($protocolWorkbook.json)"
 Write-Host "Wrote $suspectPath"

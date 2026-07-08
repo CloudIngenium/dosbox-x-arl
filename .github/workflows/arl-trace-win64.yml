@@ -70,13 +70,32 @@ jobs:
           $ErrorActionPreference = 'Stop'
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Analyze-ArlTrace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Start-ArlTraceRun.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Start-ArlEmulator.ps1)) | Out-Null
           pwsh -NoProfile -File contrib\arl\Analyze-ArlTrace.ps1 `
             -TracePath contrib\arl\fixtures\sample-trace.ndjson `
             -OutDir arl-toolkit-test
           Get-Content arl-toolkit-test\summary.md
+          if (-not (Test-Path arl-toolkit-test\protocol-candidates.json)) { throw 'protocol-candidates.json missing' }
+          pwsh -NoProfile -File contrib\arl\Analyze-ArlTrace.ps1 `
+            -TracePath contrib\arl\fixtures\sample-protocol-trace.ndjson `
+            -OutDir arl-toolkit-protocol-test
+          Get-Content arl-toolkit-protocol-test\protocol-candidates.md
+          pwsh -NoProfile -File contrib\arl\Start-ArlEmulator.ps1 `
+            -ProfilePath contrib\arl\profiles\arl3460-baseline.json `
+            -SelfTest
           pwsh -NoProfile -File contrib\arl\Start-ArlTraceRun.ps1 `
             -Session impact `
             -RunRoot "$PWD\arl-toolkit-run" `
+            -DosboxExe "$PWD\missing-dosbox.exe" `
+            -NoLaunch
+          pwsh -NoProfile -File contrib\arl\Start-ArlTraceRun.ps1 `
+            -Session impact-emulator `
+            -RunRoot "$PWD\arl-toolkit-emu-run" `
+            -DosboxExe "$PWD\missing-dosbox.exe" `
+            -NoLaunch
+          pwsh -NoProfile -File contrib\arl\Start-ArlTraceRun.ps1 `
+            -Session tics-emulator `
+            -RunRoot "$PWD\arl-toolkit-emu-run" `
             -DosboxExe "$PWD\missing-dosbox.exe" `
             -NoLaunch
 

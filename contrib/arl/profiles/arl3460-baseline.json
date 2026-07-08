@@ -1,0 +1,55 @@
+{
+  "name": "ARL 3460 trace-driven learning baseline",
+  "description": "Synthetic placeholder responses for the safe localhost emulator. Replace response bytes with confirmed lab traces before using this as a protocol model.",
+  "transaction_idle_ms": 200,
+  "default_response_delay_ms": 25,
+  "delayed_result_ms": 10000,
+  "responses": [
+    {
+      "label": "tics-tl-link-test",
+      "phase": "status",
+      "match": "ascii_contains",
+      "pattern_ascii": "TL",
+      "response_hex": "06",
+      "bad_response_hex": "15",
+      "note": "ACK placeholder for non-destructive TICS link-test harnessing."
+    },
+    {
+      "label": "tics-ve-version",
+      "phase": "status",
+      "match": "ascii_contains",
+      "pattern_ascii": "VE",
+      "response_ascii": "ARL3460-EMU 0.1\r\n",
+      "bad_response_hex": "15",
+      "note": "Synthetic version string; replace with captured VE response."
+    },
+    {
+      "label": "tics-si-status",
+      "phase": "status",
+      "match": "ascii_contains",
+      "pattern_ascii": "SI",
+      "response_ascii": "SI OK\r\n",
+      "bad_response_hex": "15",
+      "note": "Synthetic status response; replace with captured SI response."
+    },
+    {
+      "label": "tics-rs-status",
+      "phase": "status",
+      "match": "ascii_contains",
+      "pattern_ascii": "RS",
+      "response_ascii": "RS READY\r\n",
+      "bad_response_hex": "15",
+      "note": "Synthetic status response; replace with captured RS response."
+    },
+    {
+      "label": "impact-synthetic-analysis-result",
+      "phase": "analysis-result",
+      "match": "ascii_contains",
+      "pattern_ascii": "AN",
+      "response_ascii": "RESULT,AL,Si=0.00,Fe=0.00,Cu=0.00,Mg=0.00\r\n",
+      "bad_response_hex": "15",
+      "delay_ms": 250,
+      "note": "Placeholder result used only to test IMPACT state-machine behavior without real ARL hardware."
+    }
+  ]
+}
