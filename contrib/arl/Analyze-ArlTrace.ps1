@@ -384,7 +384,7 @@ if ($null -ne $lastRx -and $uartEvents.Count -gt 0) {
         $reasons.Add("rx_continues_after_guest_rhr_reads_stop")
     }
 }
-if ($reasons.Count -eq 0 -and $hangs.Count -gt 0) {
+if ($reasons.Count -eq 0 -and $hangs.Count -gt 0 -and $lastEventName -eq "hang_snapshot") {
     $reasons.Add("hang_without_clear_serial_fault")
 }
 if ($reasons.Count -eq 0) {
