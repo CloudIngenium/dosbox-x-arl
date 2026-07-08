@@ -1,6 +1,8 @@
 param(
     [string]$RunPath = "",
 
+    [string]$CapturePath = "",
+
     [string]$RunRoot = "C:\ARL\diagnostics",
 
     [string]$PrinterName = "EPSON LX-350",
@@ -12,7 +14,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-if ([string]::IsNullOrWhiteSpace($RunPath)) {
+if (-not [string]::IsNullOrWhiteSpace($CapturePath)) {
+    if (-not (Test-Path -Path $CapturePath -PathType Leaf)) {
+        throw "Capture file not found: $CapturePath"
+    }
+} elseif ([string]::IsNullOrWhiteSpace($RunPath)) {
     $candidate = Get-ChildItem -Path $RunRoot -Directory |
         Where-Object { Test-Path -Path (Join-Path $_.FullName $CaptureName) -PathType Leaf } |
         Sort-Object LastWriteTime -Descending |
@@ -25,13 +31,15 @@ if ([string]::IsNullOrWhiteSpace($RunPath)) {
     $RunPath = $candidate.FullName
 }
 
-if (-not (Test-Path -Path $RunPath -PathType Container)) {
-    throw "Run path not found: $RunPath"
-}
+if ([string]::IsNullOrWhiteSpace($CapturePath)) {
+    if (-not (Test-Path -Path $RunPath -PathType Container)) {
+        throw "Run path not found: $RunPath"
+    }
 
-$capturePath = Join-Path $RunPath $CaptureName
-if (-not (Test-Path -Path $capturePath -PathType Leaf)) {
-    throw "Capture file not found: $capturePath"
+    $CapturePath = Join-Path $RunPath $CaptureName
+    if (-not (Test-Path -Path $CapturePath -PathType Leaf)) {
+        throw "Capture file not found: $CapturePath"
+    }
 }
 
 $printer = Get-Printer -Name $PrinterName -ErrorAction SilentlyContinue
@@ -40,7 +48,7 @@ if ($null -eq $printer) {
     throw "Printer '$PrinterName' not found. Known printers: $known"
 }
 
-$capture = Get-Item -Path $capturePath
+$capture = Get-Item -Path $CapturePath
 $previewBytes = [System.IO.File]::ReadAllBytes($capture.FullName)
 $previewLength = [Math]::Min(300, $previewBytes.Length)
 $preview = ""

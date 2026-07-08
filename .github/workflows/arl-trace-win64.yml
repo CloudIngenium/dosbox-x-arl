@@ -75,6 +75,8 @@ jobs:
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactStabilityTrace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Preserve-ArlTraceRun.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Print-ArlLptCapture.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Watch-ArlLptCapture.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Compare-ArlResultTransactions.ps1)) | Out-Null
           pwsh -NoProfile -File contrib\arl\Analyze-ArlTrace.ps1 `
             -TracePath contrib\arl\fixtures\sample-trace.ndjson `
             -OutDir arl-toolkit-test
@@ -90,6 +92,23 @@ jobs:
           Get-Content arl-toolkit-post-loop-test\summary.md
           if ((Get-Content arl-toolkit-post-loop-test\summary.md -Raw) -notmatch 'post_result_poll_loop') {
             throw 'post_result_poll_loop classification missing'
+          }
+          pwsh -NoProfile -File contrib\arl\Compare-ArlResultTransactions.ps1 `
+            -TracePath contrib\arl\fixtures\post-result-poll-loop.ndjson `
+            -OutDir arl-toolkit-post-loop-test
+          if ((Get-Content arl-toolkit-post-loop-test\result-transaction-comparison.md -Raw) -notmatch 'post-result poll loop') {
+            throw 'result comparison did not report post-result poll loop'
+          }
+          New-Item -ItemType Directory -Force arl-lpt-watch-test | Out-Null
+          Set-Content -Path arl-lpt-watch-test\LPTCAP.PRN -Value "ARL PRINT TEST`r`n" -NoNewline -Encoding ASCII
+          pwsh -NoProfile -File contrib\arl\Watch-ArlLptCapture.ps1 `
+            -CapturePath "$PWD\arl-lpt-watch-test\LPTCAP.PRN" `
+            -SpoolDir "$PWD\arl-lpt-watch-test\print-jobs" `
+            -ParentPid 999999 `
+            -IdleMs 100 `
+            -PollMs 50
+          if (-not (Get-ChildItem arl-lpt-watch-test\print-jobs -Filter *.prn)) {
+            throw 'LPT watcher did not spool a print job'
           }
           pwsh -NoProfile -File contrib\arl\Start-ArlEmulator.ps1 `
             -ProfilePath contrib\arl\profiles\arl3460-baseline.json `
@@ -133,6 +152,8 @@ jobs:
           cp contrib/arl/Launch-ArlImpactStabilityTrace.ps1 "$arl_root/Launch-ArlImpactStabilityTrace.ps1"
           cp contrib/arl/Preserve-ArlTraceRun.ps1 "$arl_root/Preserve-ArlTraceRun.ps1"
           cp contrib/arl/Print-ArlLptCapture.ps1 "$arl_root/Print-ArlLptCapture.ps1"
+          cp contrib/arl/Watch-ArlLptCapture.ps1 "$arl_root/Watch-ArlLptCapture.ps1"
+          cp contrib/arl/Compare-ArlResultTransactions.ps1 "$arl_root/Compare-ArlResultTransactions.ps1"
 
           ./scripts/arl-export-patch-stack.sh "$UPSTREAM_TAG" "$package_root/arl-patches"
 

@@ -17,6 +17,10 @@ param(
     [string]$TraceLevel = "basic",
     [int]$HangMs = 15000,
     [string]$RunRoot = "C:\ARL\diagnostics",
+    [switch]$AutoPrintLpt,
+    [string]$PrinterName = "EPSON LX-350",
+    [int]$LptIdleMs = 2500,
+    [int]$LptPollMs = 500,
     [switch]$Wait,
     [switch]$NoLaunch
 )
@@ -39,6 +43,9 @@ $emulatorTracePath = Join-ArlPath $runDir "emulator.ndjson"
 $logPath = Join-ArlPath $runDir "dosbox.log"
 $confPath = Join-ArlPath $runDir "dosbox-$Session.conf"
 $lptPath = Join-ArlPath $runDir "LPTCAP.PRN"
+$lptSpoolDir = Join-ArlPath $runDir "print-jobs"
+$lptWatchLogPath = Join-ArlPath $runDir "lpt-watch.log"
+$lptWatchErrPath = Join-ArlPath $runDir "lpt-watch.err.log"
 $interfacPath = Join-ArlPath $ImplusPath "INTERFAC.DAT"
 $usesEmulator = $Session -eq "impact-emulator" -or $Session -eq "tics-emulator"
 $usesTics = $Session -eq "tics" -or $Session -eq "tics-emulator"
@@ -146,6 +153,11 @@ $metadata = [pscustomobject]@{
     cycles = $Cycles
     trace_level = if ($usesEmulator) { $null } else { $TraceLevel }
     hang_ms = $HangMs
+    lpt_capture = $lptPath
+    auto_print_lpt = [bool]$AutoPrintLpt
+    printer_name = if ($AutoPrintLpt) { $PrinterName } else { $null }
+    lpt_idle_ms = if ($AutoPrintLpt) { $LptIdleMs } else { $null }
+    lpt_spool_dir = if ($AutoPrintLpt) { $lptSpoolDir } else { $null }
 }
 $metadata | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-ArlPath $runDir "run-metadata.json") -Encoding UTF8
 
@@ -169,11 +181,55 @@ if (-not (Test-Path -Path $DosboxExe -PathType Leaf)) {
     throw "DOSBox-X ARL executable not found: $DosboxExe"
 }
 
+$watcherScriptPath = $null
+$printScriptPath = $null
+if ($AutoPrintLpt -and -not $usesEmulator) {
+    $watcherScriptPath = Join-ArlPath $PSScriptRoot "Watch-ArlLptCapture.ps1"
+    $printScriptPath = Join-ArlPath $PSScriptRoot "Print-ArlLptCapture.ps1"
+    if (-not (Test-Path -Path $watcherScriptPath -PathType Leaf)) {
+        throw "LPT watcher script not found: $watcherScriptPath"
+    }
+    if (-not (Test-Path -Path $printScriptPath -PathType Leaf)) {
+        throw "LPT print script not found: $printScriptPath"
+    }
+}
+
 $process = Start-Process -FilePath $DosboxExe -ArgumentList @("-conf", $confPath) -PassThru
 Write-Host "Started DOSBox-X ARL PID $($process.Id)"
 
+$watcherProcess = $null
+if ($AutoPrintLpt -and -not $usesEmulator) {
+    $powerShellExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+    $watcherArgs = @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $watcherScriptPath,
+        "-CapturePath", $lptPath,
+        "-PrinterName", $PrinterName,
+        "-SpoolDir", $lptSpoolDir,
+        "-PrintScriptPath", $printScriptPath,
+        "-ParentPid", "$($process.Id)",
+        "-IdleMs", "$LptIdleMs",
+        "-PollMs", "$LptPollMs",
+        "-Send"
+    )
+    $watcherProcess = Start-Process -FilePath $powerShellExe `
+        -ArgumentList $watcherArgs `
+        -RedirectStandardOutput $lptWatchLogPath `
+        -RedirectStandardError $lptWatchErrPath `
+        -WindowStyle Hidden `
+        -PassThru
+    Write-Host "Started LPT watcher PID $($watcherProcess.Id)"
+    Write-Host "LPT capture: $lptPath"
+    Write-Host "LPT print jobs: $lptSpoolDir"
+    Write-Host "LPT watcher log: $lptWatchLogPath"
+}
+
 if ($Wait) {
     $process.WaitForExit()
+    if ($null -ne $watcherProcess) {
+        $watcherProcess.WaitForExit(10000) | Out-Null
+    }
     if (Test-Path -Path $interfacPath -PathType Leaf) {
         Copy-Item -Path $interfacPath -Destination (Join-ArlPath $runDir "INTERFAC.DAT.after") -Force
     }

@@ -28,11 +28,12 @@ The public desktop shortcut `ARL IMPACT+ UARTDATA TRACE` launches
 `cycles=fixed 12000`, `rxdelay:1000`, and COM5.
 
 After the 2026-07-08 successful-first-burn / stuck-second-burn evidence, keep
-that shortcut for deep UART-consumption proof only. The next retry should use
-the side-by-side `ARL IMPACT+ STABILITY TRACE` launcher, which calls
+that shortcut for deep UART-consumption proof only. The normal retry path should
+use the side-by-side `ARL IMPACT+ STABILITY TRACE` launcher, which calls
 `Launch-ArlImpactStabilityTrace.ps1` with `arltracelevel:basic`,
-`cycles=fixed 8000`, `rxdelay:3000`, and `arltracehangms:30000`. This keeps
-TX/RX protocol evidence while reducing trace overhead.
+`cycles=fixed 8000`, `rxdelay:3000`, `arltracehangms:30000`, and LPT
+auto-print enabled. This keeps TX/RX protocol evidence while reducing trace
+overhead.
 
 Build `96994b1` moved THR/RHR `uartdata` tracing to `CSerial::Write_THR()` and
 `CSerial::Read_RHR()`. That matters because IMPACT can use BIOS/INT14 paths that
@@ -138,6 +139,7 @@ Each run creates `C:\ARL\diagnostics\<session>-<timestamp>\` with:
 - `dosbox.log`
 - `run-metadata.json`
 - `LPTCAP.PRN` if IMPACT prints to LPT1
+- `print-jobs\*.prn` plus manifests/logs when LPT auto-print is enabled
 - copied `INTERFAC.DAT.after` when `-Wait` is used and the file exists
 
 Preserve important runs before cleanup or repeated retries:
@@ -174,6 +176,12 @@ C:\ARL\DOSBox-X-ARL\Print-ArlLptCapture.ps1 `
 The first command is a dry run and shows a preview. The second sends the raw
 captured bytes to the installed Windows printer. On 2026-07-08 the HP bench PC
 had `EPSON LX-350` installed on `USB001`.
+
+When `Start-ArlTraceRun.ps1` is launched with `-AutoPrintLpt`, it starts
+`Watch-ArlLptCapture.ps1` alongside DOSBox-X. The watcher keeps `LPTCAP.PRN` as
+the full raw capture, copies each stable append window to `print-jobs\*.prn`,
+writes JSON/SHA256 metadata for later processing, and sends that job to
+`Print-ArlLptCapture.ps1 -Send`.
 
 Keep the current lab serial settings while diagnosing:
 
@@ -225,6 +233,20 @@ that the serial receive path is alive. The next diagnosis target is why IMPACT
 does not accept the repeated result/status sequence after a prior successful
 burn: missing terminator, expected ACK/status transition, stale run state, or a
 checksum/result-format mismatch.
+
+Run `C:\ARL\diagnostics\sample-analysis-20260708-145951\serial.ndjson` captured
+the best mixed evidence so far: three result transactions completed and the next
+result entered the post-result poll loop. `Compare-ArlResultTransactions.ps1`
+showed that the good `#rd` transactions were followed by `#em`, while the loop
+candidate had 136 `?` polls and no `#em`. The ARL kept sending a parseable
+numeric result row, so this is not a silent-instrument or Windows RX-loss
+failure.
+
+The same run also captured `LPTCAP.PRN` with a complete ASCII IMPACT report.
+The HP bench PC validated dry-run printing to `EPSON LX-350` on `USB001`;
+`Watch-ArlLptCapture.ps1` now preserves each stable append as
+`print-jobs\*.prn` plus JSON/SHA256 metadata before optionally sending the raw
+bytes to the printer.
 
 ## Safe ARL Emulator
 
@@ -370,6 +392,17 @@ inside the common serial register methods.
 the ARL repeatedly returned the same numeric result row. This points away from
 Windows serial loss and toward IMPACT/ARL post-result state or protocol
 acceptance.
+
+Use `Compare-ArlResultTransactions.ps1` to compare successful `#rd` result
+transactions against the first loop:
+
+```powershell
+C:\ARL\DOSBox-X-ARL\Compare-ArlResultTransactions.ps1 `
+  -RunPath C:\ARL\diagnostics\sample-analysis-YYYYMMDD-HHMMSS
+```
+
+The comparison highlights whether a good transaction included `#em`, `pa`, or
+`we` transitions that are absent in the loop candidate.
 
 ## Update Workflow
 

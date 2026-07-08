@@ -1,7 +1,9 @@
 param(
     [string]$DosboxExe = "C:\ARL\DOSBox-X-ARL\dosbox-x-arl-96994b1.exe",
     [int]$Cycles = 8000,
-    [int]$RxDelay = 3000
+    [int]$RxDelay = 3000,
+    [string]$PrinterName = "EPSON LX-350",
+    [switch]$NoAutoPrintLpt
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,10 +26,21 @@ if (-not (Test-Path -Path $DosboxExe -PathType Leaf)) {
     }
 }
 
-& $launcher `
-    -Session sample-analysis `
-    -DosboxExe $DosboxExe `
-    -TraceLevel basic `
-    -Cycles $Cycles `
-    -RxDelay $RxDelay `
-    -HangMs 30000
+$args = @(
+    "-Session", "sample-analysis",
+    "-DosboxExe", $DosboxExe,
+    "-TraceLevel", "basic",
+    "-Cycles", "$Cycles",
+    "-RxDelay", "$RxDelay",
+    "-HangMs", "30000"
+)
+
+if (-not $NoAutoPrintLpt) {
+    $args += @(
+        "-AutoPrintLpt",
+        "-PrinterName", $PrinterName,
+        "-LptIdleMs", "2500"
+    )
+}
+
+& $launcher @args
