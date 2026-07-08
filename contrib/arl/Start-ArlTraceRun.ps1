@@ -42,7 +42,10 @@ $usesEmulator = $Session -eq "impact-emulator" -or $Session -eq "tics-emulator"
 
 switch ($Session) {
     { $_ -eq "tics" -or $_ -eq "tics-emulator" } {
-        $autoexecCommand = "tics"
+        $autoexecCommand = @"
+if exist TICS\TICS.EXE cd TICS
+TICS
+"@
     }
     "status-only" {
         $autoexecCommand = "ARLTRACE STATUS"
