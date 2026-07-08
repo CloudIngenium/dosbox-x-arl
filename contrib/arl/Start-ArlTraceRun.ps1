@@ -44,6 +44,8 @@ $usesEmulator = $Session -eq "impact-emulator" -or $Session -eq "tics-emulator"
 $usesTics = $Session -eq "tics" -or $Session -eq "tics-emulator"
 
 if ($usesTics) {
+    New-Item -ItemType Directory -Force -Path (Join-ArlPath $ImplusPath "TICS\PROC") | Out-Null
+
     foreach ($extension in @("DBI", "TXT", "HLP")) {
         $source = Join-ArlPath $ImplusPath "TICS\DBTICSOE.$extension"
         $target = Join-ArlPath $ImplusPath "TICS\DBTICS.$extension"

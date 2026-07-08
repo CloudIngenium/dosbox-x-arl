@@ -159,6 +159,14 @@ responses only with bytes confirmed by real `serial.ndjson` traces.
 Use TICS separately from IMPACT to validate the ACS/ICS link. Close IMPACT before
 running TICS and keep the instrument operator present.
 
+TICS expects a few legacy filenames and folders to exist inside the mounted
+IMPLUS tree:
+
+- DOS path `C:\TICS\PROC` maps to Windows path `C:\ARL\IMPLUS\TICS\PROC`.
+- `TICS.EXE` looks for `DBTICS.DBI`, `DBTICS.TXT`, and `DBTICS.HLP`.
+- The ARL install may only include `DBTICSOE.*`; `Start-ArlTraceRun.ps1`
+  creates `DBTICS.*` aliases from those files before launching TICS.
+
 Start with communication parameters and passive/read-only checks:
 
 - communication statistics
