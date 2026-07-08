@@ -279,7 +279,9 @@ Automatic classifications include:
 - `rx_received_but_guest_did_not_read`
 - `rx_continues_after_guest_rhr_reads_stop`
 - `fifo_or_uart_error`
-- `modem_line_drop_or_low`
+- `modem_line_drop_or_low` for CTS/DSR lows that coincide with a hang or write
+  failure. DCD lows are still recorded in `suspect.json` because many lab cables
+  do not assert DCD and it is noisy as a standalone root-cause signal.
 - `baud_or_parity_rejected`
 - `write_failed`
 - `hang_without_clear_serial_fault`

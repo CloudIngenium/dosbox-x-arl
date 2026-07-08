@@ -308,13 +308,22 @@ $overruns = @($events | Where-Object {
     [int](Get-PropValue $_ "errors_in_fifo" 0) -ne 0
 })
 
-$lineDrops = @($events | Where-Object {
+$lineLowEvents = @($events | Where-Object {
     $eventName = Get-PropValue $_ "event"
     ($eventName -eq "modem" -or $eventName -eq "control") -and (
         (Get-PropValue $_ "cts" $true) -eq $false -or
         (Get-PropValue $_ "dsr" $true) -eq $false -or
         (Get-PropValue $_ "dcd" $true) -eq $false
     )
+})
+
+$blockingLineDrops = @($lineLowEvents | Where-Object {
+    (Get-PropValue $_ "cts" $true) -eq $false -or
+    (Get-PropValue $_ "dsr" $true) -eq $false
+})
+
+$dcdLowEvents = @($lineLowEvents | Where-Object {
+    (Get-PropValue $_ "dcd" $true) -eq $false
 })
 
 $lastTx = Get-LastEvent { param($e) (Get-PropValue $e "event") -eq "tx" }
@@ -347,7 +356,7 @@ if ($configRejected.Count -gt 0) {
 if ($overruns.Count -gt 0) {
     $reasons.Add("fifo_or_uart_error")
 }
-if ($lineDrops.Count -gt 0) {
+if ($blockingLineDrops.Count -gt 0 -and ($hangs.Count -gt 0 -or $txErrors.Count -gt 0)) {
     $reasons.Add("modem_line_drop_or_low")
 }
 if ($hangs.Count -gt 0 -and $null -ne $lastTx) {
@@ -390,11 +399,16 @@ $suspect = [pscustomobject]@{
     uart_thr_write_count = $uartWrites.Count
     uart_rhr_read_count = $uartReads.Count
     hang_snapshot_count = $hangs.Count
+    modem_line_low_observed_count = $lineLowEvents.Count
+    blocking_modem_line_low_count = $blockingLineDrops.Count
+    dcd_low_observed_count = $dcdLowEvents.Count
     protocol_candidate_count = $protocolWorkbook.count
     first_rejected_config = if ($configRejected.Count) { $configRejected[0] } else { $null }
     first_write_failure = if ($txErrors.Count) { $txErrors[0] } else { $null }
     first_fifo_or_uart_error = if ($overruns.Count) { $overruns[0] } else { $null }
-    first_modem_line_drop = if ($lineDrops.Count) { $lineDrops[0] } else { $null }
+    first_modem_line_drop = if ($blockingLineDrops.Count) { $blockingLineDrops[0] } else { $null }
+    first_modem_line_low_observed = if ($lineLowEvents.Count) { $lineLowEvents[0] } else { $null }
+    first_dcd_low_observed = if ($dcdLowEvents.Count) { $dcdLowEvents[0] } else { $null }
     last_tx = $lastTx
     last_rx = $lastRx
     last_uart_rhr_read = $lastRhrRead
@@ -435,6 +449,9 @@ $summaryLines = @(
     "- Guest THR writes: $($uartWrites.Count)",
     "- Guest RHR reads: $($uartReads.Count)",
     "- Hang snapshots: $($hangs.Count)",
+    "- Modem/control line low observations: $($lineLowEvents.Count)",
+    "- Blocking CTS/DSR low observations: $($blockingLineDrops.Count)",
+    "- DCD low observations: $($dcdLowEvents.Count)",
     "- Protocol candidates: $($protocolWorkbook.count)",
     "",
     "## Classification",
