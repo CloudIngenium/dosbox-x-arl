@@ -356,7 +356,8 @@ if ($configRejected.Count -gt 0) {
 if ($overruns.Count -gt 0) {
     $reasons.Add("fifo_or_uart_error")
 }
-if ($blockingLineDrops.Count -gt 0 -and ($hangs.Count -gt 0 -or $txErrors.Count -gt 0)) {
+$lastEventName = Get-PropValue $lastEvent "event"
+if ($blockingLineDrops.Count -gt 0 -and ($txErrors.Count -gt 0 -or $lastEventName -eq "hang_snapshot")) {
     $reasons.Add("modem_line_drop_or_low")
 }
 if ($hangs.Count -gt 0 -and $null -ne $lastTx) {
