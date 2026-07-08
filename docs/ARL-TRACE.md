@@ -35,6 +35,12 @@ use the side-by-side `ARL IMPACT+ STABILITY TRACE` launcher, which calls
 auto-print enabled. This keeps TX/RX protocol evidence while reducing trace
 overhead.
 
+For the next conservative serial retry, use `ARL IMPACT+ SAFE SERIAL TRACE`.
+It keeps the same low-overhead trace and `cycles=fixed 8000`, but raises
+`rxdelay` to `10000`, the highest value accepted by DOSBox-X directserial. This
+tests whether IMPACT needs a longer grace window after post-spark result bursts
+before DOSBox-X forces receive/overrun behavior.
+
 Build `96994b1` moved THR/RHR `uartdata` tracing to `CSerial::Write_THR()` and
 `CSerial::Read_RHR()`. That matters because IMPACT can use BIOS/INT14 paths that
 do not necessarily pass through the I/O-port wrappers where earlier builds

@@ -73,6 +73,7 @@ jobs:
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Start-ArlEmulator.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Analyze-LatestArlTrace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactStabilityTrace.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactSafeSerialTrace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Preserve-ArlTraceRun.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Print-ArlLptCapture.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Watch-ArlLptCapture.ps1)) | Out-Null
@@ -155,6 +156,7 @@ jobs:
           cp -R contrib/arl/. "$arl_root/contrib/arl/"
           cp contrib/arl/dosbox-arl-trace.conf "$arl_root/dosbox-arl-trace.conf"
           cp contrib/arl/Launch-ArlImpactStabilityTrace.ps1 "$arl_root/Launch-ArlImpactStabilityTrace.ps1"
+          cp contrib/arl/Launch-ArlImpactSafeSerialTrace.ps1 "$arl_root/Launch-ArlImpactSafeSerialTrace.ps1"
           cp contrib/arl/Preserve-ArlTraceRun.ps1 "$arl_root/Preserve-ArlTraceRun.ps1"
           cp contrib/arl/Print-ArlLptCapture.ps1 "$arl_root/Print-ArlLptCapture.ps1"
           cp contrib/arl/Watch-ArlLptCapture.ps1 "$arl_root/Watch-ArlLptCapture.ps1"
