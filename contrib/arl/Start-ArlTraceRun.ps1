@@ -41,12 +41,23 @@ $confPath = Join-ArlPath $runDir "dosbox-$Session.conf"
 $lptPath = Join-ArlPath $runDir "LPTCAP.PRN"
 $interfacPath = Join-ArlPath $ImplusPath "INTERFAC.DAT"
 $usesEmulator = $Session -eq "impact-emulator" -or $Session -eq "tics-emulator"
+$usesTics = $Session -eq "tics" -or $Session -eq "tics-emulator"
+
+if ($usesTics) {
+    foreach ($extension in @("DBI", "TXT", "HLP")) {
+        $source = Join-ArlPath $ImplusPath "TICS\DBTICSOE.$extension"
+        $target = Join-ArlPath $ImplusPath "TICS\DBTICS.$extension"
+        if ((Test-Path -Path $source -PathType Leaf) -and -not (Test-Path -Path $target -PathType Leaf)) {
+            Copy-Item -Path $source -Destination $target
+        }
+    }
+}
 
 switch ($Session) {
     { $_ -eq "tics" -or $_ -eq "tics-emulator" } {
         $autoexecCommand = @"
-if exist TICS\TICS.EXE TICS\TICS
-if not exist TICS\TICS.EXE TICS
+if exist TICS\TICS.EXE cd TICS
+TICS
 "@
     }
     "status-only" {
