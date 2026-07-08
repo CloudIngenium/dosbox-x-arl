@@ -25,7 +25,9 @@ As of 2026-07-08, the HP bench PC (`LABORATORIO-ARL`) is using ARL trace build
 
 The public desktop shortcut `ARL IMPACT+ UARTDATA TRACE` launches
 `Launch-ArlImpactUartDataTrace.ps1`, which uses `arltracelevel:uartdata`,
-`cycles=fixed 12000`, `rxdelay:1000`, and COM5.
+`cycles=fixed 8000`, `rxdelay:3000`, and COM5. Use it only for short,
+operator-attended diagnostic burns because it records guest UART `THR/RHR`
+activity in addition to host TX/RX bytes.
 
 After the 2026-07-08 successful-first-burn / stuck-second-burn evidence, keep
 that shortcut for deep UART-consumption proof only. The normal retry path should
@@ -54,6 +56,23 @@ The next tuning step is `ARL IMPACT+ RX4000 TRACE`, which keeps the same
 `cycles=fixed 8000` and low-overhead trace but raises `rxdelay` only slightly
 from 3000 to 4000. This tests whether a modest grace window helps without the
 long blocked-UART behavior observed at 10000.
+
+Later 2026-07-08 runs with both `rxdelay:3000` and `rxdelay:4000` reproduced the
+same post-result loop: IMPACT sent `#rd 246`, the ARL returned repeated numeric
+result rows at 2400 baud, and IMPACT kept sending `?` without sending `#em`.
+The trailing result-row checksum bytes matched the modulo-256 checksum rule
+used by commands such as `#rd 246` and `#em 242`, so the repeated rows were not
+obviously corrupt at the ASCII protocol level. The next controlled diagnostic
+burn should therefore use `ARL IMPACT+ UARTDATA TRACE` to prove whether IMPACT
+is consuming the UART receive register cleanly or whether emulated UART/FIFO
+state diverges before IMPACT accepts the packet.
+
+If DOSBox-X is closed while this loop is active, the ARL/ICS side can remain in
+the result-read state. A subsequent IMPACT launch may then send status commands
+at 9600 baud while the instrument/interface is still effectively in the
+post-result 2400-baud conversation, producing RX framing/parity errors and a
+new hang at "Reading status channels". Clear/reinitialize the ARL/ICS state
+before treating that later status-read hang as a separate failure.
 
 Build `96994b1` moved THR/RHR `uartdata` tracing to `CSerial::Write_THR()` and
 `CSerial::Read_RHR()`. That matters because IMPACT can use BIOS/INT14 paths that

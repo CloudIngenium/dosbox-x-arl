@@ -226,8 +226,9 @@ if ($AutoPrintLpt -and -not $usesEmulator) {
         '$ErrorActionPreference = "Stop"',
         '$watcherArgs = @('
     )
-    foreach ($arg in $watcherArgs) {
-        $watcherLaunch += "    $(Quote-PowerShellLiteral $arg)"
+    for ($i = 0; $i -lt $watcherArgs.Count; $i++) {
+        $separator = if ($i -lt ($watcherArgs.Count - 1)) { "," } else { "" }
+        $watcherLaunch += "    $(Quote-PowerShellLiteral $watcherArgs[$i])$separator"
     }
     $watcherLaunch += @(
         ')',
