@@ -27,6 +27,13 @@ The public desktop shortcut `ARL IMPACT+ UARTDATA TRACE` launches
 `Launch-ArlImpactUartDataTrace.ps1`, which uses `arltracelevel:uartdata`,
 `cycles=fixed 12000`, `rxdelay:1000`, and COM5.
 
+After the 2026-07-08 successful-first-burn / stuck-second-burn evidence, keep
+that shortcut for deep UART-consumption proof only. The next retry should use
+the side-by-side `ARL IMPACT+ STABILITY TRACE` launcher, which calls
+`Launch-ArlImpactStabilityTrace.ps1` with `arltracelevel:basic`,
+`cycles=fixed 8000`, `rxdelay:3000`, and `arltracehangms:30000`. This keeps
+TX/RX protocol evidence while reducing trace overhead.
+
 Build `96994b1` moved THR/RHR `uartdata` tracing to `CSerial::Write_THR()` and
 `CSerial::Read_RHR()`. That matters because IMPACT can use BIOS/INT14 paths that
 do not necessarily pass through the I/O-port wrappers where earlier builds
@@ -121,6 +128,7 @@ Preferred launcher:
 C:\ARL\DOSBox-X-ARL\Start-ArlTraceRun.ps1 -Session impact
 C:\ARL\DOSBox-X-ARL\Start-ArlTraceRun.ps1 -Session tics
 C:\ARL\DOSBox-X-ARL\Start-ArlTraceRun.ps1 -Session sample-analysis
+C:\ARL\DOSBox-X-ARL\Launch-ArlImpactStabilityTrace.ps1
 ```
 
 Each run creates `C:\ARL\diagnostics\<session>-<timestamp>\` with:
@@ -130,6 +138,17 @@ Each run creates `C:\ARL\diagnostics\<session>-<timestamp>\` with:
 - `dosbox.log`
 - `run-metadata.json`
 - copied `INTERFAC.DAT.after` when `-Wait` is used and the file exists
+
+Preserve important runs before cleanup or repeated retries:
+
+```powershell
+C:\ARL\DOSBox-X-ARL\Preserve-ArlTraceRun.ps1 `
+  -RunPath C:\ARL\diagnostics\sample-analysis-YYYYMMDD-HHMMSS `
+  -Label first-good-second-stuck
+```
+
+The preserved copy includes a manifest and `SHA256SUMS.txt` under
+`C:\ARL\diagnostics\preserved\`.
 
 Keep the current lab serial settings while diagnosing:
 

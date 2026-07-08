@@ -71,6 +71,9 @@ jobs:
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Analyze-ArlTrace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Start-ArlTraceRun.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Start-ArlEmulator.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Analyze-LatestArlTrace.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactStabilityTrace.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Preserve-ArlTraceRun.ps1)) | Out-Null
           pwsh -NoProfile -File contrib\arl\Analyze-ArlTrace.ps1 `
             -TracePath contrib\arl\fixtures\sample-trace.ndjson `
             -OutDir arl-toolkit-test
@@ -80,6 +83,13 @@ jobs:
             -TracePath contrib\arl\fixtures\sample-protocol-trace.ndjson `
             -OutDir arl-toolkit-protocol-test
           Get-Content arl-toolkit-protocol-test\protocol-candidates.md
+          pwsh -NoProfile -File contrib\arl\Analyze-ArlTrace.ps1 `
+            -TracePath contrib\arl\fixtures\post-result-poll-loop.ndjson `
+            -OutDir arl-toolkit-post-loop-test
+          Get-Content arl-toolkit-post-loop-test\summary.md
+          if ((Get-Content arl-toolkit-post-loop-test\summary.md -Raw) -notmatch 'post_result_poll_loop') {
+            throw 'post_result_poll_loop classification missing'
+          }
           pwsh -NoProfile -File contrib\arl\Start-ArlEmulator.ps1 `
             -ProfilePath contrib\arl\profiles\arl3460-baseline.json `
             -SelfTest
@@ -119,6 +129,8 @@ jobs:
           cp docs/ARL-TRACE.md "$arl_root/ARL-TRACE.md"
           cp -R contrib/arl/. "$arl_root/contrib/arl/"
           cp contrib/arl/dosbox-arl-trace.conf "$arl_root/dosbox-arl-trace.conf"
+          cp contrib/arl/Launch-ArlImpactStabilityTrace.ps1 "$arl_root/Launch-ArlImpactStabilityTrace.ps1"
+          cp contrib/arl/Preserve-ArlTraceRun.ps1 "$arl_root/Preserve-ArlTraceRun.ps1"
 
           ./scripts/arl-export-patch-stack.sh "$UPSTREAM_TAG" "$package_root/arl-patches"
 
