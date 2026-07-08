@@ -174,6 +174,21 @@ Start with communication parameters and passive/read-only checks:
 - `VE` ICS version
 - `SI` and `RS` status reads
 
+Observed TICS command database notes:
+
+- Main menu option 3 is single-command mode.
+- Main menu option 4 shows communication statistics: characters sent, ICS
+  commands sent, ACK, NAK, timeout, and alarms.
+- Main menu option 5 sends `BREAK DEL DEL` to synchronize/reset ICS. Avoid it
+  during passive diagnostics.
+- Main menu option 7 sets communication parameters before ICS jobs.
+- `TL` is "Test ACS/ICS link" and accepts an alphanumeric text string up to 16
+  characters.
+- `VE` is "Get ICS release version"; ICS identity code is `0`.
+- `RS` is "Read status channels"; status channel is `0..14`, type is `0..1`.
+- `SI` is "Read a status channel"; status channel is `0..14`, result type is
+  `0..1`.
+
 Save TICS screenshots/logs plus the ARL trace under:
 
 ```text
