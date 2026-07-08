@@ -13,6 +13,8 @@ param(
     [string]$EmulatorProfilePath = (Join-Path $PSScriptRoot "profiles\arl3460-baseline.json"),
     [int]$RxDelay = 1000,
     [int]$Cycles = 12000,
+    [ValidateSet("basic", "uart", "full")]
+    [string]$TraceLevel = "basic",
     [int]$HangMs = 15000,
     [string]$RunRoot = "C:\ARL\diagnostics",
     [switch]$Wait,
@@ -43,8 +45,8 @@ $usesEmulator = $Session -eq "impact-emulator" -or $Session -eq "tics-emulator"
 switch ($Session) {
     { $_ -eq "tics" -or $_ -eq "tics-emulator" } {
         $autoexecCommand = @"
-if exist TICS\TICS.EXE cd TICS
-TICS
+if exist TICS\TICS.EXE TICS\TICS
+if not exist TICS\TICS.EXE TICS
 "@
     }
     "status-only" {
@@ -59,7 +61,7 @@ if ($usesEmulator) {
     $serialLine = "serial1 = nullmodem server:$EmulatorHost port:$EmulatorPort transparent:1 rxdelay:$RxDelay"
     $serialComment = "# Emulator session: nullmodem over localhost. This never opens $ComPort."
 } else {
-    $serialLine = "serial1 = directserial realport:$ComPort rxdelay:$RxDelay arltracelevel:full arltracesession:$Session arltracehangms:$HangMs arltrace:$tracePath"
+    $serialLine = "serial1 = directserial realport:$ComPort rxdelay:$RxDelay arltracelevel:$TraceLevel arltracesession:$Session arltracehangms:$HangMs arltrace:$tracePath"
     $serialComment = "# Direct ARL session: opens the real Windows serial port."
 }
 
@@ -129,6 +131,7 @@ $metadata = [pscustomobject]@{
     emulator_command = if ($usesEmulator) { $emulatorCommand } else { $null }
     rxdelay = $RxDelay
     cycles = $Cycles
+    trace_level = if ($usesEmulator) { $null } else { $TraceLevel }
     hang_ms = $HangMs
 }
 $metadata | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-ArlPath $runDir "run-metadata.json") -Encoding UTF8

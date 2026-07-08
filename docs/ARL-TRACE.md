@@ -29,7 +29,7 @@ git config rerere.enabled true
 `directserial` accepts these ARL observability options:
 
 ```ini
-serial1 = directserial realport:COM5 rxdelay:1000 arltracelevel:full arltracesession:impact arltracehangms:15000 arltrace:C:\ARL\diagnostics\serial.ndjson
+serial1 = directserial realport:COM5 rxdelay:1000 arltracelevel:basic arltracesession:impact arltracehangms:15000 arltrace:C:\ARL\diagnostics\serial.ndjson
 ```
 
 - `arltrace:<file>` appends one NDJSON event per line. Omitting it preserves
@@ -37,6 +37,9 @@ serial1 = directserial realport:COM5 rxdelay:1000 arltracelevel:full arltraceses
 - `arltracelevel:basic|uart|full` controls detail. `basic` records TX/RX,
   config, modem lines, and errors. `uart` adds guest UART register reads/writes.
   `full` adds host serial DCB, timeout, and modem-control snapshots.
+  Use `basic` for normal lab runs. Use `uart` or `full` only for short,
+  controlled windows because a disconnected or waiting DOS program can poll UART
+  registers fast enough to create multi-GB traces.
 - `arltracesession:<label>` labels the run, for example `impact`, `tics`,
   `status-only`, or `sample-analysis`.
 - `arltracehangms:<ms>` emits `hang_snapshot` when no relevant TX/RX occurs for
