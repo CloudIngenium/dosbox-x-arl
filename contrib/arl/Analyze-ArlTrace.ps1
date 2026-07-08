@@ -104,11 +104,19 @@ function Format-AsciiBytes([System.Collections.IEnumerable]$Bytes) {
     return ($parts -join "")
 }
 
+function Limit-DisplayText([string]$Text, [int]$MaxLength = 180) {
+    if ([string]::IsNullOrEmpty($Text)) { return "" }
+    if ($Text.Length -le $MaxLength) { return $Text }
+    return $Text.Substring(0, $MaxLength) + "...[truncated]"
+}
+
 function Get-CommandGuess([string]$Ascii, [string]$Hex) {
     if ($Ascii -match "TL") { return "tics-link-test" }
     if ($Ascii -match "VE") { return "tics-version" }
     if ($Ascii -match "SI") { return "status-si" }
     if ($Ascii -match "RS") { return "status-rs" }
+    if ($Ascii -match "#rd" -and ([regex]::Matches($Ascii, "\?").Count -ge 20)) { return "impact-result-read-poll-loop" }
+    if ($Ascii -match "#rd") { return "impact-result-read" }
     if (-not [string]::IsNullOrWhiteSpace($Ascii.Trim("."))) {
         $text = $Ascii
         if ($text.Length -gt 40) { $text = $text.Substring(0, 40) + "..." }
@@ -229,10 +237,10 @@ function Write-ProtocolWorkbook {
     $lines.Add("|---|---:|---|---|---|---|---|---|")
     foreach ($candidate in $candidates) {
         $marks = ($candidate.marks -join "; ")
-        $txHexText = $candidate.tx_hex
-        $txAsciiText = $candidate.tx_ascii
-        $rxHexText = $candidate.rx_hex
-        $rxAsciiText = $candidate.rx_ascii
+        $txHexText = Limit-DisplayText $candidate.tx_hex
+        $txAsciiText = Limit-DisplayText $candidate.tx_ascii
+        $rxHexText = Limit-DisplayText $candidate.rx_hex
+        $rxAsciiText = Limit-DisplayText $candidate.rx_ascii
         $lines.Add("| $($candidate.index) | $($candidate.start_elapsed_ms)-$($candidate.end_elapsed_ms) | ``$txHexText`` | ``$txAsciiText`` | ``$rxHexText`` | ``$rxAsciiText`` | $($candidate.command_guess) / $($candidate.response_guess) | $marks |")
     }
     if ($candidates.Count -eq 0) {
@@ -246,7 +254,59 @@ function Write-ProtocolWorkbook {
         json = $protocolJsonPath
         markdown = $protocolMdPath
         count = $candidates.Count
+        candidates = $candidateArray
     }
+}
+
+function Get-PostResultPollLoop($Candidates) {
+    foreach ($candidate in $Candidates) {
+        $txAscii = [string]$candidate.tx_ascii
+        $rxAscii = [string]$candidate.rx_ascii
+        if ($txAscii -notmatch "#rd") { continue }
+
+        $questionCount = [regex]::Matches($txAscii, "\?").Count
+        if ($questionCount -lt 20) { continue }
+
+        $lineCounts = @{}
+        foreach ($line in ($rxAscii -split "\\r")) {
+            $normalized = $line.Trim()
+            if ($normalized.StartsWith("#")) {
+                $normalized = $normalized.Substring(1).Trim()
+            }
+            if ([string]::IsNullOrWhiteSpace($normalized)) { continue }
+            if ($normalized -notmatch ",") { continue }
+            if (([regex]::Matches($normalized, ",").Count) -lt 5) { continue }
+
+            if (-not $lineCounts.ContainsKey($normalized)) {
+                $lineCounts[$normalized] = 0
+            }
+            $lineCounts[$normalized]++
+        }
+
+        $bestLine = $null
+        $bestCount = 0
+        foreach ($key in $lineCounts.Keys) {
+            if ($lineCounts[$key] -gt $bestCount) {
+                $bestLine = $key
+                $bestCount = $lineCounts[$key]
+            }
+        }
+
+        if ($bestCount -ge 5) {
+            return [pscustomobject]@{
+                candidate_index = $candidate.index
+                start_elapsed_ms = $candidate.start_elapsed_ms
+                end_elapsed_ms = $candidate.end_elapsed_ms
+                duration_ms = $candidate.duration_ms
+                question_count = $questionCount
+                repeated_result_count = $bestCount
+                repeated_result_sample = Limit-DisplayText $bestLine 220
+                tx_count = $candidate.tx_count
+                rx_count = $candidate.rx_count
+            }
+        }
+    }
+    return $null
 }
 
 $timeline = foreach ($e in $events) {
@@ -283,6 +343,7 @@ $timeline = foreach ($e in $events) {
 $timelinePath = Join-Path $OutDir "timeline.csv"
 $timeline | Export-Csv -Path $timelinePath -NoTypeInformation
 $protocolWorkbook = Write-ProtocolWorkbook
+$postResultPollLoop = Get-PostResultPollLoop $protocolWorkbook.candidates
 
 $tx = @($events | Where-Object { (Get-PropValue $_ "event") -eq "tx" })
 $rx = @($events | Where-Object { (Get-PropValue $_ "event") -eq "rx" })
@@ -356,6 +417,9 @@ if ($configRejected.Count -gt 0) {
 if ($overruns.Count -gt 0) {
     $reasons.Add("fifo_or_uart_error")
 }
+if ($null -ne $postResultPollLoop) {
+    $reasons.Add("post_result_poll_loop")
+}
 $lastEventName = Get-PropValue $lastEvent "event"
 if ($blockingLineDrops.Count -gt 0 -and ($txErrors.Count -gt 0 -or $lastEventName -eq "hang_snapshot")) {
     $reasons.Add("modem_line_drop_or_low")
@@ -410,6 +474,7 @@ $suspect = [pscustomobject]@{
     first_modem_line_drop = if ($blockingLineDrops.Count) { $blockingLineDrops[0] } else { $null }
     first_modem_line_low_observed = if ($lineLowEvents.Count) { $lineLowEvents[0] } else { $null }
     first_dcd_low_observed = if ($dcdLowEvents.Count) { $dcdLowEvents[0] } else { $null }
+    post_result_poll_loop = $postResultPollLoop
     last_tx = $lastTx
     last_rx = $lastRx
     last_uart_rhr_read = $lastRhrRead
@@ -435,6 +500,11 @@ $lastThrText = if ($lastThrWrite) { "line $($lastThrWrite.line), elapsed_ms $($l
 $lastEventText = if ($lastEvent) { "line $($lastEvent.line), elapsed_ms $($lastEvent.elapsed_ms), event $($lastEvent.event)" } else { "none" }
 $rxVsRhrText = if ($null -ne $lastRxAfterLastRhrMs) { "$lastRxAfterLastRhrMs ms" } else { "n/a" }
 $rxVsUartText = if ($null -ne $lastRxAfterLastUartMs) { "$lastRxAfterLastUartMs ms" } else { "n/a" }
+$pollLoopText = if ($null -ne $postResultPollLoop) {
+    "candidate $($postResultPollLoop.candidate_index), ? count $($postResultPollLoop.question_count), repeated result count $($postResultPollLoop.repeated_result_count), sample: $($postResultPollLoop.repeated_result_sample)"
+} else {
+    "none"
+}
 
 $summaryLines = @(
     "# ARL Trace Summary",
@@ -454,6 +524,7 @@ $summaryLines = @(
     "- Blocking CTS/DSR low observations: $($blockingLineDrops.Count)",
     "- DCD low observations: $($dcdLowEvents.Count)",
     "- Protocol candidates: $($protocolWorkbook.count)",
+    "- Post-result poll loop: $pollLoopText",
     "",
     "## Classification",
     "",

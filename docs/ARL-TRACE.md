@@ -164,6 +164,24 @@ guest `RHR` reads consuming the result bytes but no screen/`INTERFAC.DAT` update
 classify the failure as an IMPACT result parsing/state-machine problem rather
 than a Windows serial receive problem.
 
+Run `C:\ARL\diagnostics\sample-analysis-20260708-135100\serial.ndjson` captured
+a stronger signal with build `96994b1`:
+
+- IMPACT completed the first burn and displayed analysis values.
+- During the second burn, DOSBox-X kept receiving ARL bytes and IMPACT kept
+  reading guest UART `RHR`; `RX bytes` and `Guest RHR reads` matched in the
+  analyzer snapshot.
+- The analyzer saw no framing, parity, overrun, or write error.
+- The second post-result phase entered a repeated `#rd 246` / `?` polling
+  pattern: IMPACT sent `#rd 246` and many `?` bytes while the ARL repeatedly
+  returned the same numeric result row.
+
+That pattern is now classified as `post_result_poll_loop`. Treat it as evidence
+that the serial receive path is alive. The next diagnosis target is why IMPACT
+does not accept the repeated result/status sequence after a prior successful
+burn: missing terminator, expected ACK/status transition, stale run state, or a
+checksum/result-format mismatch.
+
 ## Safe ARL Emulator
 
 The V1 emulator is external to DOSBox-X. It listens on localhost TCP and DOSBox-X
@@ -297,11 +315,17 @@ For post-spark diagnosis, check these fields in `suspect.json` and `summary.md`:
 - `last_rx_after_last_uart_ms`
 - `last_uart_rhr_read`
 - `last_uart_thr_write`
+- `post_result_poll_loop`
 
 Large positive deltas mean bytes are still arriving from the host side after the
 guest stopped reading the UART data register. With build `96994b1` or later,
 that is stronger evidence than earlier builds because THR/RHR logging is emitted
 inside the common serial register methods.
+
+`post_result_poll_loop` means IMPACT sent `#rd` followed by many `?` bytes and
+the ARL repeatedly returned the same numeric result row. This points away from
+Windows serial loss and toward IMPACT/ARL post-result state or protocol
+acceptance.
 
 ## Update Workflow
 
