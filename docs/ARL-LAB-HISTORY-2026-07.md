@@ -750,3 +750,49 @@ Do not forget:
   clean loop.
 - The clean loop is now an IMPACT/ICS acceptance problem, not a proven Windows
   RX delivery problem.
+
+## 2026-07-08 17:33 CYCLES6000 Good Reference
+
+Launcher:
+
+- `ARL IMPACT+ CYCLES6000 TRACE`.
+- `cycles=fixed 6000`.
+- `rxdelay:3000`.
+- `trace_level=basic`.
+- Direct serial COM5, WCH FIFO disabled/minimized.
+
+Run folder:
+
+```text
+C:\ARL\diagnostics\sample-analysis-20260708-173311
+```
+
+Observed while the session was still open:
+
+- `serial.ndjson` grew normally without runaway size.
+- At 17:40, trace summary showed `#rd=4`, `#em=4`, `?=0`.
+- RX/TX errors were zero.
+- `LPTCAP.PRN` contained real IMPACT print output, including "Absolute
+  Intensities" and "Ratioed Intensities".
+- A preservation snapshot was copied:
+  - `INTERFAC.DAT.snapshot-20260708-174032`
+  - `LPTCAP.snapshot-20260708-174032.PRN`
+
+Interpretation:
+
+- This is the best good-reference HP/DOSBox-X run so far.
+- `6000/3000` is currently the strongest timing candidate.
+- The important difference from bad runs is not merely whether bytes arrive;
+  accepted rows are followed by `#em`, while rejected loops send `?`.
+- Continue testing `6000/3000` before moving to 10000 or other variables.
+
+LPT note:
+
+- The raw DOSBox LPT capture worked.
+- Auto-print did not run for this already-open session because the HP had a
+  stale `Watch-ArlLptCapture.ps1` that did not understand `-SpoolDir` and
+  parsed it as `ParentPid`.
+- The corrected `Watch-ArlLptCapture.ps1` and `Print-ArlLptCapture.ps1` were
+  recopied to `C:\ARL\DOSBox-X-ARL\`.
+- A smoke test with `-ExecutionPolicy Bypass` confirmed the corrected watcher
+  accepts `-SpoolDir` and exits cleanly when the parent PID is gone.
