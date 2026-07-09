@@ -914,3 +914,28 @@ Updated recommended test order:
    attempting more.
 5. If it fails with `?`, launch `ARL IMPACT+ CYCLES6000 UARTDATA TRACE` for
    one detailed burn; do not keep moving cycles blindly.
+
+## 2026-07-08 386-Class Cycle Probe
+
+Rationale:
+
+- IMPACT appears to accept or reject complete checksum-valid result rows within
+  a few milliseconds, so the remaining hypothesis is a narrow DOS timing/state
+  window rather than missing serial bytes.
+- A 1993-era IMPACT installation plausibly targeted 386DX/33-40 or early
+  486SX/25-class PCs. DOSBox-X `cycles` is not a direct MHz conversion, but it
+  is the available control for guest instruction pacing.
+
+New controlled launchers:
+
+- `ARL IMPACT+ CYCLES3500 TRACE` (`cycles=fixed 3500`, `rxdelay:3000`).
+- `ARL IMPACT+ CYCLES4000 TRACE` (`cycles=fixed 4000`, `rxdelay:3000`).
+
+Test order:
+
+1. Fresh DOSBox/IMPACT session.
+2. Try `CYCLES3500 TRACE` first.
+3. If status channels do not read or the first result fails, close DOSBox and
+   try `CYCLES4000 TRACE`.
+4. Stop after the first failure loop and run `Analyze-ArlTrace.ps1 -NoTimeline`
+   on the run folder.
