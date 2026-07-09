@@ -95,6 +95,8 @@ Recent commits in the fork:
 - `fc3851b` - Add ARL UARTDATA diagnostic launcher.
 - `1cc500d` - Validate ARL UARTDATA launcher in CI.
 - `85fcc41` - Cap ARL serial trace size.
+- `ac246de` - Handle ARL checksum sweep end-sample command.
+- `6436a9b` - Add ARL emulator setup fallbacks.
 
 CI status at the time this note was written:
 
@@ -254,6 +256,42 @@ Purpose:
   protocol traces are captured.
 - Reproduce "silent after spark" or "delayed result" safely without touching the
   real ARL.
+
+### Checksum Acceptance Finding
+
+Detailed checksum notes and the current inventory are maintained in
+`docs/ARL-PROTOCOL-CHECKSUM-NOTES-2026-07.md`.
+
+As of 2026-07-09, the local inventory from five captured real traces contains 18
+result rows:
+
+- 13 accepted rows, all with checksum `000-099`.
+- 5 rejected rows, all with checksum `100-255`.
+- Every rejected row has a checksum that validates under the observed algorithm
+  of summing ASCII payload bytes modulo 256.
+
+Interpretation: the failure is probably not RX loss. IMPACT appears to reject
+valid result rows when the result checksum is a three-digit value of 100 or
+higher. This may be a receive-side parser/presentation bug in IMPACT rather than
+an ARL checksum error.
+
+The `95 EMU CHECKSUM SWEEP` profile was adjusted after it accidentally sent the
+same `099` row as both the control and recovery row. That caused IMPACT to treat
+two identical rows as a stable complete sample and enter the `Store Result?`
+flow, contaminating the checksum experiment. The profile now uses visually
+distinct values for every sweep case and a sequence of distinct low-checksum
+recovery rows after `?`, so the experiment measures checksum/format acceptance
+rather than repeated-sample behavior. Trace-derived emulator profiles also
+include safe fallbacks for `st `, `#st `, `ns `, and `#ns ` setup/new-sample
+commands.
+
+Next emulator tests:
+
+- Verify `099` is accepted.
+- Verify `100` and `101` are rejected.
+- Test `100` as `00`, `101` as `01`, and `117` as `17`.
+- Test leading-zero-shaped rows that preserve numeric values but recompute to
+  checksum values below 100.
 
 ## Test Timeline And Evidence
 

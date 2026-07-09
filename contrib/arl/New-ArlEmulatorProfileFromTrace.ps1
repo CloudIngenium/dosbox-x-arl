@@ -404,6 +404,26 @@ $responses.Add([pscustomobject][ordered]@{
     note = "Fallback for trace-derived emulator profiles: preserve exact replay when available, but acknowledge unseen #st setup rows instead of hanging."
 })
 
+$responses.Add([pscustomobject][ordered]@{
+    label = "impact-generic-new-sample-ns-ack"
+    phase = "init-status"
+    match = "prefix_ascii"
+    pattern_ascii = "ns "
+    response_ascii = "#"
+    delay_ms = $DefaultResponseDelayMs
+    note = "Fallback for trace-derived emulator profiles: after Store Result/cancel, IMPACT can send unprefixed ns rows before another analysis. Real traces show ns/#ns transitions acknowledged with '#'."
+})
+
+$responses.Add([pscustomobject][ordered]@{
+    label = "impact-generic-new-sample-hash-ns-ack"
+    phase = "init-status"
+    match = "prefix_ascii"
+    pattern_ascii = "#ns "
+    response_ascii = "#"
+    delay_ms = $DefaultResponseDelayMs
+    note = "Fallback for trace-derived emulator profiles: acknowledge unseen #ns new-sample rows instead of hanging."
+})
+
 $acceptedCount = @($rows | Where-Object { ([string]$_.outcome).StartsWith("accepted") }).Count
 $rejectedCount = @($rows | Where-Object { ([string]$_.outcome).StartsWith("rejected") }).Count
 $sourceCore = Get-PropValue $metadata "core"
