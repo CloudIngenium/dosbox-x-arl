@@ -860,13 +860,11 @@ Offline toolkit updates:
 - These files summarize result-read acceptance count, first rejected checksum,
   `INTERFAC.DAT`/LPT artifacts, and the next recommended variable.
 
-Recommended test order:
+Original next test idea, superseded later the same day:
 
-1. Close the stuck DOSBox-X window to stop the `?` loop.
-2. Restart/reinitialize the ARL/ICS side if the lab procedure allows it.
-3. Run `CYCLES5000 TRACE` on the same SS-413BD workflow and try five burns.
-4. If 5000 fails, run `CYCLES7000 TRACE` under the same workflow.
-5. Only after those two tests, revisit `rxdelay` changes.
+- We planned to try `CYCLES5000 TRACE` and `CYCLES7000 TRACE` around 6000.
+- Those tests were run and did not improve the system. See the follow-up
+  section below for the current recommendation.
 
 ## 2026-07-08 18:25-18:30 CYCLES5000 / CYCLES7000 Follow-Up
 
@@ -901,7 +899,7 @@ Updated interpretation:
   - session hygiene,
   - short IMPACT sessions,
   - 6000/3000 after ARL service,
-  - UARTDATA only if 6000 fails again.
+  - `ARL IMPACT+ CYCLES6000 UARTDATA TRACE` only if normal 6000 fails again.
 
 Updated recommended test order:
 
@@ -910,5 +908,5 @@ Updated recommended test order:
 3. Run one reference burn.
 4. If it passes, run up to four burns maximum, then close/reopen IMPACT before
    attempting more.
-5. If it fails with `?`, capture with UARTDATA at 6000/3000; do not keep
-   moving cycles blindly.
+5. If it fails with `?`, launch `ARL IMPACT+ CYCLES6000 UARTDATA TRACE` for
+   one detailed burn; do not keep moving cycles blindly.
