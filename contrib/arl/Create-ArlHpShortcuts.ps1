@@ -101,6 +101,16 @@ $shortcuts = @(
         BuildRequired = $false
     },
     @{
+        Name = "96 EMU FORMAT EQUIV"
+        Target = "Launch-ArlImpactEmulatorFormatEquivalenceTrace.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "97 EMU CHECKSUM GRAMMAR"
+        Target = "Launch-ArlImpactEmulatorChecksumGrammarTrace.cmd"
+        BuildRequired = $false
+    },
+    @{
         Name = "99 FORCELINES - 6000 SIMPLE386"
         Target = "Launch-ArlImpactCycles6000Simple386ForceLinesTrace.cmd"
         BuildRequired = $true

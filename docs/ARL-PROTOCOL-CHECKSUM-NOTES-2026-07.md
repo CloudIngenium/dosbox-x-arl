@@ -278,6 +278,56 @@ Next protocol test:
   value. If IMPACT accepts those variants, a receive-side canonicalization
   filter becomes viable without changing the chemical values.
 
+## Next Test Profiles
+
+### `96 EMU FORMAT EQUIV`
+
+Profile: `impact-format-equivalence-sweep.json`.
+
+Purpose: prove or disprove whether IMPACT can accept the same numeric results
+when only the ASCII representation changes. This is the key safety gate before
+building any receive-side canonicalization filter.
+
+Coverage:
+
+- Four known-rejected numeric rows: original checksum `100`, `101`, `117`, and
+  `231`.
+- For each base row, the original rejected row is sent as a control.
+- Then value-equivalent variants are sent with checksums targeted to known
+  accepted values: `000`, `023`, `055`, `089`, and `099` when a valid equivalent
+  ASCII representation can be found.
+- Variants use combinations that a C/DOS numeric parser should usually accept:
+  leading zeros, trailing precision zeros, leading spaces, and explicit `+`
+  signs.
+
+Interpretation:
+
+- If a variant is accepted, the checksum/content rejection can likely be worked
+  around by rewriting only textual representation while preserving numeric
+  values.
+- If all variants are rejected, IMPACT likely rejects one of the numeric values,
+  field widths, signs/spaces, or accumulated state rather than checksum alone.
+
+### `97 EMU CHECKSUM GRAMMAR`
+
+Profile: `impact-checksum-grammar-sweep.json`.
+
+Purpose: test row grammar around already-accepted low-checksum payloads.
+
+Coverage:
+
+- Leading `#` versus no leading `#`.
+- Fixed three-digit checksum versus unpadded or four-digit checksum text.
+- CR versus CRLF line ending.
+- Delimiter experiments between payload and checksum.
+- A known rejected checksum `100` control.
+
+Interpretation:
+
+- If no-hash rows are accepted, the leading `#` is optional for result rows.
+- If unpadded or four-digit checksums are rejected, checksum width is fixed.
+- If CRLF is accepted, line ending is tolerant; if rejected, keep CR-only.
+
 ## Implementation Notes
 
 - The emulator profile must avoid using the same recovery row immediately after
