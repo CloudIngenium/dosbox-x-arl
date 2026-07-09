@@ -90,6 +90,13 @@ if (-not $NoCleanup) {
             -not $desiredNames.ContainsKey($name)
         } |
         Remove-Item -Force
+
+    Get-ChildItem -Path $DesktopPath -File |
+        Where-Object {
+            $_.Extension -ne ".lnk" -and
+            $_.BaseName -match "ARL|IMPACT|CYCLES|SIMPLE|TRACE|TICS|UARTDATA|FORCELINES|HOLDRTS|RX4000|SAFE SERIAL|STABILITY"
+        } |
+        Remove-Item -Force
 }
 
 $created = foreach ($item in $shortcuts) {
