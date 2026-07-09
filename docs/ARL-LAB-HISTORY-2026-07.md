@@ -1581,3 +1581,48 @@ Next emulator interpretation:
   2. Run `81 EMU COMPAC ON SAFE LOOP` and close after one accepted/store flow.
   3. Compare `impact-post-run-files` against baseline.
   4. Only then run `82 EMU COMPAC AUTO SAFE LOOP`.
+
+2026-07-09 emulator safe-loop freeze after accepted rows:
+
+- Observed HP run: `C:\ARL\diagnostics\impact-emulator-20260709-092144`.
+- IMPACT accepted result rows before freezing on the Sample Analysis screen,
+  not on the normal blinking `Please Run Sample` reject loop.
+- Emulator summary showed:
+  - `9` accepted cases;
+  - `0` rejected cases;
+  - `0` no-match events;
+  - `LPTCAP.PRN` present with `22782` bytes.
+- Last useful log sequence:
+  - IMPACT sent `#em 242\r`;
+  - emulator ACKed `#`;
+  - IMPACT started the next analysis prep with
+    `pa 3,15,5,0,2,2,0,0,1000,1,1 174\r`;
+  - emulator answered `#0 080\r`;
+  - IMPACT sent full `#m1 1 015\r`;
+  - old emulator produced no `rule_match`, `no_match`, or error after that
+    final CR.
+- Interpretation:
+  - This specific failure was an emulator/tooling bug, not evidence that IMPACT
+    rejected another result row.
+  - The run is still valuable because it proves accepted rows and LPT capture
+    were flowing before the emulator stalled.
+- Fix:
+  - Added `transaction_start`, `transaction_done`, and `transaction_error`
+    telemetry around every emulator transaction.
+  - Added safe-loop `fast_response_ascii` for simple recurring ACK commands:
+    `#m1 1 015\r`, `cl 239\r`,
+    `dc 27,17,9,13,7,24,29,15,23,20,26,25,3,1,15 171\r`,
+    `m2 1 016\r`, `we 252\r`, and `#em 242\r`.
+  - Validated locally that the prep sequence returns:
+    `pa -> #0 080\r`, `#m1 -> #`, `cl -> #`, `dc -> #`,
+    `m2 -> #`, `we -> #0 080\r`.
+  - Deployed and hash-verified on the HP:
+    `Start-ArlEmulator.ps1` SHA256
+    `51E6C9E98E6661793724E5E76147BDD7104539A9453F01C6543EE76E167BD4B6`;
+    `impact-format-equivalence-safe-loop.json` SHA256
+    `12A1D35E460E0C0E6BE7EAF968D30015D1D9BF307A8A42A7EA9DFD13F7C44B58`.
+- Next emulator instruction:
+  - close the current stuck DOSBox/emulator session;
+  - relaunch `80 EMU SAFE LOOP`;
+  - confirm the log now shows `transaction_start` and `transaction_done` after
+    the recurring `#m1 1 015\r` prep command.

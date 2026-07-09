@@ -2307,5 +2307,13 @@
       "reset_to": 0,
       "note": "After all safe rows are consumed, reset to the first safe row on the next #rd request."
     }
+  },
+  "fast_response_ascii": {
+    "#m1 1 015\r": "#",
+    "cl 239\r": "#",
+    "dc 27,17,9,13,7,24,29,15,23,20,26,25,3,1,15 171\r": "#",
+    "m2 1 016\r": "#",
+    "we 252\r": "#0 080\r",
+    "#em 242\r": "#"
   }
 }

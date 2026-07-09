@@ -251,10 +251,58 @@ function Find-MatchingRule([byte[]]$InputBytes) {
     return $null
 }
 
+function Get-FastResponseRule([string]$InputAscii) {
+    $fastResponses = Get-PropValue $script:Profile "fast_response_ascii"
+    if ($null -eq $fastResponses) { return $null }
+
+    foreach ($property in $fastResponses.PSObject.Properties) {
+        if ($InputAscii -eq [string]$property.Name) {
+            $responseAscii = [string]$property.Value
+            return [pscustomobject]@{
+                label = "fast-response"
+                phase = "fast-response"
+                response_ascii = $responseAscii
+                delay_ms = 0
+            }
+        }
+    }
+
+    return $null
+}
+
 function Invoke-Transaction([System.Net.Sockets.NetworkStream]$Stream, [byte[]]$InputBytes) {
-    $rule = Find-MatchingRule $InputBytes
     $inputHex = Format-HexBytes $InputBytes
     $inputAscii = Format-AsciiBytes $InputBytes
+    $inputText = [System.Text.Encoding]::ASCII.GetString($InputBytes)
+
+    Write-EmulatorEvent @{
+        event = "transaction_start"
+        input_hex = $inputHex
+        input_ascii = $inputAscii
+    }
+
+    try {
+        $rule = Get-FastResponseRule $inputText
+        if ($null -ne $rule) {
+            Write-EmulatorEvent @{
+                event = "fast_response_match"
+                rule = Get-PropValue $rule "label" "fast-response"
+                phase = Get-PropValue $rule "phase" "fast-response"
+                input_hex = $inputHex
+                input_ascii = $inputAscii
+            }
+        } else {
+            $rule = Find-MatchingRule $InputBytes
+        }
+    } catch {
+        Write-EmulatorEvent @{
+            event = "transaction_error"
+            input_hex = $inputHex
+            input_ascii = $inputAscii
+            error = $_.Exception.Message
+        }
+        throw
+    }
 
     if ($null -eq $rule) {
         Write-EmulatorEvent @{
@@ -318,6 +366,13 @@ function Invoke-Transaction([System.Net.Sockets.NetworkStream]$Stream, [byte[]]$
         $Stream.Write($one, 0, 1)
         $Stream.Flush()
         Write-ByteEvent "rx" $byte $rule
+    }
+    Write-EmulatorEvent @{
+        event = "transaction_done"
+        rule = $label
+        phase = $phase
+        input_hex = $inputHex
+        input_ascii = $inputAscii
     }
     return $false
 }
