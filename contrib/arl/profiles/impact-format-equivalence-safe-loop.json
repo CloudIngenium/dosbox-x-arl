@@ -1936,11 +1936,11 @@
     },
     {
       "label": "impact-generic-read-status-ack",
-      "phase": "init-status",
+      "phase": "status",
       "match": "prefix_ascii",
       "pattern_ascii": "#rs ",
-      "response_ascii": "#0 080\r",
-      "note": "Fallback for first-launch startup paths where strict replay sequence is not aligned before status reads."
+      "response_ascii": "#012.01288,037.85,0211.1995,-997.1655,025.2,04.93,011.95958,-11.94207,024.02338,-99.87646,00.,00.,00.,00.,00.,00. 204\r",
+      "note": "Trace-derived status-channel response used when strict replay sequence is not aligned before status reads."
     },
     {
       "label": "impact-generic-read-status-nohash-ack",
