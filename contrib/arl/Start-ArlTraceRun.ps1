@@ -11,6 +11,11 @@ param(
     [ValidateSet("happy-path", "silent-after-spark", "delayed-result", "line-drop", "bad-response")]
     [string]$EmulatorMode = "happy-path",
     [string]$EmulatorProfilePath = (Join-Path $PSScriptRoot "profiles\arl3460-baseline.json"),
+    [string]$WindowResolution = "1280x960",
+    [ValidateSet("default", "surface", "opengl", "openglnb", "openglpp", "direct3d", "ttf")]
+    [string]$VideoOutput = "openglnb",
+    [bool]$Aspect = $true,
+    [string]$Scaler = "none",
     [int]$RxDelay = 1000,
     [int]$Cycles = 12000,
     [ValidateSet("normal", "simple", "dynamic", "auto")]
@@ -165,7 +170,13 @@ $conf = @"
 
 [sdl]
 fullscreen = false
+windowresolution = $WindowResolution
+output = $VideoOutput
 autolock = false
+
+[render]
+aspect = $($Aspect.ToString().ToLowerInvariant())
+scaler = $Scaler
 
 [dosbox]
 machine = svga_s3
@@ -220,6 +231,10 @@ $metadata = [pscustomobject]@{
     run_dir = $runDir
     dosbox_exe = $DosboxExe
     config = $confPath
+    window_resolution = $WindowResolution
+    video_output = $VideoOutput
+    aspect = $Aspect
+    scaler = $Scaler
     trace = if ($usesEmulator) { $null } else { $tracePath }
     emulator_trace = if ($usesEmulator) { $emulatorTracePath } else { $null }
     log = $logPath

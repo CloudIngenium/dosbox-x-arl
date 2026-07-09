@@ -1226,3 +1226,11 @@ Current read:
 - The next high-signal test is `11 NOINT33 - 6000 SIMPLE386`, which disables
   `DOS\MOUSE.COM`, DOSBox-X `int33`, BIOS PS/2 mouse emulation, and keyboard
   AUX mouse emulation, with auto-print off for the test.
+
+2026-07-09 display adjustment:
+
+- Generated configs now default to a larger 4:3 operator window:
+  `windowresolution=1280x960`, `output=openglnb`, `aspect=true`,
+  `scaler=none`.
+- This is intended to improve RDP readability without changing IMPACT's DOS
+  video mode.

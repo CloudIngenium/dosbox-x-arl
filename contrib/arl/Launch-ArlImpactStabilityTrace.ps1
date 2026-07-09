@@ -26,6 +26,11 @@ param(
     [switch]$ArlForceDcd,
     [switch]$ArlHoldRts,
     [switch]$ArlHoldDtr,
+    [string]$WindowResolution = "1280x960",
+    [ValidateSet("default", "surface", "opengl", "openglnb", "openglpp", "direct3d", "ttf")]
+    [string]$VideoOutput = "openglnb",
+    [bool]$Aspect = $true,
+    [string]$Scaler = "none",
     [string]$PrinterName = "EPSON LX-350",
     [switch]$NoAutoPrintLpt,
     [switch]$NoLptFormFeed,
@@ -56,6 +61,10 @@ $runArgs = @{
     Session = "sample-analysis"
     DosboxExe = $DosboxExe
     TraceLevel = "basic"
+    WindowResolution = $WindowResolution
+    VideoOutput = $VideoOutput
+    Aspect = $Aspect
+    Scaler = $Scaler
     Cycles = $Cycles
     RxDelay = $RxDelay
     Core = $Core

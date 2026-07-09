@@ -237,6 +237,19 @@ Next preferred isolation test:
   - disables `DOS\MOUSE.COM`, `int33`, `biosps2`, and keyboard `aux`
   - disables auto-print to remove LPT watcher side effects for this test
 
+## Operator Window Size
+
+Generated ARL configs use a larger operator window by default:
+
+- `[sdl] windowresolution = 1280x960`
+- `[sdl] output = openglnb`
+- `[render] aspect = true`
+- `[render] scaler = none`
+
+This scales DOSBox-X output for readability while keeping the DOS video mode
+seen by IMPACT unchanged. If the HP/RDP display is too small, lower
+`WindowResolution` in the launcher call, for example `1024x768`.
+
 If those do not move the failure, use the deeper DOS compatibility launchers:
 
 - `ARL IMPACT+ CYCLES6000 SIMPLE386 ZEROEMS TRACE`
