@@ -115,6 +115,31 @@ function Limit-DisplayText([string]$Text, [int]$MaxLength = 180) {
     return $Text.Substring(0, $MaxLength) + "...[truncated]"
 }
 
+function Get-NumberStats([System.Collections.IEnumerable]$Values) {
+    $numbers = @($Values | Where-Object { $null -ne $_ } | ForEach-Object { [double]$_ } | Sort-Object)
+    if ($numbers.Count -eq 0) {
+        return [pscustomobject]@{
+            count = 0
+            avg = $null
+            max = $null
+            p95 = $null
+        }
+    }
+
+    $sum = 0.0
+    foreach ($number in $numbers) { $sum += $number }
+    $p95Index = [Math]::Ceiling($numbers.Count * 0.95) - 1
+    if ($p95Index -lt 0) { $p95Index = 0 }
+    if ($p95Index -ge $numbers.Count) { $p95Index = $numbers.Count - 1 }
+
+    return [pscustomobject]@{
+        count = $numbers.Count
+        avg = [Math]::Round($sum / $numbers.Count, 3)
+        max = [Math]::Round($numbers[-1], 3)
+        p95 = [Math]::Round($numbers[$p95Index], 3)
+    }
+}
+
 function Get-ArlChecksum([string]$Payload) {
     if ($null -eq $Payload) { return $null }
     $body = $Payload
@@ -308,12 +333,22 @@ function Get-ResultReadMetrics {
                 $lineEndMs = [int](Get-PropValue $rxEvent "elapsed_ms" 0)
                 $info = Get-ResultLineInfo $lineText
                 if ($null -ne $info) {
+                    $lineElapsed = @($lineEvents | ForEach-Object { [int](Get-PropValue $_ "elapsed_ms" 0) })
+                    $lineGaps = New-Object System.Collections.Generic.List[int]
+                    for ($gapIndex = 1; $gapIndex -lt $lineElapsed.Count; $gapIndex++) {
+                        $lineGaps.Add($lineElapsed[$gapIndex] - $lineElapsed[$gapIndex - 1])
+                    }
+                    $gapStats = Get-NumberStats $lineGaps
                     $rxLines.Add([pscustomobject]@{
                         line = $info.raw
                         start_elapsed_ms = $lineStartMs
                         end_elapsed_ms = $lineEndMs
                         duration_ms = ($lineEndMs - $lineStartMs)
                         byte_count = $lineEvents.Count
+                        interbyte_gap_count = $gapStats.count
+                        interbyte_gap_avg_ms = $gapStats.avg
+                        interbyte_gap_max_ms = $gapStats.max
+                        interbyte_gap_p95_ms = $gapStats.p95
                         checksum = $info.checksum
                         computed_checksum = $info.computed_checksum
                         checksum_valid = $info.checksum_valid
@@ -348,7 +383,15 @@ function Get-ResultReadMetrics {
             first_rx_delay_ms = if ($rxEvents.Count) { [int](Get-PropValue $rxEvents[0] "elapsed_ms" 0) - $rdMs } else { $null }
             result_line_count = $rxLines.Count
             first_result = $firstResult
+            first_result_start_delay_ms = if ($null -ne $firstResult) { $firstResult.start_elapsed_ms - $rdMs } else { $null }
+            first_result_end_delay_ms = if ($null -ne $firstResult) { $firstResult.end_elapsed_ms - $rdMs } else { $null }
             first_result_duration_ms = if ($null -ne $firstResult) { $firstResult.duration_ms } else { $null }
+            first_result_byte_count = if ($null -ne $firstResult) { $firstResult.byte_count } else { $null }
+            first_result_interbyte_avg_ms = if ($null -ne $firstResult) { $firstResult.interbyte_gap_avg_ms } else { $null }
+            first_result_interbyte_max_ms = if ($null -ne $firstResult) { $firstResult.interbyte_gap_max_ms } else { $null }
+            first_result_interbyte_p95_ms = if ($null -ne $firstResult) { $firstResult.interbyte_gap_p95_ms } else { $null }
+            first_result_checksum = if ($null -ne $firstResult) { $firstResult.checksum } else { $null }
+            first_result_checksum_valid = if ($null -ne $firstResult) { $firstResult.checksum_valid } else { $null }
             post_result_tx_delay_ms = if ($null -ne $firstResult -and $postTxEvents.Count) { [int](Get-PropValue $postTxEvents[0] "elapsed_ms" 0) - $firstResult.end_elapsed_ms } else { $null }
             post_result_tx_excerpt = Limit-DisplayText $postText 80
             outcome = $outcome
@@ -873,6 +916,69 @@ $labNextLines = @(
 )
 $labNextLines | Set-Content -Path $labNextTestMdPath -Encoding UTF8
 
+$resultTimingPath = Join-Path $OutDir "result-timing.csv"
+$resultTimingMdPath = Join-Path $OutDir "result-timing.md"
+$resultTimingRows = @(
+    $resultReadMetrics.transactions | ForEach-Object {
+        [pscustomobject]@{
+            index = $_.index
+            outcome = $_.outcome
+            rd_elapsed_ms = $_.rd_elapsed_ms
+            first_rx_delay_ms = $_.first_rx_delay_ms
+            first_result_start_delay_ms = $_.first_result_start_delay_ms
+            first_result_end_delay_ms = $_.first_result_end_delay_ms
+            first_result_duration_ms = $_.first_result_duration_ms
+            first_result_byte_count = $_.first_result_byte_count
+            interbyte_avg_ms = $_.first_result_interbyte_avg_ms
+            interbyte_p95_ms = $_.first_result_interbyte_p95_ms
+            interbyte_max_ms = $_.first_result_interbyte_max_ms
+            post_result_tx_delay_ms = $_.post_result_tx_delay_ms
+            post_result_tx_excerpt = $_.post_result_tx_excerpt
+            checksum = $_.first_result_checksum
+            checksum_valid = $_.first_result_checksum_valid
+            result_line_count = $_.result_line_count
+            first_result = if ($null -ne $_.first_result) { $_.first_result.line } else { $null }
+        }
+    }
+)
+$resultTimingRows | Export-Csv -Path $resultTimingPath -NoTypeInformation -Encoding UTF8
+
+$acceptedTiming = @($resultTimingRows | Where-Object { ([string]$_.outcome).StartsWith("accepted") })
+$rejectedTiming = @($resultTimingRows | Where-Object { ([string]$_.outcome).StartsWith("rejected") })
+function Format-TimingGroup([string]$Label, $Rows) {
+    $rowsArray = @($Rows)
+    if ($rowsArray.Count -eq 0) { return "- ${Label}: none" }
+    $firstRxStats = Get-NumberStats (@($rowsArray | ForEach-Object { $_.first_rx_delay_ms }))
+    $durationStats = Get-NumberStats (@($rowsArray | ForEach-Object { $_.first_result_duration_ms }))
+    $postStats = Get-NumberStats (@($rowsArray | ForEach-Object { $_.post_result_tx_delay_ms }))
+    return "- ${Label}: count $($rowsArray.Count), first RX avg/max $($firstRxStats.avg)/$($firstRxStats.max) ms, row duration avg/max $($durationStats.avg)/$($durationStats.max) ms, IMPACT response avg/max $($postStats.avg)/$($postStats.max) ms"
+}
+
+$resultTimingLines = @(
+    "# ARL Result Timing",
+    "",
+    "Trace: $TracePath",
+    "",
+    "This report measures the result-read phase after each `#rd 246` command.",
+    "",
+    "## Summary",
+    "",
+    (Format-TimingGroup "accepted" $acceptedTiming),
+    (Format-TimingGroup "rejected" $rejectedTiming),
+    "",
+    "## Transactions",
+    "",
+    "| # | outcome | #rd ms | first RX delay | row start delay | row end delay | row duration | bytes | gap avg/p95/max | IMPACT response delay | response | checksum |",
+    "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---|"
+)
+foreach ($row in $resultTimingRows) {
+    $gapText = "$($row.interbyte_avg_ms)/$($row.interbyte_p95_ms)/$($row.interbyte_max_ms)"
+    $checksumText = if ($null -ne $row.checksum) { "$($row.checksum) valid=$($row.checksum_valid)" } else { "" }
+    $responseText = ([string]$row.post_result_tx_excerpt).Replace("|", "\|")
+    $resultTimingLines += "| $($row.index) | $($row.outcome) | $($row.rd_elapsed_ms) | $($row.first_rx_delay_ms) | $($row.first_result_start_delay_ms) | $($row.first_result_end_delay_ms) | $($row.first_result_duration_ms) | $($row.first_result_byte_count) | $gapText | $($row.post_result_tx_delay_ms) | ``$responseText`` | $checksumText |"
+}
+$resultTimingLines | Set-Content -Path $resultTimingMdPath -Encoding UTF8
+
 $summaryPath = Join-Path $OutDir "summary.md"
 $auditManifestPath = Join-Path $OutDir "audit-manifest.json"
 $auditManifestMdPath = Join-Path $OutDir "audit-manifest.md"
@@ -936,6 +1042,8 @@ $summaryLines = @(
     "- Suspect JSON: $suspectPath",
     "- Lab next test MD: $labNextTestMdPath",
     "- Lab next test JSON: $labNextTestJsonPath",
+    "- Result timing MD: $resultTimingMdPath",
+    "- Result timing CSV: $resultTimingPath",
     "- Audit manifest MD: $auditManifestMdPath",
     "- Audit manifest JSON: $auditManifestPath"
 )
