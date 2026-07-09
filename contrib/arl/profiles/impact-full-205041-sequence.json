@@ -856,6 +856,24 @@
       "note": "Fallback for trace-derived emulator profiles: preserve exact replay when available, but acknowledge unseen #st setup rows instead of hanging."
     },
     {
+      "label": "impact-generic-mode-select-ms-ack",
+      "phase": "init-status",
+      "match": "prefix_ascii",
+      "pattern_ascii": "#ms ",
+      "response_ascii": "#0 080\r",
+      "delay_ms": 25,
+      "note": "Trace-derived setup fallback: #ms mode-select rows are acknowledged by the ARL with #0 080."
+    },
+    {
+      "label": "impact-generic-status-rs-response",
+      "phase": "status",
+      "match": "prefix_ascii",
+      "pattern_ascii": "#rs ",
+      "response_ascii": "#012.01288,037.85,0211.1995,-997.1655,025.2,04.93,011.95958,-11.94207,024.02338,-99.87646,00.,00.,00.,00.,00.,00. 204\r",
+      "delay_ms": 25,
+      "note": "Trace-derived status-channel response used when the startup replay sequence differs before #rs."
+    },
+    {
       "label": "impact-generic-new-sample-ns-ack",
       "phase": "init-status",
       "match": "prefix_ascii",
