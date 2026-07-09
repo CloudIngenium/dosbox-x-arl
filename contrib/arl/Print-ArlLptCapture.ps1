@@ -5,7 +5,10 @@ param(
 
     [string]$RunRoot = "C:\ARL\diagnostics",
 
-    [string]$PrinterName = "EPSON LX-350",
+    [string[]]$PrinterName = @("EPSON LX-350"),
+
+    [ValidateSet("Raw", "Text")]
+    [string]$PrintMode = "Raw",
 
     [string]$CaptureName = "LPTCAP.PRN",
 
@@ -44,10 +47,14 @@ if ([string]::IsNullOrWhiteSpace($CapturePath)) {
     }
 }
 
-$printer = Get-Printer -Name $PrinterName -ErrorAction SilentlyContinue
-if ($null -eq $printer) {
-    $known = (Get-Printer | Select-Object -ExpandProperty Name) -join ", "
-    throw "Printer '$PrinterName' not found. Known printers: $known"
+$printers = @()
+foreach ($name in $PrinterName) {
+    $printer = Get-Printer -Name $name -ErrorAction SilentlyContinue
+    if ($null -eq $printer) {
+        $known = (Get-Printer | Select-Object -ExpandProperty Name) -join ", "
+        throw "Printer '$name' not found. Known printers: $known"
+    }
+    $printers += $printer
 }
 
 $capture = Get-Item -Path $CapturePath
@@ -76,7 +83,10 @@ if ($previewLength -gt 0) {
 
 Write-Host "Capture: $($capture.FullName)"
 Write-Host "Bytes: $($capture.Length)"
-Write-Host "Printer: $($printer.Name) on $($printer.PortName)"
+Write-Host "Print mode: $PrintMode"
+foreach ($printer in $printers) {
+    Write-Host "Printer: $($printer.Name) on $($printer.PortName)"
+}
 if ($AppendFormFeed -and $printBytes.Length -ne $previewBytes.Length) {
     Write-Host "Print bytes: $($printBytes.Length) (appended form feed)"
 }
@@ -85,7 +95,7 @@ Write-Host $preview
 
 if (-not $Send) {
     Write-Host ""
-    Write-Host "Dry run only. Re-run with -Send to send RAW bytes to the printer."
+    Write-Host "Dry run only. Re-run with -Send to print."
     exit 0
 }
 
@@ -170,5 +180,26 @@ if (-not ([System.Management.Automation.PSTypeName]"ArlRawPrinter").Type) {
     Add-Type -TypeDefinition $source
 }
 
-[ArlRawPrinter]::SendBytes($printer.Name, "ARL IMPACT+ LPT capture", $printBytes)
-Write-Host "Sent $($printBytes.Length) RAW bytes to $($printer.Name)."
+function ConvertTo-ArlPrintableText([byte[]]$Bytes) {
+    $text = [System.Text.Encoding]::ASCII.GetString($Bytes)
+    $text = $text -replace "`e\[[0-9;?]*[A-Za-z]", ""
+    $text = $text -replace "`e.", ""
+    $text = $text -replace "`f", "`r`n`r`n"
+    return $text
+}
+
+foreach ($printer in $printers) {
+    if ($PrintMode -eq "Raw") {
+        [ArlRawPrinter]::SendBytes($printer.Name, "ARL IMPACT+ LPT capture", $printBytes)
+        Write-Host "Sent $($printBytes.Length) RAW bytes to $($printer.Name)."
+    } else {
+        $textPath = Join-Path ([System.IO.Path]::GetTempPath()) ("arl-lpt-{0}.txt" -f ([guid]::NewGuid().ToString("N")))
+        try {
+            ConvertTo-ArlPrintableText $previewBytes | Set-Content -Path $textPath -Encoding ASCII
+            Get-Content -Path $textPath | Out-Printer -Name $printer.Name
+            Write-Host "Sent text-rendered capture to $($printer.Name)."
+        } finally {
+            Remove-Item -Path $textPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+}

@@ -51,6 +51,8 @@ param(
     [string]$RunRoot = "C:\ARL\diagnostics",
     [switch]$AutoPrintLpt,
     [string]$PrinterName = "EPSON LX-350",
+    [ValidateSet("Raw", "Text")]
+    [string]$PrintMode = "Raw",
     [int]$LptIdleMs = 2500,
     [int]$LptPollMs = 500,
     [switch]$NoLptFormFeed,
@@ -445,6 +447,7 @@ $metadata = [pscustomobject]@{
     lpt_capture = $lptPath
     auto_print_lpt = [bool]$AutoPrintLpt
     printer_name = if ($AutoPrintLpt) { $PrinterName } else { $null }
+    print_mode = if ($AutoPrintLpt) { $PrintMode } else { $null }
     lpt_idle_ms = if ($AutoPrintLpt) { $LptIdleMs } else { $null }
     lpt_spool_dir = if ($AutoPrintLpt) { $lptSpoolDir } else { $null }
     lpt_append_form_feed = if ($AutoPrintLpt) { -not [bool]$NoLptFormFeed } else { $null }
@@ -599,6 +602,7 @@ if ($AutoPrintLpt -and -not $usesEmulator) {
     $watcherArgs = [ordered]@{
         CapturePath = $lptPath
         PrinterName = $PrinterName
+        PrintMode = $PrintMode
         SpoolDir = $lptSpoolDir
         PrintScriptPath = $printScriptPath
         ParentPid = $process.Id

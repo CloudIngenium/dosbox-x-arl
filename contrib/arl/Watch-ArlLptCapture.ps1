@@ -2,7 +2,10 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$CapturePath,
 
-    [string]$PrinterName = "EPSON LX-350",
+    [string[]]$PrinterName = @("EPSON LX-350"),
+
+    [ValidateSet("Raw", "Text")]
+    [string]$PrintMode = "Raw",
 
     [string]$SpoolDir = "",
 
@@ -78,7 +81,8 @@ if ($Send -and -not (Test-Path -Path $PrintScriptPath -PathType Leaf)) {
 
 Write-Log "Watching LPT capture: $CapturePath"
 Write-Log "Spool directory: $SpoolDir"
-Write-Log "Printer: $PrinterName"
+Write-Log "Printer: $($PrinterName -join ', ')"
+Write-Log "Print mode: $PrintMode"
 Write-Log "Send enabled: $Send"
 Write-Log "Append form feed: $AppendFormFeed"
 if ($ParentPid -gt 0) {
@@ -177,6 +181,7 @@ while ($true) {
                 length = $count
                 sha256 = $hash.Hash
                 printer_name = $PrinterName
+                print_mode = $PrintMode
                 send_enabled = [bool]$Send
                 append_form_feed = [bool]$AppendFormFeed
                 parent_pid = if ($ParentPid -gt 0) { $ParentPid } else { $null }
@@ -189,6 +194,7 @@ while ($true) {
                     $printArgs = @(
                         "-CapturePath", $jobPath,
                         "-PrinterName", $PrinterName,
+                        "-PrintMode", $PrintMode,
                         "-Send"
                     )
                     if ($AppendFormFeed) {

@@ -1707,3 +1707,40 @@ Next emulator interpretation:
   - it does not touch `COM5` or the real ARL;
   - it is intended for checksum/format/timing probes while preserving a live
     IMPACT state.
+
+2026-07-09 printing, screen-print policy, and checksum-sanitizer path:
+
+- Windows printers found on the HP:
+  - `EPSON LX-350` on `USB001`;
+  - `HPAFDCEE.Corp.Tpu.mx (HP Smart Tank 750 series)` on a WSD network port;
+  - `Microsoft Print to PDF`;
+  - `OneNote (Desktop)`.
+- Printing policy:
+  - use `PrintMode Raw` for the Epson matrix printer because it receives the
+    captured IMPACT LPT bytes directly;
+  - use `PrintMode Text` for the HP Smart Tank/network ink printer because it
+    renders the ASCII report through the Windows print driver instead of
+    assuming Epson ESC/P compatibility.
+- Dry-run validation:
+  - `Print-ArlLptCapture.ps1 -PrinterName "HPAFDCEE.Corp.Tpu.mx (HP Smart Tank 750 series)" -PrintMode Text`
+    found the latest `LPTCAP.PRN`, previewed it, and did not print without
+    `-Send`.
+- Screen-print policy:
+  - prefer LPT/print artifacts when IMPACT reaches a real report path:
+    `LPTCAP.PRN`, `print-jobs\*.prn`, `0.RES`, and `INTERFAC.DAT`;
+  - use screenshots for state evidence only: hangs, dialogs, `Please Run
+    Sample`, `Store Result?`, printer errors, or configuration/status screens;
+  - a screenshot alone is not enough to prove a result was accepted; acceptance
+    remains `#rd` result followed by `#em`, plus `INTERFAC.DAT`/`0.RES` update.
+- Added `Set-ArlEmulatorControl.ps1`:
+  - writes the active run's `emulator-control.json`;
+  - can program the next emulator response to `#rd 246\r`;
+  - calculates and reports claimed vs computed checksum;
+  - supports exact `-ResponseAscii` or generated `-Values`.
+- Checksum-sanitizer path:
+  - emulator-only first: use hot control to prove that IMPACT accepts a
+    modified low-checksum row while staying in the same IMPACT session;
+  - if proven, implement a separate opt-in DOSBox-X directserial RX filter for
+    the real ARL, guarded by an explicit config flag and full trace logging;
+  - do not enable any real-ARL mutation until emulator evidence shows the exact
+    transformation is accepted and scientifically acceptable.
