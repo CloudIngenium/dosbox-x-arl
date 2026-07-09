@@ -187,6 +187,11 @@ serial1 = directserial realport:COM5 rxdelay:1000 arltracelevel:basic arltracese
   size limit. `Start-ArlTraceRun.ps1` uses `64` MB by default so a stuck polling
   loop preserves evidence without filling the disk. Use `0` only for short,
   supervised captures where an unlimited trace is intentional.
+- `arlforcects:1`, `arlforcedsr:1`, and `arlforcedcd:1` force the
+  guest-visible modem input lines high. Use only for compatibility tests after
+  installing a build that contains these options.
+- `arlholdrts:1` and `arlholddtr:1` keep the host RTS/DTR output lines high
+  toward the ARL/ICS while tracing the effective line state.
 
 Trace v2 includes:
 
@@ -201,6 +206,41 @@ Trace v2 includes:
   in `uart` and `full`
 - FIFO usage, IRQ state, `rx_state`, `rx_retry`, and error counters
 - Windows host DCB, timeouts, flow-control flags, and modem status in `full`
+
+## SIMPLE386 Reject Matrix
+
+The current best evidence run is
+`C:\ARL\diagnostics\sample-analysis-20260708-205041\snapshot-20260708-205610`.
+It used `core=simple`, `cputype=386`, `cycles=fixed 6000`, `rxdelay:3000`,
+accepted three result rows, then rejected a fourth complete checksum-valid row
+with `?` instead of `#em`.
+
+Use this no-rebuild order next, one variable per fresh DOSBox/IMPACT session:
+
+1. `ARL IMPACT+ CYCLES6000 SIMPLE386 NOMOUSE TRACE`
+2. `ARL IMPACT+ CYCLES6000 SIMPLE386 NOUMB TRACE`
+3. `ARL IMPACT+ CYCLES6000 SIMPLE386 NOAUTOPRINT TRACE`
+4. `ARL IMPACT+ CYCLES6000 SIMPLE386 EMSBOARD TRACE`
+5. `ARL IMPACT+ CYCLES6000 SIMPLE386 EMM386 TRACE`
+
+If those do not move the failure, use the deeper DOS compatibility launchers:
+
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 ZEROEMS TRACE`
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 ZEROXMS TRACE`
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 MCBCOMPAT TRACE`
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 NOSHARE TRACE`
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 UNMASKDISKIO TRACE`
+
+The following are build-required; do not expose them as operator-default
+shortcuts until the newer artifact is installed:
+
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 FORCELINES TRACE`
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 HOLDRTS-DTR TRACE`
+
+Emulator profiles derived from the run:
+
+- `profiles\impact-simple386-four-row-sequence.json`
+- `profiles\impact-simple386-rejected-row-first.json`
 
 ## ARLTRACE.COM
 

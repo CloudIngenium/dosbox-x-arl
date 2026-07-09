@@ -1069,3 +1069,103 @@ Print issue:
 - Windows showed the print job in the EPSON queue with status `Normal`; if no
   paper moved, the remaining issue is printer/driver/USB consumption, not LPT
   capture.
+
+## 2026-07-08 SIMPLE386 Valid-Row Reject Reference
+
+Reference run:
+
+- `C:\ARL\diagnostics\sample-analysis-20260708-205041`
+- Snapshot:
+  `C:\ARL\diagnostics\sample-analysis-20260708-205041\snapshot-20260708-205610`
+- Launcher profile:
+  - `core=simple`
+  - `cputype=386`
+  - `cycles=fixed 6000`
+  - `rxdelay:3000`
+  - `arltracelevel=basic`
+
+This is the current primary evidence run. IMPACT accepted three analysis rows,
+then rejected the fourth even though the row was complete and checksum-valid.
+
+Analyzer signal:
+
+- result reads: `4`
+- accepted by IMPACT: `3`
+- rejected by IMPACT: `1`
+- accepted before first reject: `3`
+- post-result `?` poll count: `90`
+- repeated result row count: `90`
+- RX/TX errors: none reported by the trace analyzer
+
+The rejected row:
+
+```text
+#106.251,13.389,2.615,0.690,3.180,65.430,1.528,62.935,1.454,87.305,11.880,10.284,19.361,6.779,62.935 117
+```
+
+Its trailing checksum is `117`, and the analyzer computed `117`. The important
+shift is that this should not be treated as a simple Windows RX-loss failure.
+The ARL returned a valid row, DOSBox-X captured it, and IMPACT then sent `?`
+instead of `#em`.
+
+Active hypotheses after this run:
+
+- IMPACT rejects by value/range/curve state even though the serial row is valid.
+- IMPACT accumulates state after several burns and rejects a later valid row.
+- DOS memory layout or resident driver placement changes an old parser/buffer
+  path.
+- Modem-control lines do not match what a native COM port exposed to IMPACT or
+  to the ARL/ICS.
+- Printing or file side effects interfere after successful prior analyses.
+
+Implemented no-rebuild test matrix:
+
+1. `ARL IMPACT+ CYCLES6000 SIMPLE386 NOMOUSE TRACE`
+   - `core=simple`, `cputype=386`, no `DOS\MOUSE.COM`.
+2. `ARL IMPACT+ CYCLES6000 SIMPLE386 NOUMB TRACE`
+   - `core=simple`, `cputype=386`, `umb=false`.
+3. `ARL IMPACT+ CYCLES6000 SIMPLE386 NOAUTOPRINT TRACE`
+   - captures `LPTCAP.PRN` but does not start the watcher or send to Epson.
+4. `ARL IMPACT+ CYCLES6000 SIMPLE386 EMSBOARD TRACE`
+   - `ems=emsboard`.
+5. `ARL IMPACT+ CYCLES6000 SIMPLE386 EMM386 TRACE`
+   - `ems=emm386`.
+
+Additional no-rebuild DOS compatibility launchers:
+
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 ZEROEMS TRACE`
+  - `zero memory on ems memory allocation=true`.
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 ZEROXMS TRACE`
+  - `zero memory on xms memory allocation=true`.
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 MCBCOMPAT TRACE`
+  - `mcb corruption becomes application free memory=true`.
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 NOSHARE TRACE`
+  - `share=false`.
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 UNMASKDISKIO TRACE`
+  - `unmask timer on disk io=true`.
+
+Build-required launchers prepared but not valid until a newer DOSBox-X-ARL
+artifact is installed:
+
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 FORCELINES TRACE`
+  - adds `arlforcects:1 arlforcedsr:1 arlforcedcd:1`.
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 HOLDRTS-DTR TRACE`
+  - adds `arlholdrts:1 arlholddtr:1`.
+
+Test rule:
+
+- Start each launcher from a fresh DOSBox/IMPACT process.
+- Do up to five burns or stop at the first `Please Run Sample` loop.
+- Preserve/analyze the run before trying the next variable.
+- Do not use `UARTDATA` for stability tests unless a short proof capture is
+  explicitly needed.
+
+Emulator profiles derived from this run:
+
+- `profiles\impact-simple386-four-row-sequence.json` returns the three accepted
+  rows, then the valid row that IMPACT rejected, and repeats it when IMPACT
+  sends `?`.
+- `profiles\impact-simple386-rejected-row-first.json` returns the rejected row
+  as the first result. If IMPACT rejects it immediately, suspect value/range or
+  row format. If it accepts it first but rejects it after three accepted rows,
+  suspect accumulated IMPACT/session state.

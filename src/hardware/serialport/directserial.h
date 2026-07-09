@@ -96,6 +96,11 @@ private:
 	bool trace_dtr = false;
 	bool trace_break = false;
 	int trace_modem_status = -1;
+	bool arl_force_cts = false;
+	bool arl_force_dsr = false;
+	bool arl_force_dcd = false;
+	bool arl_hold_rts = false;
+	bool arl_hold_dtr = false;
 	bool trace_have_tx = false;
 	bool trace_have_rx = false;
 	uint8_t trace_last_tx = 0;

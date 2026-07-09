@@ -1,0 +1,43 @@
+{
+  "name": "impact-simple386-rejected-row-first",
+  "description": "Trace-derived control profile that returns the row rejected in the SIMPLE386 run as the first analysis result. Use to test whether IMPACT rejects this row because of values/format or only after accumulated state.",
+  "source_run": "sample-analysis-20260708-205041/snapshot-20260708-205610",
+  "source_settings": {
+    "core": "simple",
+    "cputype": "386",
+    "cycles": 6000,
+    "rxdelay": 3000,
+    "trace_level": "basic"
+  },
+  "transaction_idle_ms": 120,
+  "default_response_delay_ms": 25,
+  "delayed_result_ms": 10000,
+  "responses": [
+    {
+      "label": "impact-rejected-row-as-first-result",
+      "phase": "analysis-result",
+      "match": "ascii_contains",
+      "pattern_ascii": "#rd",
+      "response_ascii": "#106.251,13.389,2.615,0.690,3.180,65.430,1.528,62.935,1.454,87.305,11.880,10.284,19.361,6.779,62.935 117\r\n",
+      "checksum": 117,
+      "accepted_by_impact_in_source_run": false,
+      "control_question": "If IMPACT rejects this as the first row, suspect row value/range/format. If it accepts it first but rejects it after three prior rows, suspect accumulated IMPACT state."
+    },
+    {
+      "label": "impact-reject-loop-repeat-rejected-row",
+      "phase": "reject-loop",
+      "match": "ascii_contains",
+      "pattern_ascii": "?",
+      "response_ascii": "#106.251,13.389,2.615,0.690,3.180,65.430,1.528,62.935,1.454,87.305,11.880,10.284,19.361,6.779,62.935 117\r\n",
+      "checksum": 117
+    },
+    {
+      "label": "impact-accepted-end-marker",
+      "phase": "accepted",
+      "match": "ascii_contains",
+      "pattern_ascii": "#em",
+      "response_ascii": "",
+      "note": "No response is needed; only record whether IMPACT sends #em."
+    }
+  ]
+}

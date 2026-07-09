@@ -24,6 +24,35 @@ ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/svc-claude svc-claude@LABOR
 Do not assume `jcarlos@LABORATORIO-ARL`; that reaches the host but is not the
 working automation account.
 
+## 2026-07-08 Remote Access Blocker
+
+During the SIMPLE386 matrix deployment attempt, all remote execution paths were
+partially broken:
+
+- Direct SSH authenticated by host name but the configured shell emitted
+  `No se pudo iniciar CLR, HRESULT: 80004005`.
+- `scp` closed the connection before upload.
+- Azure Arc `run-command` reached the machine, but Windows PowerShell failed
+  inside the run-command host with internal error `800705af`.
+- SMB enumerated `C$` and `IMPLUS$`, but denied directory listing/content access
+  from this macOS session even when mounting with the service account.
+
+Treat this as a remote-management issue, not an ARL toolkit issue. The toolkit
+package can still be installed from the interactive RDP session as user `JC`.
+
+Manual install fallback:
+
+1. Copy `arl-toolkit-simple386-matrix-20260708.zip` to the HP.
+2. Extract it over `C:\ARL\DOSBox-X-ARL`.
+3. From an interactive PowerShell window on the HP, run:
+
+```powershell
+C:\ARL\DOSBox-X-ARL\Create-ArlHpShortcuts.ps1
+```
+
+This creates only the no-rebuild operator shortcuts. Do not pass
+`-IncludeBuildRequired` until a build newer than `96994b1` is installed.
+
 ## Avoid Inline PowerShell Quoting
 
 Avoid this pattern for anything non-trivial:
@@ -73,4 +102,3 @@ Get-ChildItem 'C:\Users\Public\Desktop' -Filter 'ARL IMPACT+ *.lnk' |
     [pscustomobject]@{ Name = $_.Name; Target = $s.TargetPath; Exists = Test-Path $s.TargetPath }
   }
 ```
-

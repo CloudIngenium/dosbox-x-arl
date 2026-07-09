@@ -138,39 +138,77 @@ function Get-RuleDelayMs($Rule, [string]$CurrentMode) {
     return [int](Get-PropValue $Rule "delay_ms" (Get-PropValue $script:Profile "default_response_delay_ms" 25))
 }
 
+function Test-RuleMatch($Rule, [string]$InputHex, [string]$InputAscii) {
+    $matchType = Get-PropValue $Rule "match" "exact_hex"
+    switch ($matchType) {
+        "any" { return $true }
+        "exact_hex" {
+            return $InputHex -eq (Normalize-Hex (Get-PropValue $Rule "pattern_hex" ""))
+        }
+        "prefix_hex" {
+            $pattern = Normalize-Hex (Get-PropValue $Rule "pattern_hex" "")
+            return (-not [string]::IsNullOrWhiteSpace($pattern) -and $InputHex.StartsWith($pattern))
+        }
+        "contains_hex" {
+            $pattern = Normalize-Hex (Get-PropValue $Rule "pattern_hex" "")
+            return (-not [string]::IsNullOrWhiteSpace($pattern) -and $InputHex.Contains($pattern))
+        }
+        "exact_ascii" {
+            return $InputAscii -eq (Get-PropValue $Rule "pattern_ascii" "")
+        }
+        "prefix_ascii" {
+            $pattern = Get-PropValue $Rule "pattern_ascii" ""
+            return (-not [string]::IsNullOrWhiteSpace($pattern) -and $InputAscii.StartsWith($pattern))
+        }
+        "ascii_contains" {
+            $pattern = Get-PropValue $Rule "pattern_ascii" ""
+            return (-not [string]::IsNullOrWhiteSpace($pattern) -and $InputAscii.Contains($pattern))
+        }
+        default {
+            throw "Unknown emulator match type '$matchType' in rule '$((Get-PropValue $Rule "label" "unknown"))'"
+        }
+    }
+}
+
+function Get-RuleSequenceKey($Rule) {
+    $key = Get-PropValue $Rule "sequence_key" ""
+    if ([string]::IsNullOrWhiteSpace($key)) { return $null }
+    return [string]$key
+}
+
+function Test-RuleSequenceReady($Rule) {
+    $repeatPolicy = Get-PropValue $Rule "repeat_policy" ""
+    if ($repeatPolicy -ne "sequence") { return $true }
+
+    $key = Get-RuleSequenceKey $Rule
+    if ([string]::IsNullOrWhiteSpace($key)) {
+        throw "Rule '$((Get-PropValue $Rule "label" "unknown"))' uses repeat_policy=sequence without sequence_key"
+    }
+
+    $expected = [int](Get-PropValue $Rule "sequence_index" 0)
+    $actual = 0
+    if ($script:SequenceState.ContainsKey($key)) {
+        $actual = [int]$script:SequenceState[$key]
+    }
+    return $actual -eq $expected
+}
+
+function Advance-RuleSequence($Rule) {
+    $repeatPolicy = Get-PropValue $Rule "repeat_policy" ""
+    if ($repeatPolicy -ne "sequence") { return }
+
+    $key = Get-RuleSequenceKey $Rule
+    $next = [int](Get-PropValue $Rule "sequence_next" ([int](Get-PropValue $Rule "sequence_index" 0) + 1))
+    $script:SequenceState[$key] = $next
+}
+
 function Find-MatchingRule([byte[]]$InputBytes) {
     $inputHex = Format-HexCompact $InputBytes
     $inputAscii = [System.Text.Encoding]::ASCII.GetString($InputBytes)
 
     foreach ($rule in @($script:Profile.responses)) {
-        $matchType = Get-PropValue $rule "match" "exact_hex"
-        switch ($matchType) {
-            "any" { return $rule }
-            "exact_hex" {
-                if ($inputHex -eq (Normalize-Hex (Get-PropValue $rule "pattern_hex" ""))) { return $rule }
-            }
-            "prefix_hex" {
-                $pattern = Normalize-Hex (Get-PropValue $rule "pattern_hex" "")
-                if (-not [string]::IsNullOrWhiteSpace($pattern) -and $inputHex.StartsWith($pattern)) { return $rule }
-            }
-            "contains_hex" {
-                $pattern = Normalize-Hex (Get-PropValue $rule "pattern_hex" "")
-                if (-not [string]::IsNullOrWhiteSpace($pattern) -and $inputHex.Contains($pattern)) { return $rule }
-            }
-            "exact_ascii" {
-                if ($inputAscii -eq (Get-PropValue $rule "pattern_ascii" "")) { return $rule }
-            }
-            "prefix_ascii" {
-                $pattern = Get-PropValue $rule "pattern_ascii" ""
-                if (-not [string]::IsNullOrWhiteSpace($pattern) -and $inputAscii.StartsWith($pattern)) { return $rule }
-            }
-            "ascii_contains" {
-                $pattern = Get-PropValue $rule "pattern_ascii" ""
-                if (-not [string]::IsNullOrWhiteSpace($pattern) -and $inputAscii.Contains($pattern)) { return $rule }
-            }
-            default {
-                throw "Unknown emulator match type '$matchType' in rule '$((Get-PropValue $rule "label" "unknown"))'"
-            }
+        if ((Test-RuleMatch $rule $inputHex $inputAscii) -and (Test-RuleSequenceReady $rule)) {
+            return $rule
         }
     }
     return $null
@@ -201,6 +239,7 @@ function Invoke-Transaction([System.Net.Sockets.NetworkStream]$Stream, [byte[]]$
         input_hex = $inputHex
         input_ascii = $inputAscii
     }
+    Advance-RuleSequence $rule
 
     if ($Mode -eq "silent-after-spark" -and $phase -eq "analysis-result") {
         Write-EmulatorEvent @{
@@ -314,6 +353,7 @@ if (-not (Test-Path -Path $ProfilePath -PathType Leaf)) {
 
 $script:Profile = Get-Content -Path $ProfilePath -Raw | ConvertFrom-Json
 $script:StartEpochMs = Get-NowMs
+$script:SequenceState = @{}
 
 if (-not [string]::IsNullOrWhiteSpace($LogPath)) {
     $logDir = Split-Path -Parent $LogPath

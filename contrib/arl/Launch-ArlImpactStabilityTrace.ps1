@@ -8,9 +8,19 @@ param(
     [ValidateRange(1, 63)]
     [int]$MemSize = 16,
     [bool]$Xms = $true,
-    [bool]$Ems = $true,
+    [object]$Ems = $true,
     [bool]$Umb = $true,
     [bool]$LoadMouse = $true,
+    [bool]$ZeroMemoryOnEmsAllocation = $false,
+    [bool]$ZeroMemoryOnXmsAllocation = $false,
+    [bool]$McbCorruptionBecomesApplicationFreeMemory = $false,
+    [bool]$Share = $true,
+    [bool]$UnmaskTimerOnDiskIo = $false,
+    [switch]$ArlForceCts,
+    [switch]$ArlForceDsr,
+    [switch]$ArlForceDcd,
+    [switch]$ArlHoldRts,
+    [switch]$ArlHoldDtr,
     [string]$PrinterName = "EPSON LX-350",
     [switch]$NoAutoPrintLpt,
     [switch]$NoLptFormFeed,
@@ -50,8 +60,18 @@ $runArgs = @{
     Ems = $Ems
     Umb = $Umb
     LoadMouse = $LoadMouse
+    ZeroMemoryOnEmsAllocation = $ZeroMemoryOnEmsAllocation
+    ZeroMemoryOnXmsAllocation = $ZeroMemoryOnXmsAllocation
+    McbCorruptionBecomesApplicationFreeMemory = $McbCorruptionBecomesApplicationFreeMemory
+    Share = $Share
+    UnmaskTimerOnDiskIo = $UnmaskTimerOnDiskIo
     HangMs = 30000
 }
+if ($ArlForceCts) { $runArgs.ArlForceCts = $true }
+if ($ArlForceDsr) { $runArgs.ArlForceDsr = $true }
+if ($ArlForceDcd) { $runArgs.ArlForceDcd = $true }
+if ($ArlHoldRts) { $runArgs.ArlHoldRts = $true }
+if ($ArlHoldDtr) { $runArgs.ArlHoldDtr = $true }
 
 if (-not $NoAutoPrintLpt) {
     $runArgs.AutoPrintLpt = $true

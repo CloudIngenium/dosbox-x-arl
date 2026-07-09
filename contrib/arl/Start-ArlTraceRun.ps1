@@ -19,9 +19,19 @@ param(
     [ValidateRange(1, 63)]
     [int]$MemSize = 16,
     [bool]$Xms = $true,
-    [bool]$Ems = $true,
+    [object]$Ems = $true,
     [bool]$Umb = $true,
     [bool]$LoadMouse = $true,
+    [bool]$ZeroMemoryOnEmsAllocation = $false,
+    [bool]$ZeroMemoryOnXmsAllocation = $false,
+    [bool]$McbCorruptionBecomesApplicationFreeMemory = $false,
+    [bool]$Share = $true,
+    [bool]$UnmaskTimerOnDiskIo = $false,
+    [switch]$ArlForceCts,
+    [switch]$ArlForceDsr,
+    [switch]$ArlForceDcd,
+    [switch]$ArlHoldRts,
+    [switch]$ArlHoldDtr,
     [ValidateSet("basic", "uartdata", "uart", "full")]
     [string]$TraceLevel = "basic",
     [int]$HangMs = 15000,
@@ -50,8 +60,35 @@ function Quote-PowerShellLiteral([string]$Value) {
     return "'" + $Value.Replace("'", "''") + "'"
 }
 
+function ConvertTo-ArlDosOption([object]$Value, [string]$Name, [string[]]$AllowedValues) {
+    if ($Value -is [bool]) {
+        $text = if ($Value) { "true" } else { "false" }
+    } elseif ($null -eq $Value) {
+        throw "$Name cannot be null"
+    } else {
+        $text = ([string]$Value).Trim().ToLowerInvariant()
+        if ($text -eq "1") { $text = "true" }
+        if ($text -eq "0") { $text = "false" }
+    }
+
+    if ($AllowedValues -notcontains $text) {
+        throw "$Name must be one of: $($AllowedValues -join ', ')"
+    }
+
+    return $text
+}
+
+$xmsText = ConvertTo-ArlDosOption $Xms "Xms" @("true", "false")
+$emsText = ConvertTo-ArlDosOption $Ems "Ems" @("true", "false", "emsboard", "emm386")
+$umbText = ConvertTo-ArlDosOption $Umb "Umb" @("true", "false")
+
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $runDir = Join-ArlPath $RunRoot "$Session-$stamp"
+$runSuffix = 1
+while (Test-Path -Path $runDir) {
+    $runSuffix++
+    $runDir = Join-ArlPath $RunRoot "$Session-$stamp-$runSuffix"
+}
 New-Item -ItemType Directory -Force -Path $runDir | Out-Null
 
 $tracePath = Join-ArlPath $runDir "serial.ndjson"
@@ -99,7 +136,14 @@ if ($usesEmulator) {
     $serialComment = "# Emulator session: nullmodem over localhost. This never opens $ComPort."
 } else {
     $traceLimitOption = if ($TraceMaxMb -gt 0) { " arltracemaxmb:$TraceMaxMb" } else { "" }
-    $serialLine = "serial1 = directserial realport:$ComPort rxdelay:$RxDelay arltracelevel:$TraceLevel arltracesession:$Session arltracehangms:$HangMs$traceLimitOption arltrace:$tracePath"
+    $lineOptions = New-Object System.Collections.Generic.List[string]
+    if ($ArlForceCts) { $lineOptions.Add("arlforcects:1") }
+    if ($ArlForceDsr) { $lineOptions.Add("arlforcedsr:1") }
+    if ($ArlForceDcd) { $lineOptions.Add("arlforcedcd:1") }
+    if ($ArlHoldRts) { $lineOptions.Add("arlholdrts:1") }
+    if ($ArlHoldDtr) { $lineOptions.Add("arlholddtr:1") }
+    $lineOptionsText = if ($lineOptions.Count -gt 0) { " " + ($lineOptions -join " ") } else { "" }
+    $serialLine = "serial1 = directserial realport:$ComPort rxdelay:$RxDelay arltracelevel:$TraceLevel arltracesession:$Session arltracehangms:$HangMs$traceLimitOption$lineOptionsText arltrace:$tracePath"
     $serialComment = "# Direct ARL session: opens the real Windows serial port."
 }
 
@@ -138,9 +182,14 @@ parallel1 = file append:$lptPath timeout:2000
 parallel2 = disabled
 
 [dos]
-xms = $($Xms.ToString().ToLowerInvariant())
-ems = $($Ems.ToString().ToLowerInvariant())
-umb = $($Umb.ToString().ToLowerInvariant())
+xms = $xmsText
+ems = $emsText
+umb = $umbText
+zero memory on ems memory allocation = $($ZeroMemoryOnEmsAllocation.ToString().ToLowerInvariant())
+zero memory on xms memory allocation = $($ZeroMemoryOnXmsAllocation.ToString().ToLowerInvariant())
+mcb corruption becomes application free memory = $($McbCorruptionBecomesApplicationFreeMemory.ToString().ToLowerInvariant())
+share = $($Share.ToString().ToLowerInvariant())
+unmask timer on disk io = $($UnmaskTimerOnDiskIo.ToString().ToLowerInvariant())
 
 [autoexec]
 mount c "$ImplusPath"
@@ -173,10 +222,20 @@ $metadata = [pscustomobject]@{
     core = $Core
     cputype = $CpuType
     memsize = $MemSize
-    xms = $Xms
-    ems = $Ems
-    umb = $Umb
+    xms = $xmsText
+    ems = $emsText
+    umb = $umbText
     load_mouse = $LoadMouse
+    zero_memory_on_ems_memory_allocation = $ZeroMemoryOnEmsAllocation
+    zero_memory_on_xms_memory_allocation = $ZeroMemoryOnXmsAllocation
+    mcb_corruption_becomes_application_free_memory = $McbCorruptionBecomesApplicationFreeMemory
+    share = $Share
+    unmask_timer_on_disk_io = $UnmaskTimerOnDiskIo
+    arl_force_cts = [bool]$ArlForceCts
+    arl_force_dsr = [bool]$ArlForceDsr
+    arl_force_dcd = [bool]$ArlForceDcd
+    arl_hold_rts = [bool]$ArlHoldRts
+    arl_hold_dtr = [bool]$ArlHoldDtr
     trace_level = if ($usesEmulator) { $null } else { $TraceLevel }
     hang_ms = $HangMs
     trace_max_mb = if ($usesEmulator) { $null } else { $TraceMaxMb }
