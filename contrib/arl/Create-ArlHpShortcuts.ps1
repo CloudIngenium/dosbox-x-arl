@@ -96,6 +96,11 @@ $shortcuts = @(
         BuildRequired = $false
     },
     @{
+        Name = "95 EMU CHECKSUM SWEEP"
+        Target = "Launch-ArlImpactEmulatorChecksumSweepTrace.cmd"
+        BuildRequired = $false
+    },
+    @{
         Name = "99 FORCELINES - 6000 SIMPLE386"
         Target = "Launch-ArlImpactCycles6000Simple386ForceLinesTrace.cmd"
         BuildRequired = $true
