@@ -1445,3 +1445,28 @@ Next emulator interpretation:
   same numeric values but changes ASCII representation to target accepted
   checksums. This directly tests whether a future DOSBox-X-ARL receive-side
   formatting filter can fix IMPACT without changing chemistry.
+
+2026-07-09 first-launch status hang:
+
+- User observed a consistent pattern: the first IMPACT launch after opening
+  DOSBox-X often hangs at `Reading status channels... Please wait`, while the
+  second launch advances. This happens with both real ARL and emulator.
+- Emulator evidence from `impact-emulator-20260709-081304`: first launch sent
+  `st 1,...` without the leading `#`, then later sent `#ms 000\r`; the emulator
+  had replay rules for strict `#st`/`#ms` order, but the generic `st` fallback
+  did not advance the replay sequence, so `#ms 000\r` logged `no_match`.
+- Interpretation: first launch can take a slightly different ICS/status
+  initialization path than the trace-derived replay expected. The second launch
+  benefits from files/state produced during the first attempt and takes the
+  better-known path.
+- HP filesystem evidence during the hang included fresh `TELEX.DAT`,
+  `TELEX.DEF`, and `NOTDONE.FLG`; `NOTDONE.FLG` was not previously in the
+  cleanup list.
+- Fix applied:
+  - added generic emulator acknowledgements for `#ms 000\r`, `ms 000\r`,
+    `#rs ...`, and `rs ...`;
+  - regenerated and uploaded profiles `95`, `96`, and `97`;
+  - added `notdone.flg` and `report.x` to backed-up IMPACT temp cleanup.
+- Validation target: close all DOSBox windows, launch `96 EMU FORMAT EQUIV`
+  once from a cold state, and confirm whether it passes the first status read
+  without needing a second IMPACT launch.

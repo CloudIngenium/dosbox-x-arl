@@ -86,6 +86,49 @@ function cloneBaseProfile(name, description) {
   return profile;
 }
 
+function ensureStartupFallbacks(profile) {
+  const fallbacks = [
+    {
+      label: "impact-generic-measure-status-ack",
+      phase: "init-status",
+      match: "exact_ascii",
+      pattern_ascii: "#ms 000\r",
+      response_ascii: "#0 080\r",
+      note: "Fallback for first-launch startup paths where IMPACT reaches #ms after generic st acknowledgements and the strict replay sequence is not aligned.",
+    },
+    {
+      label: "impact-generic-measure-status-nohash-ack",
+      phase: "init-status",
+      match: "exact_ascii",
+      pattern_ascii: "ms 000\r",
+      response_ascii: "#0 080\r",
+      note: "No-hash variant of the startup #ms acknowledgement.",
+    },
+    {
+      label: "impact-generic-read-status-ack",
+      phase: "init-status",
+      match: "prefix_ascii",
+      pattern_ascii: "#rs ",
+      response_ascii: "#0 080\r",
+      note: "Fallback for first-launch startup paths where strict replay sequence is not aligned before status reads.",
+    },
+    {
+      label: "impact-generic-read-status-nohash-ack",
+      phase: "init-status",
+      match: "prefix_ascii",
+      pattern_ascii: "rs ",
+      response_ascii: "#0 080\r",
+      note: "No-hash variant of the startup status-read acknowledgement.",
+    },
+  ];
+
+  for (const fallback of fallbacks) {
+    if (!profile.responses.some((rule) => rule.label === fallback.label)) {
+      profile.responses.push(fallback);
+    }
+  }
+}
+
 function insertBeforeAcceptedMarker(profile, rules) {
   const insertAt = profile.responses.findIndex((rule) => rule.label === "sweep-accepted-end-marker");
   profile.responses.splice(insertAt >= 0 ? insertAt : profile.responses.length, 0, ...rules);
@@ -189,6 +232,7 @@ function buildFormatEquivalenceProfile() {
     "impact-format-equivalence-sweep",
     "IMPACT emulator sweep that keeps numeric result values equivalent while changing ASCII formatting to target accepted checksums.",
   );
+  ensureStartupFallbacks(profile);
 
   const sourceByLabel = new Map(
     JSON.parse(fs.readFileSync(basePath, "utf8")).responses.map((rule) => [rule.label, rule]),
@@ -265,6 +309,7 @@ function buildChecksumGrammarProfile() {
     "impact-checksum-grammar-sweep",
     "IMPACT emulator sweep for result-row prefix, checksum width, delimiter, and line-ending grammar.",
   );
+  ensureStartupFallbacks(profile);
   const source = JSON.parse(fs.readFileSync(basePath, "utf8"));
   const accepted023 = source.responses.find((rule) => rule.label === "sweep-case-08-low023-shaped-distinct");
   const accepted000 = source.responses.find((rule) => rule.label === "sweep-case-09-low000-shaped-distinct");

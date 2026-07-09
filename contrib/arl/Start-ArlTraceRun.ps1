@@ -129,6 +129,8 @@ function Invoke-ImpactTempCleanup([string]$ImpactPath, [string]$BackupRoot) {
         "qafile.flg",
         "qanofile.flg",
         "spc.flg",
+        "notdone.flg",
+        "report.x",
         "telex.dat",
         "telex.def"
     )

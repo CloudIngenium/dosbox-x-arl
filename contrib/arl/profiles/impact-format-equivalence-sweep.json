@@ -1645,6 +1645,38 @@
       "response_ascii": "#",
       "delay_ms": 25,
       "note": "Fallback for trace-derived emulator profiles: acknowledge unseen #ns new-sample rows instead of hanging."
+    },
+    {
+      "label": "impact-generic-measure-status-ack",
+      "phase": "init-status",
+      "match": "exact_ascii",
+      "pattern_ascii": "#ms 000\r",
+      "response_ascii": "#0 080\r",
+      "note": "Fallback for first-launch startup paths where IMPACT reaches #ms after generic st acknowledgements and the strict replay sequence is not aligned."
+    },
+    {
+      "label": "impact-generic-measure-status-nohash-ack",
+      "phase": "init-status",
+      "match": "exact_ascii",
+      "pattern_ascii": "ms 000\r",
+      "response_ascii": "#0 080\r",
+      "note": "No-hash variant of the startup #ms acknowledgement."
+    },
+    {
+      "label": "impact-generic-read-status-ack",
+      "phase": "init-status",
+      "match": "prefix_ascii",
+      "pattern_ascii": "#rs ",
+      "response_ascii": "#0 080\r",
+      "note": "Fallback for first-launch startup paths where strict replay sequence is not aligned before status reads."
+    },
+    {
+      "label": "impact-generic-read-status-nohash-ack",
+      "phase": "init-status",
+      "match": "prefix_ascii",
+      "pattern_ascii": "rs ",
+      "response_ascii": "#0 080\r",
+      "note": "No-hash variant of the startup status-read acknowledgement."
     }
   ],
   "format_equivalence_cases": [
