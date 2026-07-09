@@ -96,8 +96,22 @@ Current status after repair:
 - The previous default executable hash
   `499A1F9D992F28CD022429F6F2CCAAFA0F03D898F68B606B7659CA29819571DA`
   was backed up under `C:\ARL\DOSBox-X-ARL\_backups\exe-20260708-220943`.
-- Thirteen SIMPLE386 shortcuts were created under
-  `C:\Users\Public\Desktop`.
+- Operator shortcuts under `C:\Users\Public\Desktop` are intentionally short and
+  numbered. `Create-ArlHpShortcuts.ps1` removes old ARL/IMPACT shortcuts by
+  default and recreates only the active no-build matrix:
+  - `01 NOAUTOPRINT - 6000 SIMPLE386`
+  - `02 NOMOUSE - 6000 SIMPLE386`
+  - `03 NOUMB - 6000 SIMPLE386`
+  - `04 EMSBOARD - 6000 SIMPLE386`
+  - `05 EMM386 - 6000 SIMPLE386`
+  - `06 ZEROEMS - 6000 SIMPLE386`
+  - `07 ZEROXMS - 6000 SIMPLE386`
+  - `08 MCBCOMPAT - 6000 SIMPLE386`
+  - `09 NOSHARE - 6000 SIMPLE386`
+  - `10 UNMASKDISKIO - 6000 SIMPLE386`
+  - `Diagnostics - Serial Traces`
+- `FORCELINES` and `HOLDRTS-DTR` are not recreated unless
+  `-IncludeBuildRequired` is passed explicitly.
 - `FORCELINES` was dry-run verified to emit
   `arlforcects:1 arlforcedsr:1 arlforcedcd:1`.
 - `HOLDRTS-DTR` was dry-run verified to emit
