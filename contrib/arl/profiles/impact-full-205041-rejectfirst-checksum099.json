@@ -783,8 +783,8 @@
       "phase": "accepted",
       "match": "ascii_contains",
       "pattern_ascii": "#em",
-      "response_ascii": "",
-      "note": "Observed IMPACT transition after accepted rows."
+      "response_ascii": "#",
+      "note": "Observed IMPACT transition after accepted rows. Updated to ACK #em with # because real traces show ARL acknowledgement after accepted/end-marker transitions."
     },
     {
       "label": "impact-generic-setup-st-ack",

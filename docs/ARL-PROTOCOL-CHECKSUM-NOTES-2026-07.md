@@ -115,6 +115,34 @@ Acceptance signal:
 - `#em 242\r` means IMPACT accepted the row.
 - `?` means IMPACT rejected the row.
 
+## Emulator Results
+
+### 2026-07-09 01:47 - `95 EMU CHECKSUM SWEEP`
+
+Run folder: `C:\ARL\diagnostics\impact-emulator-20260709-014719`.
+
+| Case | Payload/checksum test | IMPACT response | Interpretation |
+|---|---|---|---|
+| 01 | distinct valid checksum `099` | `#em` | Accepted |
+| 02 | distinct valid checksum `100` | `?` | Rejected |
+| recovery 01 | distinct low checksum `055` | `#em` | Accepted |
+| 03 | distinct valid checksum `101` | `?` | Rejected |
+| recovery 02 | distinct low checksum `061` | `#em` | Accepted |
+| 04 | payload computes to `100`, checksum field sent as `00` | `?` | Rejected; two-digit truncation did not pass |
+| recovery 03 | distinct low checksum `040` | `#em` | Accepted |
+
+The run then entered a weird/blank IMPACT state because the emulator matched
+`sweep-accepted-end-marker` for `#em 242\r` but returned no bytes. Real traces
+show `#em` transitions being acknowledged by the ARL with `#`, so emulator
+profiles were updated to return `#` for accepted end-marker rules.
+
+Confirmed from this run:
+
+- Valid decimal `100` and `101` result checksums are rejected by IMPACT.
+- Simply truncating `100` to a two-digit checksum field `00` is also rejected.
+- Distinct low-checksum recovery rows continue to be accepted, so the rejection
+  is still tied to checksum presentation/validation rather than value similarity.
+
 ## Implementation Notes
 
 - The emulator profile must avoid using the same recovery row immediately after

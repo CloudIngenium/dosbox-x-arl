@@ -293,6 +293,12 @@ Next emulator tests:
 - Test leading-zero-shaped rows that preserve numeric values but recompute to
   checksum values below 100.
 
+Result from `impact-emulator-20260709-014719`: `099` was accepted; valid `100`
+and valid `101` were rejected; the `100` payload sent with checksum field `00`
+was also rejected. Low-checksum recovery rows `055`, `061`, and `040` were
+accepted. The run then stalled because the emulator returned no ACK after
+`#em 242\r`; profiles were updated to return `#` for accepted end-marker rules.
+
 ## Test Timeline And Evidence
 
 ### Earlier Windows/FIFO baseline

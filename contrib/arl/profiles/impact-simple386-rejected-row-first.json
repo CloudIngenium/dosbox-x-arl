@@ -36,8 +36,8 @@
       "phase": "accepted",
       "match": "ascii_contains",
       "pattern_ascii": "#em",
-      "response_ascii": "",
-      "note": "No response is needed; only record whether IMPACT sends #em."
+      "response_ascii": "#",
+      "note": "No response is needed; only record whether IMPACT sends #em. Updated to ACK #em with # because real traces show ARL acknowledgement after accepted/end-marker transitions."
     },
     {
       "label": "impact-generic-setup-st-ack",

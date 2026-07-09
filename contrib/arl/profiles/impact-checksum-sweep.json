@@ -755,8 +755,8 @@
       "phase": "sweep-prep",
       "match": "exact_ascii",
       "pattern_ascii": "#em 242\r",
-      "response_ascii": "",
-      "note": "Generic prep response used by checksum sweep after each accepted or recovered row."
+      "response_ascii": "#",
+      "note": "Generic prep response used by checksum sweep after each accepted or recovered row. Updated to ACK #em with # because real traces show ARL acknowledgement after accepted/end-marker transitions."
     },
     {
       "label": "sweep-end-sample-es",
