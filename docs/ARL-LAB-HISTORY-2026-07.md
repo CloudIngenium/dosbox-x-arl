@@ -1397,3 +1397,29 @@ Next emulator interpretation:
   and then rejects the same transition, accumulated IMPACT state becomes likely.
 - If emulator behavior does not match real ARL behavior, improve the emulator
   with more pre-`#rd` context from traces before touching real COM settings.
+
+2026-07-09 checksum sweep third tanda:
+
+- User ran `95 EMU CHECKSUM SWEEP` through several analysis groups. The run
+  reached `C:\ARL\diagnostics\impact-emulator-20260709-015659`.
+- IMPACT accepted several recovery rows and generated an `LPTCAP.PRN`, proving
+  that the emulator can reach store/print flows.
+- The final visible stall matched emulator rule
+  `sweep-case-12-decimal117-as-two-digits17`: IMPACT received the row, rejected
+  it with `?`, and the emulator logged `no_match` because the profile had only
+  nine recovery rows.
+- Interpretation: this stall was test-profile exhaustion, not a new nullmodem
+  or DOSBox transport failure.
+- Updated `impact-checksum-sweep.json` with 40 recovery rows, removed checksum
+  `005` from recovery use, and verified the HP copy:
+  `Recoveries=40`, `Bad005=0`, `Invalid=0`.
+- Current protocol evidence from the sweep:
+  - Decimal checksums `100`, `101`, and `117` are rejected.
+  - Hex checksum text `64`, `65`, and `75` is rejected.
+  - Two-digit decimal text `00` and `17` is rejected.
+  - Low checksum alone is not sufficient because `005` is rejected.
+  - Low checksums `055`, `061`, `040`, `062`, `093`, `089`, `023`, and `000`
+    have all been accepted in at least one sweep/recovery context.
+- Next action: close the stuck DOSBox session, relaunch `95 EMU CHECKSUM SWEEP`,
+  and continue the sweep. The updated profile should recover from many more
+  rejected cases before stopping.

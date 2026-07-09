@@ -175,9 +175,9 @@ stable/repeated-sample `Store Result?` behavior during the checksum experiment.
 
 Run folder: `C:\ARL\diagnostics\impact-emulator-20260709-015659`.
 
-The emulator had no `no_match` events. The accepted-end-marker and new-sample
-fallbacks worked: after an `es 248\r`, IMPACT sent `ns 0,0 173\r` and the
-emulator ACKed it, allowing the next analysis group to continue.
+The first part of the run had no `no_match` events. The accepted-end-marker and
+new-sample fallbacks worked: after an `es 248\r`, IMPACT sent `ns 0,0 173\r`
+and the emulator ACKed it, allowing the next analysis group to continue.
 
 | Case | Test | IMPACT response | Interpretation |
 |---:|---|---|---|
@@ -195,6 +195,13 @@ emulator ACKed it, allowing the next analysis group to continue.
 | 07 | Distinct shaped/control row with checksum `005` | `?` | Rejected |
 | recovery 06 | Low checksum `089` | `#em` | Accepted |
 | 08 | Distinct shaped/control row with checksum `023` | `#em` | Accepted |
+| 09 | Distinct shaped/control row with checksum `000` | `#em` | Accepted |
+| 10 | Valid decimal checksum `117` | `?` | Rejected |
+| recovery 07 | Low checksum `005` | `?` | Rejected |
+| recovery 08 | Low checksum `023` | `#em` | Accepted |
+| 11 | Payload computes to 117, checksum field sent as hex `75` | `?` | Rejected |
+| recovery 09 | Low checksum `000` | `#em` | Accepted |
+| 12 | Payload computes to 117, checksum field sent as decimal last two digits `17` | `?` then `no_match` | Rejected; profile ran out of recovery rows |
 
 New conclusions from this run:
 
@@ -204,7 +211,12 @@ New conclusions from this run:
   for computed checksum 100.
 - Low checksum alone is not sufficient: case 07 with checksum `005` was
   rejected, while recovery/checksum rows `055`, `061`, `040`, `062`, `093`,
-  `089`, and case 08 `023` were accepted.
+  `089`, case 08 `023`, recovery `023`, and recovery `000` were accepted.
+- Two-digit decimal truncation is not a general workaround: checksum `17` for a
+  payload that computes to `117` was rejected.
+- The third-tanda stall was caused by test-profile exhaustion, not by a new
+  emulator transport failure: after case 12, IMPACT sent `?`, and the profile
+  had no remaining recovery rule.
 - This introduces a second suspected validator beyond checksum range: IMPACT may
   also reject some rows based on numeric ranges, field formatting, or alloy
   plausibility. The checksum boundary remains strong, but not exclusive.
@@ -217,6 +229,9 @@ New conclusions from this run:
 - `95 EMU CHECKSUM SWEEP` now uses distinct values for every case and a sequence
   of distinct low-checksum recovery rows after `?`, so it can keep moving past a
   rejected case without triggering repeated-sample behavior.
+- After run `impact-emulator-20260709-015659`, the profile was expanded from 9
+  recovery rows to 40 and all checksum `005` recovery rows were removed because
+  `005` was observed rejected both as a case and as a recovery.
 - After `Store Result?` or cancel, IMPACT can send additional setup/new-sample
   commands such as `st ...`, `#st ...`, and `ns 0,0 173\r`; trace-derived
   profiles now include safe ACK fallbacks for those commands.
