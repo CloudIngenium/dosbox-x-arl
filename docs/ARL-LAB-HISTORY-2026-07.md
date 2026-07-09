@@ -1280,6 +1280,49 @@ Current read:
   `serial1 = nullmodem server:127.0.0.1 port:3460 transparent:1 rxdelay:1000`
   and does not open `COM5`.
 
+2026-07-09 emulator prelude fix:
+
+- `91 EMU REJECT-FIRST` initially hung in IMPACT's "Configuring ICS" phase.
+- Cause: the emulator profile only knew result-read responses; IMPACT first
+  sends ICS setup/status commands and waits for acknowledgements.
+- Updated `New-ArlEmulatorProfileFromTrace.ps1 -IncludeProtocolPrelude` to
+  replay trace-derived pre-`#rd` responses from `protocol-candidates.json`.
+- Regenerated profiles on HP:
+  - `impact-6000-good7-then-reject.json`: 14 rules, including 4
+    `init-status` rules, 8 result rows, 1 reject-loop rule, and 1 `#em` rule.
+  - `impact-6000-rejectfirst-current.json`: 7 rules, including 4
+    `init-status` rules, 1 rejected result row, 1 reject-loop rule, and 1
+    `#em` rule.
+- The prelude currently replays `sc`, `sw/st/ms`, `rs`, and the first
+  `ns/pa/m1/cl/dc/m2/we` preparation burst. This should let IMPACT pass the
+  configuration/status screens before emulator result tests.
+
+2026-07-09 AUTOEXEC/CONFIG audit:
+
+- Current `C:\ARL\IMPLUS\AUTOEXEC.BAT`:
+  - sets `PATH=.;\;\LOCALE`;
+  - runs EGA/codepage/keyboard setup;
+  - runs `mode com2:4800,n,8,1`;
+  - runs `mode lpt2:=com2:`;
+  - has legacy `FILES=30` and `buffers=30` lines;
+  - loads `mouse`;
+  - changes to `C:\IMPLUS` and runs `implus`.
+- Older `C:\ARL\IMPLUS\18_01_05\AUTOEXEC.BAT` is similar but simpler:
+  `path c:\;c:\dos`, `mode com2:4800,n,8,1`, `mode lpt2:=com2:`, `doskey`,
+  `mouse`, then `implus`.
+- `IMP.BAT`/`IMPLUS.BAT` delete transient files such as `impact.dbf`,
+  `telex.sav`, `temp.tmp`, `result.tmp`, `qafile.flg`, `qanofile.flg`,
+  `spc.flg`, `telex.dat`, and `telex.def`; then they run `impact 1 2` on
+  first entry and `impact 1` on internal cycles.
+- Hypothesis: stale transient files and IMPACT's own `Temp Opt`/`Temp Choice`
+  in `IMPACT.INI` can explain state that persists across an IMPACT restart
+  inside the same DOSBox-mounted directory. Do not delete production files
+  blindly; preserve before cleanup tests.
+- Hypothesis for later, separate launcher: a "legacy DOS startup" profile could
+  set DOSBox-X `[config] files=30` and emulate the old startup more closely.
+  Do not add `mode com2` to the main baseline until we decide whether IMPACT is
+  actually using COM1 or COM2 under DOSBox-X.
+
 Next emulator interpretation:
 
 - Run `91 EMU REJECT-FIRST` first when the ARL is not needed. If IMPACT rejects

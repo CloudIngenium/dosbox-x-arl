@@ -16,6 +16,8 @@ param(
 
     [int]$DefaultResponseDelayMs = 15,
 
+    [switch]$IncludeProtocolPrelude,
+
     [switch]$RunAnalyzer
 )
 
@@ -65,6 +67,7 @@ function Convert-ToNullableBool($Value) {
 $resolvedRunPath = (Resolve-Path -Path $RunPath).Path
 $tracePath = Join-Path $resolvedRunPath "serial.ndjson"
 $timingPath = Join-Path $resolvedRunPath "result-timing.csv"
+$protocolPath = Join-Path $resolvedRunPath "protocol-candidates.json"
 $metadataPath = Join-Path $resolvedRunPath "run-metadata.json"
 
 if (-not (Test-Path -Path $tracePath -PathType Leaf)) {
@@ -134,6 +137,60 @@ if (Test-Path -Path $metadataPath -PathType Leaf) {
 
 $lineEndingText = Get-LineEndingText $LineEnding
 $responses = New-Object System.Collections.Generic.List[object]
+
+if ($IncludeProtocolPrelude) {
+    if ($RunAnalyzer -or -not (Test-Path -Path $protocolPath -PathType Leaf)) {
+        $analyzer = Join-Path $PSScriptRoot "Analyze-ArlTrace.ps1"
+        if (-not (Test-Path -Path $analyzer -PathType Leaf)) {
+            throw "Analyzer not found: $analyzer"
+        }
+        & $analyzer -TracePath $tracePath -OutDir $resolvedRunPath
+    }
+
+    if (-not (Test-Path -Path $protocolPath -PathType Leaf)) {
+        throw "Protocol candidates not found: $protocolPath"
+    }
+
+    $protocol = Get-Content -Path $protocolPath -Raw | ConvertFrom-Json
+    $candidates = @($protocol.candidates)
+    $firstResultCandidate = @(
+        $candidates |
+            Where-Object { ([string]$_.tx_ascii).Contains("#rd") } |
+            Select-Object -First 1
+    )
+    $firstResultIndex = if ($firstResultCandidate.Count -gt 0) { [int]$firstResultCandidate[0].index } else { [int]::MaxValue }
+    $preludeCandidates = @(
+        $candidates |
+            Where-Object {
+                [int]$_.index -lt $firstResultIndex -and
+                [int]$_.tx_count -gt 0 -and
+                [int]$_.rx_count -gt 0 -and
+                -not [string]::IsNullOrEmpty([string]$_.rx_ascii)
+            }
+    )
+
+    for ($p = 0; $p -lt $preludeCandidates.Count; $p++) {
+        $candidate = $preludeCandidates[$p]
+        $txPreview = [string]$candidate.tx_ascii
+        if ($txPreview.Length -gt 80) {
+            $txPreview = $txPreview.Substring(0, 80) + "..."
+        }
+        $responses.Add([pscustomobject][ordered]@{
+            label = "impact-prelude-$($p + 1)-candidate-$($candidate.index)"
+            phase = "init-status"
+            match = "any"
+            response_ascii = [string]$candidate.rx_ascii
+            repeat_policy = "sequence"
+            sequence_key = "impact-prelude"
+            sequence_index = $p
+            sequence_next = $p + 1
+            source_candidate_index = [int]$candidate.index
+            source_tx_preview = $txPreview
+            source_rx_count = [int]$candidate.rx_count
+            note = "Trace-derived pre-result response replayed so IMPACT can pass ICS configuration/status before #rd."
+        })
+    }
+}
 
 for ($i = 0; $i -lt $selectedRows.Count; $i++) {
     $row = $selectedRows[$i]
@@ -233,8 +290,10 @@ $profile = [pscustomobject]@{
     default_response_delay_ms = $DefaultResponseDelayMs
     delayed_result_ms = 10000
     response_line_ending = $LineEnding
+    include_protocol_prelude = [bool]$IncludeProtocolPrelude
     notes = @(
         "Generated from result-timing.csv; no command in this profile opens COM5.",
+        "Protocol prelude rules, when present, are trace-derived responses before the first #rd.",
         "Rows include the leading # and the selected line ending.",
         "Use with serial1=nullmodem, never directserial."
     )

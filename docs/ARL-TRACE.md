@@ -502,6 +502,10 @@ Current HP profiles:
   followed by the checksum-valid row that IMPACT rejected with `?`.
 - `profiles\impact-6000-rejectfirst-current.json`: the current baseline
   reject row as the first emulator result.
+- Both profiles include a trace-derived protocol prelude before the result
+  rules: `sc`, `sw`, `st`, `rs`, and the first `ns/pa/m1/cl/dc/m2/we`
+  preparation burst. This is required because IMPACT must pass ICS
+  configuration/status before it ever asks for `#rd`.
 
 Operator emulator shortcuts:
 
