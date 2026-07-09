@@ -131,6 +131,11 @@ Do not use `10.30.1.6` for this lab PC; that address was observed to be a
 different Linux host. Use `LABORATORIO-ARL` / `10.5.18.101` for SSH access when
 reachable.
 
+Remote HP operations are documented in
+[`ARL-HP-REMOTE-OPS.md`](./ARL-HP-REMOTE-OPS.md). Use `svc-claude` with
+`~/.ssh/svc-claude`, place user-facing launchers in `C:\Users\Public\Desktop`,
+and prefer uploading `.ps1` files over inline PowerShell in SSH commands.
+
 ## Branches
 
 - `upstream-master` tracks `joncampbell123/dosbox-x` `master` and is treated as
