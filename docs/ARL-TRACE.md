@@ -217,11 +217,25 @@ with `?` instead of `#em`.
 
 Use this no-rebuild order next, one variable per fresh DOSBox/IMPACT session:
 
-1. `ARL IMPACT+ CYCLES6000 SIMPLE386 NOMOUSE TRACE`
-2. `ARL IMPACT+ CYCLES6000 SIMPLE386 NOUMB TRACE`
-3. `ARL IMPACT+ CYCLES6000 SIMPLE386 NOAUTOPRINT TRACE`
-4. `ARL IMPACT+ CYCLES6000 SIMPLE386 EMSBOARD TRACE`
-5. `ARL IMPACT+ CYCLES6000 SIMPLE386 EMM386 TRACE`
+1. `01 NOAUTOPRINT - 6000 SIMPLE386`
+2. `02 NO MOUSE.COM - 6000 SIMPLE386`
+3. `03 NOUMB - 6000 SIMPLE386`
+4. `04 EMSBOARD - 6000 SIMPLE386`
+5. `05 EMM386 - 6000 SIMPLE386`
+
+Observed on 2026-07-08/09:
+
+- `01` accepted the first burn, then rejected the second checksum-valid row.
+- `02` through `05` each rejected the first checksum-valid result row.
+- `02` only disables `DOS\MOUSE.COM`; DOSBox-X still exposes its internal
+  `INT 33h`/PS2/AUX mouse path unless the generated config disables it.
+
+Next preferred isolation test:
+
+- `11 NOINT33 - 6000 SIMPLE386`
+  - `core=simple`, `cputype=386`, `cycles=fixed 6000`, `rxdelay:3000`
+  - disables `DOS\MOUSE.COM`, `int33`, `biosps2`, and keyboard `aux`
+  - disables auto-print to remove LPT watcher side effects for this test
 
 If those do not move the failure, use the deeper DOS compatibility launchers:
 

@@ -100,7 +100,7 @@ Current status after repair:
   numbered. `Create-ArlHpShortcuts.ps1` removes old ARL/IMPACT shortcuts by
   default and recreates only the active no-build matrix:
   - `01 NOAUTOPRINT - 6000 SIMPLE386`
-  - `02 NOMOUSE - 6000 SIMPLE386`
+  - `02 NO MOUSE.COM - 6000 SIMPLE386`
   - `03 NOUMB - 6000 SIMPLE386`
   - `04 EMSBOARD - 6000 SIMPLE386`
   - `05 EMM386 - 6000 SIMPLE386`
@@ -109,6 +109,7 @@ Current status after repair:
   - `08 MCBCOMPAT - 6000 SIMPLE386`
   - `09 NOSHARE - 6000 SIMPLE386`
   - `10 UNMASKDISKIO - 6000 SIMPLE386`
+  - `11 NOINT33 - 6000 SIMPLE386`
   - `Diagnostics - Serial Traces`
 - `FORCELINES` and `HOLDRTS-DTR` are not recreated unless
   `-IncludeBuildRequired` is passed explicitly.

@@ -16,7 +16,7 @@ $shortcuts = @(
         BuildRequired = $false
     },
     @{
-        Name = "02 NOMOUSE - 6000 SIMPLE386"
+        Name = "02 NO MOUSE.COM - 6000 SIMPLE386"
         Target = "Launch-ArlImpactCycles6000Simple386NoMouseTrace.cmd"
         BuildRequired = $false
     },
@@ -61,6 +61,11 @@ $shortcuts = @(
         BuildRequired = $false
     },
     @{
+        Name = "11 NOINT33 - 6000 SIMPLE386"
+        Target = "Launch-ArlImpactCycles6000Simple386NoInt33Trace.cmd"
+        BuildRequired = $false
+    },
+    @{
         Name = "99 FORCELINES - 6000 SIMPLE386"
         Target = "Launch-ArlImpactCycles6000Simple386ForceLinesTrace.cmd"
         BuildRequired = $true
@@ -86,7 +91,7 @@ if (-not $NoCleanup) {
     Get-ChildItem -Path $DesktopPath -Filter "*.lnk" -File |
         Where-Object {
             $name = $_.Name.ToLowerInvariant()
-            ($_.BaseName -match "ARL|IMPACT|CYCLES|SIMPLE|TRACE|TICS|UARTDATA|FORCELINES|HOLDRTS|RX4000|SAFE SERIAL|STABILITY") -and
+            ($_.BaseName -match "ARL|IMPACT|CYCLES|SIMPLE|TRACE|TICS|UARTDATA|FORCELINES|HOLDRTS|RX4000|SAFE SERIAL|STABILITY|NOINT33|NO MOUSE") -and
             -not $desiredNames.ContainsKey($name)
         } |
         Remove-Item -Force

@@ -22,6 +22,11 @@ param(
     [object]$Ems = $true,
     [bool]$Umb = $true,
     [bool]$LoadMouse = $true,
+    [bool]$Int33 = $true,
+    [bool]$BiosPs2 = $true,
+    [bool]$KeyboardAux = $true,
+    [ValidateSet("intellimouse", "2button", "3button", "none")]
+    [string]$AuxDevice = "intellimouse",
     [bool]$ZeroMemoryOnEmsAllocation = $false,
     [bool]$ZeroMemoryOnXmsAllocation = $false,
     [bool]$McbCorruptionBecomesApplicationFreeMemory = $false,
@@ -81,6 +86,9 @@ function ConvertTo-ArlDosOption([object]$Value, [string]$Name, [string[]]$Allowe
 $xmsText = ConvertTo-ArlDosOption $Xms "Xms" @("true", "false")
 $emsText = ConvertTo-ArlDosOption $Ems "Ems" @("true", "false", "emsboard", "emm386")
 $umbText = ConvertTo-ArlDosOption $Umb "Umb" @("true", "false")
+$int33Text = ConvertTo-ArlDosOption $Int33 "Int33" @("true", "false")
+$biosPs2Text = ConvertTo-ArlDosOption $BiosPs2 "BiosPs2" @("true", "false")
+$keyboardAuxText = ConvertTo-ArlDosOption $KeyboardAux "KeyboardAux" @("true", "false")
 
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $runDir = Join-ArlPath $RunRoot "$Session-$stamp"
@@ -181,10 +189,16 @@ serial4 = disabled
 parallel1 = file append:$lptPath timeout:2000
 parallel2 = disabled
 
+[keyboard]
+aux = $keyboardAuxText
+auxdevice = $AuxDevice
+
 [dos]
 xms = $xmsText
 ems = $emsText
 umb = $umbText
+int33 = $int33Text
+biosps2 = $biosPs2Text
 zero memory on ems memory allocation = $($ZeroMemoryOnEmsAllocation.ToString().ToLowerInvariant())
 zero memory on xms memory allocation = $($ZeroMemoryOnXmsAllocation.ToString().ToLowerInvariant())
 mcb corruption becomes application free memory = $($McbCorruptionBecomesApplicationFreeMemory.ToString().ToLowerInvariant())
@@ -226,6 +240,10 @@ $metadata = [pscustomobject]@{
     ems = $emsText
     umb = $umbText
     load_mouse = $LoadMouse
+    int33 = $int33Text
+    biosps2 = $biosPs2Text
+    keyboard_aux = $keyboardAuxText
+    auxdevice = $AuxDevice
     zero_memory_on_ems_memory_allocation = $ZeroMemoryOnEmsAllocation
     zero_memory_on_xms_memory_allocation = $ZeroMemoryOnXmsAllocation
     mcb_corruption_becomes_application_free_memory = $McbCorruptionBecomesApplicationFreeMemory

@@ -1193,3 +1193,36 @@ Emulator profiles derived from this run:
   as the first result. If IMPACT rejects it immediately, suspect value/range or
   row format. If it accepts it first but rejects it after three accepted rows,
   suspect accumulated IMPACT/session state.
+
+## 2026-07-08/09 SIMPLE386 Matrix 01-05
+
+Operator shortcuts were shortened under `C:\Users\Public\Desktop` to reduce
+selection mistakes. The first five matrix tests produced:
+
+- `01 NOAUTOPRINT - 6000 SIMPLE386`
+  - Run: `C:\ARL\diagnostics\sample-analysis-20260708-225509`
+  - Accepted first burn with `#em`, then rejected a complete checksum-valid
+    second result row with repeated `?`.
+  - Conclusion: LPT watcher/autoprint is not the primary trigger.
+- `02 NO MOUSE.COM - 6000 SIMPLE386`
+  - Run: `C:\ARL\diagnostics\sample-analysis-20260708-230028`
+  - Rejected the first checksum-valid result row with repeated `?`.
+  - Note: this disables only the DOS mouse driver load; DOSBox-X internal
+    `INT 33h`/PS2/AUX mouse support remains active unless disabled separately.
+- `03 NOUMB - 6000 SIMPLE386`
+  - Run: `C:\ARL\diagnostics\sample-analysis-20260708-230247`
+  - Rejected the first checksum-valid result row.
+- `04 EMSBOARD - 6000 SIMPLE386`
+  - Run: `C:\ARL\diagnostics\sample-analysis-20260708-230537`
+  - Rejected the first checksum-valid result row.
+- `05 EMM386 - 6000 SIMPLE386`
+  - Run: `C:\ARL\diagnostics\sample-analysis-20260708-230916`
+  - Rejected the first checksum-valid result row.
+
+Current read:
+
+- Do not spend more ARL burn time on `06-10` until a stronger variable is
+  tested.
+- The next high-signal test is `11 NOINT33 - 6000 SIMPLE386`, which disables
+  `DOS\MOUSE.COM`, DOSBox-X `int33`, BIOS PS/2 mouse emulation, and keyboard
+  AUX mouse emulation, with auto-print off for the test.

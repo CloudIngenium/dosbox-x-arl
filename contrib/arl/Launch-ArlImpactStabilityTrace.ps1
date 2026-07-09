@@ -11,6 +11,11 @@ param(
     [object]$Ems = $true,
     [bool]$Umb = $true,
     [bool]$LoadMouse = $true,
+    [bool]$Int33 = $true,
+    [bool]$BiosPs2 = $true,
+    [bool]$KeyboardAux = $true,
+    [ValidateSet("intellimouse", "2button", "3button", "none")]
+    [string]$AuxDevice = "intellimouse",
     [bool]$ZeroMemoryOnEmsAllocation = $false,
     [bool]$ZeroMemoryOnXmsAllocation = $false,
     [bool]$McbCorruptionBecomesApplicationFreeMemory = $false,
@@ -60,6 +65,10 @@ $runArgs = @{
     Ems = $Ems
     Umb = $Umb
     LoadMouse = $LoadMouse
+    Int33 = $Int33
+    BiosPs2 = $BiosPs2
+    KeyboardAux = $KeyboardAux
+    AuxDevice = $AuxDevice
     ZeroMemoryOnEmsAllocation = $ZeroMemoryOnEmsAllocation
     ZeroMemoryOnXmsAllocation = $ZeroMemoryOnXmsAllocation
     McbCorruptionBecomesApplicationFreeMemory = $McbCorruptionBecomesApplicationFreeMemory
