@@ -817,6 +817,13 @@ Analyzer output:
 - `#rd=8`, `#em=7`, `?=95`.
 - RX errors: zero.
 - TX errors: zero.
+- New analyzer metrics report:
+  - Result-read transactions: 8.
+  - Accepted results: 7.
+  - Rejected results: 1.
+  - Accepted before first reject: 7.
+  - First rejected row duration: 757 ms.
+  - IMPACT sent `?` 5 ms after the row terminator.
 - Trace did not show a Windows receive loss; it showed a valid result row
   repeated while IMPACT sent `?`.
 - `result-transaction-comparison.md` classified candidate 33 as a post-result
@@ -846,6 +853,13 @@ Next launchers added:
 - `ARL IMPACT+ CYCLES5000 TRACE` (`cycles=fixed 5000`, `rxdelay:3000`).
 - `ARL IMPACT+ CYCLES7000 TRACE` (`cycles=fixed 7000`, `rxdelay:3000`).
 
+Offline toolkit updates:
+
+- `Analyze-ArlTrace.ps1` now writes `lab-next-test.md` and
+  `lab-next-test.json`.
+- These files summarize result-read acceptance count, first rejected checksum,
+  `INTERFAC.DAT`/LPT artifacts, and the next recommended variable.
+
 Recommended test order:
 
 1. Close the stuck DOSBox-X window to stop the `?` loop.
@@ -853,3 +867,48 @@ Recommended test order:
 3. Run `CYCLES5000 TRACE` on the same SS-413BD workflow and try five burns.
 4. If 5000 fails, run `CYCLES7000 TRACE` under the same workflow.
 5. Only after those two tests, revisit `rxdelay` changes.
+
+## 2026-07-08 18:25-18:30 CYCLES5000 / CYCLES7000 Follow-Up
+
+New runs:
+
+```text
+C:\ARL\diagnostics\sample-analysis-20260708-175857  cycles=5000 rxdelay=3000
+C:\ARL\diagnostics\sample-analysis-20260708-182449  cycles=7000 rxdelay=3000
+C:\ARL\diagnostics\sample-analysis-20260708-182520  cycles=7000 rxdelay=3000
+C:\ARL\diagnostics\sample-analysis-20260708-182856  cycles=7000 rxdelay=3000
+```
+
+Findings:
+
+- `5000/3000` reached result read once, but rejected immediately:
+  - `#rd=1`, `#em=0`, `?=187`.
+  - First row checksum was valid: claimed `238`, computed `238`.
+  - RX/TX errors were zero.
+  - This is not better than 6000; it fails on the first result instead of
+    after several accepted results.
+- `7000/3000` did not reach result read:
+  - `#rd=0`.
+  - Repeated status/readiness traffic such as `st`, `#rs`, and `ns`.
+  - One long run had RX errors.
+  - This setting appears worse for initialization/status stability.
+
+Updated interpretation:
+
+- The cycle sweep did not reveal a better value around 6000.
+- `6000/3000` remains the best observed transport setting.
+- The practical next step is not more wide cycle sweeps; it is:
+  - session hygiene,
+  - short IMPACT sessions,
+  - 6000/3000 after ARL service,
+  - UARTDATA only if 6000 fails again.
+
+Updated recommended test order:
+
+1. After ARL service, launch `ARL IMPACT+ CYCLES6000 TRACE`.
+2. Use a fresh DOSBox/IMPACT session.
+3. Run one reference burn.
+4. If it passes, run up to four burns maximum, then close/reopen IMPACT before
+   attempting more.
+5. If it fails with `?`, capture with UARTDATA at 6000/3000; do not keep
+   moving cycles blindly.
