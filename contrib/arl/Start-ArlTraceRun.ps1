@@ -54,6 +54,7 @@ param(
     [int]$LptIdleMs = 2500,
     [int]$LptPollMs = 500,
     [switch]$NoLptFormFeed,
+    [bool]$CleanImpactTemp = $true,
     [switch]$Wait,
     [switch]$NoLaunch
 )
@@ -118,6 +119,54 @@ function Stop-StaleArlEmulatorProcesses([int]$Port) {
     }
 }
 
+function Invoke-ImpactTempCleanup([string]$ImpactPath, [string]$BackupRoot) {
+    $tempNames = @(
+        "tmh",
+        "impact.dbf",
+        "telex.sav",
+        "temp.tmp",
+        "result.tmp",
+        "qafile.flg",
+        "qanofile.flg",
+        "spc.flg",
+        "telex.dat",
+        "telex.def"
+    )
+
+    $backupDir = Join-ArlPath $BackupRoot "impact-temp-before-start"
+    New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
+
+    $manifest = New-Object System.Collections.Generic.List[object]
+    foreach ($name in $tempNames) {
+        $path = Join-ArlPath $ImpactPath $name
+        if (-not (Test-Path -Path $path -PathType Leaf)) {
+            continue
+        }
+
+        $backupPath = Join-ArlPath $backupDir $name
+        Copy-Item -Path $path -Destination $backupPath -Force
+        $item = Get-Item -Path $path
+        [void]$manifest.Add([pscustomobject]@{
+            name = $name
+            path = $path
+            backup_path = $backupPath
+            length = $item.Length
+            last_write_time = $item.LastWriteTime
+        })
+        Remove-Item -Path $path -Force
+        Write-Host "Deleted stale IMPACT temp file: $path"
+    }
+
+    $manifestPath = Join-ArlPath $backupDir "manifest.json"
+    $manifest | ConvertTo-Json -Depth 4 | Set-Content -Path $manifestPath -Encoding UTF8
+    return [pscustomobject]@{
+        backup_dir = $backupDir
+        manifest_path = $manifestPath
+        deleted_count = $manifest.Count
+        deleted_names = @($manifest | ForEach-Object { $_.name })
+    }
+}
+
 $xmsText = ConvertTo-ArlDosOption $Xms "Xms" @("true", "false")
 $emsText = ConvertTo-ArlDosOption $Ems "Ems" @("true", "false", "emsboard", "emm386")
 $umbText = ConvertTo-ArlDosOption $Umb "Umb" @("true", "false")
@@ -133,6 +182,11 @@ while (Test-Path -Path $runDir) {
     $runDir = Join-ArlPath $RunRoot "$Session-$stamp-$runSuffix"
 }
 New-Item -ItemType Directory -Force -Path $runDir | Out-Null
+
+$impactTempCleanup = $null
+if ($CleanImpactTemp) {
+    $impactTempCleanup = Invoke-ImpactTempCleanup -ImpactPath $ImplusPath -BackupRoot $runDir
+}
 
 $tracePath = Join-ArlPath $runDir "serial.ndjson"
 $emulatorTracePath = Join-ArlPath $runDir "emulator.ndjson"
@@ -291,6 +345,8 @@ $metadata = [pscustomobject]@{
     biosps2 = $biosPs2Text
     keyboard_aux = $keyboardAuxText
     auxdevice = $AuxDevice
+    clean_impact_temp = $CleanImpactTemp
+    impact_temp_cleanup = $impactTempCleanup
     zero_memory_on_ems_memory_allocation = $ZeroMemoryOnEmsAllocation
     zero_memory_on_xms_memory_allocation = $ZeroMemoryOnXmsAllocation
     mcb_corruption_becomes_application_free_memory = $McbCorruptionBecomesApplicationFreeMemory
