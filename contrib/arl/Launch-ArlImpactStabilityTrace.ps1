@@ -5,6 +5,11 @@ param(
     [ValidateSet("normal", "simple", "dynamic", "auto")]
     [string]$Core = "normal",
     [string]$CpuType = "486",
+    [ValidateRange(1, 63)]
+    [int]$MemSize = 16,
+    [bool]$Xms = $true,
+    [bool]$Ems = $true,
+    [bool]$Umb = $true,
     [string]$PrinterName = "EPSON LX-350",
     [switch]$NoAutoPrintLpt,
     [switch]$NoLptFormFeed,
@@ -39,6 +44,10 @@ $runArgs = @{
     RxDelay = $RxDelay
     Core = $Core
     CpuType = $CpuType
+    MemSize = $MemSize
+    Xms = $Xms
+    Ems = $Ems
+    Umb = $Umb
     HangMs = 30000
 }
 

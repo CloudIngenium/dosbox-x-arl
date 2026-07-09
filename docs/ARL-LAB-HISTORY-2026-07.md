@@ -974,3 +974,46 @@ New launchers prepared:
 Test these in that order. Stop a launcher after the first result-reject loop and
 preserve/analyze the run instead of continuing to burn in the same stuck
 conversation.
+
+## 2026-07-08 Memory-Layout Probe
+
+Rationale:
+
+- IMPACT is receiving complete checksum-valid result rows but sometimes rejects
+  them with `?` instead of accepting with `#em`.
+- That can still be an IMPACT internal-state problem rather than a serial-loss
+  problem: EMS/XMS/UMB layout, resident driver placement, or a buffer path that
+  changes when old DOS software detects expanded memory.
+- Native FreeDOS machines that work may have a different `CONFIG.SYS` /
+  `AUTOEXEC.BAT` memory layout than DOSBox-X defaults.
+
+New launchers prepared:
+
+- `ARL IMPACT+ CYCLES6000 NOEMS TRACE`
+  - `cycles=fixed 6000`
+  - `rxdelay:3000`
+  - `memsize=16`
+  - `xms=true`, `ems=false`, `umb=true`
+- `ARL IMPACT+ CYCLES6000 LOWMEM TRACE`
+  - `cycles=fixed 6000`
+  - `rxdelay:3000`
+  - `memsize=4`
+  - `xms=true`, `ems=false`, `umb=true`
+- `ARL IMPACT+ CYCLES6000 CONVENTIONAL TRACE`
+  - `cycles=fixed 6000`
+  - `rxdelay:3000`
+  - `memsize=4`
+  - `xms=false`, `ems=false`, `umb=false`
+
+Test order:
+
+1. `NOEMS` first. It is the least disruptive memory change and directly tests
+   whether EMS detection changes IMPACT's buffering/result parser path.
+2. `LOWMEM` second if `NOEMS` still rejects rows.
+3. `CONVENTIONAL` last. It may reduce free memory enough to expose other DOS
+   limits, but it is useful if IMPACT was written for a very plain DOS memory
+   environment.
+
+For each memory variant, use a fresh IMPACT launch and stop after the first
+reject loop. Do not combine memory changes with cycle/core/cputype changes until
+one memory variant has a clear signal.

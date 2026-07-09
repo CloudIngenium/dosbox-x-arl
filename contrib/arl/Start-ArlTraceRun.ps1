@@ -16,6 +16,11 @@ param(
     [ValidateSet("normal", "simple", "dynamic", "auto")]
     [string]$Core = "normal",
     [string]$CpuType = "486",
+    [ValidateRange(1, 63)]
+    [int]$MemSize = 16,
+    [bool]$Xms = $true,
+    [bool]$Ems = $true,
+    [bool]$Umb = $true,
     [ValidateSet("basic", "uartdata", "uart", "full")]
     [string]$TraceLevel = "basic",
     [int]$HangMs = 15000,
@@ -111,7 +116,7 @@ autolock = false
 [dosbox]
 machine = svga_s3
 captures = $runDir
-memsize = 16
+memsize = $MemSize
 logfile = $logPath
 
 [cpu]
@@ -131,9 +136,9 @@ parallel1 = file append:$lptPath timeout:2000
 parallel2 = disabled
 
 [dos]
-xms = true
-ems = true
-umb = true
+xms = $($Xms.ToString().ToLowerInvariant())
+ems = $($Ems.ToString().ToLowerInvariant())
+umb = $($Umb.ToString().ToLowerInvariant())
 
 [autoexec]
 mount c "$ImplusPath"
@@ -165,6 +170,10 @@ $metadata = [pscustomobject]@{
     cycles = $Cycles
     core = $Core
     cputype = $CpuType
+    memsize = $MemSize
+    xms = $Xms
+    ems = $Ems
+    umb = $Umb
     trace_level = if ($usesEmulator) { $null } else { $TraceLevel }
     hang_ms = $HangMs
     trace_max_mb = if ($usesEmulator) { $null } else { $TraceMaxMb }

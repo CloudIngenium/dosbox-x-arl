@@ -80,6 +80,19 @@ transport setting and change the emulated DOS machine profile:
 - `Launch-ArlImpactCycles6000Simple386Trace.ps1`: `core=simple`,
   `cputype=386`, `cycles=fixed 6000`, `rxdelay:3000`
 
+Memory-layout variants are also available because IMPACT may change parser or
+buffer paths when EMS/XMS/UMB are present:
+
+- `Launch-ArlImpactCycles6000NoEmsTrace.ps1`: `memsize=16`, `xms=true`,
+  `ems=false`, `umb=true`
+- `Launch-ArlImpactCycles6000LowMemTrace.ps1`: `memsize=4`, `xms=true`,
+  `ems=false`, `umb=true`
+- `Launch-ArlImpactCycles6000ConventionalTrace.ps1`: `memsize=4`,
+  `xms=false`, `ems=false`, `umb=false`
+
+Use `NOEMS` before `LOWMEM` or `CONVENTIONAL`; it changes the least while
+testing the most suspicious old-DOS memory variable.
+
 Before each burn, close DOSBox-X, confirm no `dosbox` process remains, and have
 the operator reinitialize ARL/ICS. A passing run is a result row followed by
 `#em`, `INTERFAC.DAT` update, and LPT capture/print job if IMPACT reaches print.
