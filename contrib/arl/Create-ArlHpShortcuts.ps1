@@ -1,7 +1,7 @@
 param(
     [string]$ToolkitRoot = "C:\ARL\DOSBox-X-ARL",
     [string]$DesktopPath = "C:\Users\Public\Desktop",
-    [string]$IconPath = "C:\ARL\DOSBox-X-ARL\dosbox-x-arl-96994b1.exe",
+    [string]$IconPath = "C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe",
     [switch]$IncludeBuildRequired
 )
 

@@ -24,21 +24,47 @@ ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/svc-claude svc-claude@LABOR
 Do not assume `jcarlos@LABORATORIO-ARL`; that reaches the host but is not the
 working automation account.
 
-## 2026-07-08 Remote Access Blocker
+## 2026-07-08 Remote Access Repair
 
-During the SIMPLE386 matrix deployment attempt, all remote execution paths were
-partially broken:
+During the SIMPLE386 matrix deployment attempt, the first remote attempts looked
+broken because they mixed fragile Windows paths, inline PowerShell quoting, and
+Arc Run Command. The durable working path is:
 
-- Direct SSH authenticated by host name but the configured shell emitted
-  `No se pudo iniciar CLR, HRESULT: 80004005`.
-- `scp` closed the connection before upload.
-- Azure Arc `run-command` reached the machine, but Windows PowerShell failed
-  inside the run-command host with internal error `800705af`.
-- SMB enumerated `C$` and `IMPLUS$`, but denied directory listing/content access
-  from this macOS session even when mounting with the service account.
+- SSH key auth to `svc-claude@LABORATORIO-ARL`.
+- Remote command probe through explicit `cmd.exe`:
 
-Treat this as a remote-management issue, not an ARL toolkit issue. The toolkit
-package can still be installed from the interactive RDP session as user `JC`.
+```bash
+ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/svc-claude \
+  svc-claude@LABORATORIO-ARL 'C:\Windows\System32\cmd.exe /c hostname'
+```
+
+- File transfer through SFTP-style Windows paths. Use `/C:/...`, not `C:/...`:
+
+```bash
+sftp -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/svc-claude \
+  svc-claude@LABORATORIO-ARL
+sftp> put local-file.zip /C:/ARL/DOSBox-X-ARL/_remote/local-file.zip
+```
+
+- Remote PowerShell through `-EncodedCommand`, never raw inline quoting.
+  `contrib/arl/Invoke-ArlHpRemoteScript.ps1` now does this automatically.
+
+Verification:
+
+```powershell
+pwsh -NoProfile -File contrib/arl/Test-ArlHpRemoteAccess.ps1
+```
+
+Expected checks:
+
+- `ssh-cmd`
+- `ssh-powershell-encoded`
+- `remote-directory`
+- `sftp-put-ls-rm`
+
+Avoid Azure Arc Run Command for this HP unless SSH/SFTP are genuinely
+unavailable. Arc may still show confusing `Succeeded` states while the embedded
+PowerShell host writes errors, and it is slower than direct SSH/SFTP.
 
 Manual install fallback:
 
@@ -50,8 +76,34 @@ Manual install fallback:
 C:\ARL\DOSBox-X-ARL\Create-ArlHpShortcuts.ps1
 ```
 
-This creates only the no-rebuild operator shortcuts. Do not pass
-`-IncludeBuildRequired` until a build newer than `96994b1` is installed.
+This creates only the no-rebuild operator shortcuts. Pass
+`-IncludeBuildRequired` only after a build containing the ARL modem-line options
+is installed:
+
+```powershell
+C:\ARL\DOSBox-X-ARL\Create-ArlHpShortcuts.ps1 -IncludeBuildRequired
+```
+
+Current status after repair:
+
+- `arl-toolkit-simple386-matrix-20260708.zip` was uploaded to
+  `C:\ARL\DOSBox-X-ARL\_remote`.
+- The toolkit was expanded over `C:\ARL\DOSBox-X-ARL`.
+- A backup was created under `C:\ARL\DOSBox-X-ARL\_backups`.
+- Build `9663306eb639` was installed as both:
+  - `C:\ARL\DOSBox-X-ARL\dosbox-x-arl-9663306.exe`
+  - `C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe`
+- The previous default executable hash
+  `499A1F9D992F28CD022429F6F2CCAAFA0F03D898F68B606B7659CA29819571DA`
+  was backed up under `C:\ARL\DOSBox-X-ARL\_backups\exe-20260708-220943`.
+- Thirteen SIMPLE386 shortcuts were created under
+  `C:\Users\Public\Desktop`.
+- `FORCELINES` was dry-run verified to emit
+  `arlforcects:1 arlforcedsr:1 arlforcedcd:1`.
+- `HOLDRTS-DTR` was dry-run verified to emit
+  `arlholdrts:1 arlholddtr:1`.
+- The no-launch verification directories were removed so they do not appear as
+  real ARL diagnostic runs.
 
 ## Avoid Inline PowerShell Quoting
 
@@ -67,8 +119,8 @@ quotes, and script blocks are easy to corrupt.
 Prefer this pattern:
 
 1. Generate a local `.ps1`.
-2. Copy it to `C:\ARL\DOSBox-X-ARL\_remote\`.
-3. Execute with `powershell -NoProfile -ExecutionPolicy Bypass -File`.
+2. Copy it to `/C:/ARL/DOSBox-X-ARL/_remote/` through SFTP/SCP.
+3. Execute it through remote PowerShell `-EncodedCommand`.
 
 Helper:
 
@@ -86,7 +138,7 @@ pwsh -NoProfile -File contrib/arl/Invoke-ArlHpRemoteScript.ps1 `
 - Use the DOSBox-X executable icon when present:
 
 ```powershell
-C:\ARL\DOSBox-X-ARL\dosbox-x-arl-96994b1.exe,0
+C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe,0
 ```
 
 ## Quick Verification
