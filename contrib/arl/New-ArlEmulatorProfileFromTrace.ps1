@@ -68,6 +68,98 @@ function Get-PreludePattern([string]$Text) {
     return $clean
 }
 
+function Convert-TraceByteToText($Event) {
+    $hex = [string](Get-PropValue $Event "byte_hex" "")
+    if ($hex -eq "0D") { return "`r" }
+    if ($hex -eq "0A") { return "`n" }
+
+    $ascii = [string](Get-PropValue $Event "ascii" "")
+    if ($ascii -eq "\r") { return "`r" }
+    if ($ascii -eq "\n") { return "`n" }
+    if ($ascii.Length -eq 1) { return $ascii }
+    return "."
+}
+
+function Convert-TextPreview([string]$Text, [int]$MaxLength = 80) {
+    $preview = $Text.Replace("`r", "\r").Replace("`n", "\n")
+    if ($preview.Length -gt $MaxLength) {
+        return $preview.Substring(0, $MaxLength) + "..."
+    }
+    return $preview
+}
+
+function Get-StartupReplayTransactions([string]$TracePath) {
+    $rows = New-Object System.Collections.Generic.List[object]
+    $current = $null
+    $state = "idle"
+    $line = 0
+
+    Get-Content -Path $TracePath | ForEach-Object {
+        $line++
+        try {
+            $event = $_ | ConvertFrom-Json
+        } catch {
+            return
+        }
+
+        if ($event.event -ne "tx" -and $event.event -ne "rx") {
+            return
+        }
+
+        $text = Convert-TraceByteToText $event
+        if ($event.event -eq "tx") {
+            if ($state -eq "after-cr" -and $null -ne $current -and -not [string]::IsNullOrEmpty($current.rx)) {
+                [void]$rows.Add([pscustomobject]$current)
+                $current = $null
+                $state = "idle"
+            }
+
+            if ($null -eq $current) {
+                $current = [ordered]@{
+                    start_ms = [int]$event.elapsed_ms
+                    start_line = $line
+                    tx = ""
+                    rx = ""
+                    tx_done_ms = $null
+                    rx_start_ms = $null
+                    rx_end_ms = $null
+                }
+            }
+
+            $current.tx += $text
+            if ([string]$event.byte_hex -eq "0D") {
+                $current.tx_done_ms = [int]$event.elapsed_ms
+                $state = "after-cr"
+            }
+            return
+        }
+
+        if ($null -eq $current) {
+            $current = [ordered]@{
+                start_ms = [int]$event.elapsed_ms
+                start_line = $line
+                tx = "<unsolicited>"
+                rx = ""
+                tx_done_ms = $null
+                rx_start_ms = $null
+                rx_end_ms = $null
+            }
+        }
+
+        if ($null -eq $current.rx_start_ms) {
+            $current.rx_start_ms = [int]$event.elapsed_ms
+        }
+        $current.rx += $text
+        $current.rx_end_ms = [int]$event.elapsed_ms
+    }
+
+    if ($null -ne $current) {
+        [void]$rows.Add([pscustomobject]$current)
+    }
+
+    return @($rows.ToArray())
+}
+
 function Convert-ToNullableInt($Value) {
     if ($null -eq $Value -or [string]::IsNullOrWhiteSpace([string]$Value)) { return $null }
     return [int]$Value
@@ -153,36 +245,6 @@ $lineEndingText = Get-LineEndingText $LineEnding
 $responses = New-Object System.Collections.Generic.List[object]
 
 if ($IncludeProtocolPrelude) {
-    if ($RunAnalyzer -or -not (Test-Path -Path $protocolPath -PathType Leaf)) {
-        $analyzer = Join-Path $PSScriptRoot "Analyze-ArlTrace.ps1"
-        if (-not (Test-Path -Path $analyzer -PathType Leaf)) {
-            throw "Analyzer not found: $analyzer"
-        }
-        & $analyzer -TracePath $tracePath -OutDir $resolvedRunPath
-    }
-
-    if (-not (Test-Path -Path $protocolPath -PathType Leaf)) {
-        throw "Protocol candidates not found: $protocolPath"
-    }
-
-    $protocol = Get-Content -Path $protocolPath -Raw | ConvertFrom-Json
-    $candidates = @($protocol.candidates)
-    $firstResultCandidate = @(
-        $candidates |
-            Where-Object { ([string]$_.tx_ascii).Contains("#rd") } |
-            Select-Object -First 1
-    )
-    $firstResultIndex = if ($firstResultCandidate.Count -gt 0) { [int]$firstResultCandidate[0].index } else { [int]::MaxValue }
-    $preludeCandidates = @(
-        $candidates |
-            Where-Object {
-                [int]$_.index -lt $firstResultIndex -and
-                [int]$_.tx_count -gt 0 -and
-                [int]$_.rx_count -gt 0 -and
-                -not [string]::IsNullOrEmpty([string]$_.rx_ascii)
-            }
-    )
-
     $responses.Add([pscustomobject][ordered]@{
         label = "impact-sync-7f-ready"
         phase = "init-sync"
@@ -192,32 +254,71 @@ if ($IncludeProtocolPrelude) {
         note = "Real ARL eventually answered the initial 0x7F sync with '#', which lets IMPACT continue into the sc command."
     })
 
-    for ($p = 0; $p -lt $preludeCandidates.Count; $p++) {
-        $candidate = $preludeCandidates[$p]
-        $txPreview = [string]$candidate.tx_ascii
-        if ($txPreview.Length -gt 80) {
-            $txPreview = $txPreview.Substring(0, 80) + "..."
-        }
-        $pattern = Get-PreludePattern ([string]$candidate.tx_ascii)
-        if ([string]::IsNullOrWhiteSpace($pattern)) {
+    $startupRows = @(
+        Get-StartupReplayTransactions -TracePath $tracePath |
+            Where-Object {
+                -not [string]::IsNullOrEmpty([string]$_.tx) -and
+                -not [string]::IsNullOrEmpty([string]$_.rx) -and
+                -not ([string]$_.tx).Contains("#rd")
+            }
+    )
+
+    $sequenceIndex = 0
+    foreach ($startupRow in $startupRows) {
+        $txText = [string]$startupRow.tx
+        $rxText = [string]$startupRow.rx
+        if ($txText -eq "<unsolicited>") {
             continue
         }
-        $responseAscii = [string]$candidate.rx_ascii
-        $candidateHex = [string]$candidate.tx_hex
-        if ($candidateHex.StartsWith("7F") -and $responseAscii.StartsWith("##")) {
-            $responseAscii = $responseAscii.Substring(1)
+
+        if ($txText.Contains("#rd")) {
+            break
         }
+
+        $patternText = $txText
+        if ($patternText.Contains("sc ")) {
+            $scIndex = $patternText.IndexOf("sc ")
+            if ($scIndex -gt 0) {
+                $patternText = $patternText.Substring($scIndex)
+            }
+            if ($rxText.StartsWith("##")) {
+                $rxText = $rxText.Substring(1)
+            }
+        }
+
+        if ($patternText.StartsWith(".")) {
+            continue
+        }
+
+        if ([string]::IsNullOrWhiteSpace($patternText) -or [string]::IsNullOrEmpty($rxText)) {
+            continue
+        }
+
+        $rxDelay = $null
+        if ($null -ne $startupRow.tx_done_ms -and $null -ne $startupRow.rx_start_ms) {
+            $rxDelay = [Math]::Max(0, ([int]$startupRow.rx_start_ms - [int]$startupRow.tx_done_ms))
+        }
+        if ($null -eq $rxDelay) {
+            $rxDelay = $DefaultResponseDelayMs
+        }
+
         $responses.Add([pscustomobject][ordered]@{
-            label = "impact-prelude-$($p + 1)-candidate-$($candidate.index)"
+            label = "impact-startup-replay-$($sequenceIndex + 1)"
             phase = "init-status"
-            match = "ascii_contains"
-            pattern_ascii = $pattern
-            response_ascii = $responseAscii
-            source_candidate_index = [int]$candidate.index
-            source_tx_preview = $txPreview
-            source_rx_count = [int]$candidate.rx_count
-            note = "Trace-derived pre-result response replayed so IMPACT can pass ICS configuration/status before #rd."
+            match = "exact_ascii"
+            pattern_ascii = $patternText
+            response_ascii = $rxText
+            delay_ms = $rxDelay
+            repeat_policy = "sequence"
+            sequence_key = "impact-startup-replay"
+            sequence_index = $sequenceIndex
+            sequence_next = $sequenceIndex + 1
+            source_start_ms = [int]$startupRow.start_ms
+            source_tx_preview = Convert-TextPreview $patternText
+            source_rx_preview = Convert-TextPreview $rxText
+            note = "Command-level trace replay before the first #rd. This preserves sc/#sw/#st/#ms/#rs responses instead of collapsing them into broad candidates."
         })
+        $sequenceIndex++
     }
 }
 

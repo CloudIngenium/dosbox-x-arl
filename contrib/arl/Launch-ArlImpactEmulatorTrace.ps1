@@ -1,7 +1,7 @@
 param(
     [string]$DosboxExe = "C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe",
 
-    [string]$ProfilePath = "C:\ARL\DOSBox-X-ARL\profiles\impact-6000-good7-then-reject.json",
+    [string]$ProfilePath = "C:\ARL\DOSBox-X-ARL\profiles\impact-full-205041-sequence.json",
 
     [ValidateSet("happy-path", "silent-after-spark", "delayed-result", "line-drop", "bad-response")]
     [string]$Mode = "happy-path",
