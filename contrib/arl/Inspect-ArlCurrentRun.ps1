@@ -7,8 +7,17 @@ param(
 $ErrorActionPreference = "Stop"
 
 function Read-SharedLines([string]$Path, [int]$LineTail = 0) {
-    $share = [System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete
-    $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, $share)
+    $share = [System.IO.FileShare]([int][System.IO.FileShare]::ReadWrite -bor [int][System.IO.FileShare]::Delete)
+    $stream = $null
+    for ($attempt = 1; $attempt -le 20; $attempt++) {
+        try {
+            $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, $share)
+            break
+        } catch [System.IO.IOException] {
+            if ($attempt -eq 20) { throw }
+            Start-Sleep -Milliseconds 100
+        }
+    }
     try {
         $reader = New-Object System.IO.StreamReader($stream)
         $lines = New-Object System.Collections.Generic.List[string]
