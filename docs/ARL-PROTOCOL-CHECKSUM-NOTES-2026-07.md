@@ -171,6 +171,44 @@ repeating already-settled variants:
 All case rows and recovery rows use distinct values to avoid triggering IMPACT's
 stable/repeated-sample `Store Result?` behavior during the checksum experiment.
 
+### 2026-07-09 01:56 - Revised `95 EMU CHECKSUM SWEEP`
+
+Run folder: `C:\ARL\diagnostics\impact-emulator-20260709-015659`.
+
+The emulator had no `no_match` events. The accepted-end-marker and new-sample
+fallbacks worked: after an `es 248\r`, IMPACT sent `ns 0,0 173\r` and the
+emulator ACKed it, allowing the next analysis group to continue.
+
+| Case | Test | IMPACT response | Interpretation |
+|---:|---|---|---|
+| 01 | Low-checksum control `099` | `#em` | Accepted |
+| 02 | Valid decimal checksum `100` | `?` | Rejected |
+| recovery 01 | Low checksum `055` | `#em` | Accepted |
+| 03 | Valid decimal checksum `101` | `?` | Rejected |
+| recovery 02 | Low checksum `061` | `#em` | Accepted |
+| 04 | Payload computes to 100, checksum field sent as hex `64` | `?` | Rejected |
+| recovery 03 | Low checksum `040` | `#em` | Accepted |
+| 05 | Payload computes to 101, checksum field sent as hex `65` | `?` | Rejected |
+| recovery 04 | Low checksum `062` | `#em` | Accepted |
+| 06 | Payload computes to 100, checksum field sent as single text byte `d` | `?` | Rejected |
+| recovery 05 | Low checksum `093` | `#em` | Accepted |
+| 07 | Distinct shaped/control row with checksum `005` | `?` | Rejected |
+| recovery 06 | Low checksum `089` | `#em` | Accepted |
+| 08 | Distinct shaped/control row with checksum `023` | `#em` | Accepted |
+
+New conclusions from this run:
+
+- Hex presentation (`64`, `65`) does not satisfy IMPACT for payloads whose
+  computed decimal checksums are 100 and 101.
+- A single-character/byte-style presentation (`d`) also does not satisfy IMPACT
+  for computed checksum 100.
+- Low checksum alone is not sufficient: case 07 with checksum `005` was
+  rejected, while recovery/checksum rows `055`, `061`, `040`, `062`, `093`,
+  `089`, and case 08 `023` were accepted.
+- This introduces a second suspected validator beyond checksum range: IMPACT may
+  also reject some rows based on numeric ranges, field formatting, or alloy
+  plausibility. The checksum boundary remains strong, but not exclusive.
+
 ## Implementation Notes
 
 - The emulator profile must avoid using the same recovery row immediately after
