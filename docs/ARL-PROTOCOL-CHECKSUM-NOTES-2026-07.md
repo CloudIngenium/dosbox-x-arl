@@ -324,6 +324,24 @@ First live result:
   `impact-format-equivalence-safe-sweep.json`, keeps only format-equivalent rows
   that do not begin any numeric field with whitespace.
 
+Follow-up after continuing past the dialog:
+
+- User pressed through the `Ratioed Intensities` dialog and continued the same
+  `96` session.
+- IMPACT completed the remaining `96` cases. The only protocol rejections were
+  the original control rows with checksums `100`, `101`, `117`, and `231`.
+- Every format-equivalent row eventually received `#em`, including rows with
+  leading spaces. Therefore the dialog is a higher-level IMPACT validation/UI
+  error, not a serial/protocol rejection.
+- Safer operational interpretation: plus signs, leading zeros, and extra
+  precision are viable candidate transformations; leading whitespace inside
+  result fields is risky and should not be used in a real filter.
+- `98 EMU FORMAT SAFE` was revised to v2:
+  - remove known-rejected original controls;
+  - remove every row with a numeric field that begins with whitespace;
+  - keep only eight accepted-style value-equivalent variants with valid
+    checksums `000`, `023`, `055`, `089`, and `099`.
+
 ### `97 EMU CHECKSUM GRAMMAR`
 
 Profile: `impact-checksum-grammar-sweep.json`.
