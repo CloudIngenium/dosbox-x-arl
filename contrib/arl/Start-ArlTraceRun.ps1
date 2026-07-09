@@ -11,6 +11,7 @@ param(
     [ValidateSet("happy-path", "silent-after-spark", "delayed-result", "line-drop", "bad-response")]
     [string]$EmulatorMode = "happy-path",
     [string]$EmulatorProfilePath = (Join-Path $PSScriptRoot "profiles\arl3460-baseline.json"),
+    [switch]$StartEmulator,
     [string]$WindowResolution = "1280x960",
     [ValidateSet("default", "surface", "opengl", "openglnb", "openglpp", "direct3d", "ttf")]
     [string]$VideoOutput = "openglnb",
@@ -161,7 +162,8 @@ if ($usesEmulator) {
 }
 
 $emulatorScriptPath = Join-ArlPath $PSScriptRoot "Start-ArlEmulator.ps1"
-$emulatorCommand = "pwsh -NoProfile -File `"$emulatorScriptPath`" -Mode $EmulatorMode -ProfilePath `"$EmulatorProfilePath`" -ListenAddress $EmulatorHost -Port $EmulatorPort -Session $Session -LogPath `"$emulatorTracePath`""
+$powerShellExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+$emulatorCommand = "$powerShellExe -NoProfile -ExecutionPolicy Bypass -File `"$emulatorScriptPath`" -Mode $EmulatorMode -ProfilePath `"$EmulatorProfilePath`" -ListenAddress $EmulatorHost -Port $EmulatorPort -Session $Session -LogPath `"$emulatorTracePath`" -MaxConnections 1"
 $mouseCommand = if ($LoadMouse) { "DOS\MOUSE.COM" } else { "rem DOS\\MOUSE.COM disabled for memory-layout test" }
 
 $conf = @"
@@ -246,6 +248,7 @@ $metadata = [pscustomobject]@{
     emulator_mode = if ($usesEmulator) { $EmulatorMode } else { $null }
     emulator_profile = if ($usesEmulator) { $EmulatorProfilePath } else { $null }
     emulator_command = if ($usesEmulator) { $emulatorCommand } else { $null }
+    emulator_auto_started = if ($usesEmulator) { [bool]$StartEmulator } else { $null }
     rxdelay = $RxDelay
     cycles = $Cycles
     core = $Core
@@ -286,8 +289,12 @@ Write-Host "Run directory: $runDir"
 Write-Host "Config: $confPath"
 if ($usesEmulator) {
     Write-Host "Emulator trace: $emulatorTracePath"
-    Write-Host "Start emulator first:"
-    Write-Host $emulatorCommand
+    if ($StartEmulator) {
+        Write-Host "Emulator will be started automatically."
+    } else {
+        Write-Host "Start emulator first:"
+        Write-Host $emulatorCommand
+    }
 } else {
     Write-Host "Trace: $tracePath"
 }
@@ -315,12 +322,45 @@ if ($AutoPrintLpt -and -not $usesEmulator) {
     }
 }
 
+$emulatorProcess = $null
+if ($usesEmulator -and $StartEmulator) {
+    if (-not (Test-Path -Path $emulatorScriptPath -PathType Leaf)) {
+        throw "ARL emulator script not found: $emulatorScriptPath"
+    }
+    if (-not (Test-Path -Path $EmulatorProfilePath -PathType Leaf)) {
+        throw "ARL emulator profile not found: $EmulatorProfilePath"
+    }
+    $emulatorArgs = @(
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        $emulatorScriptPath,
+        "-Mode",
+        $EmulatorMode,
+        "-ProfilePath",
+        $EmulatorProfilePath,
+        "-ListenAddress",
+        $EmulatorHost,
+        "-Port",
+        [string]$EmulatorPort,
+        "-Session",
+        $Session,
+        "-LogPath",
+        $emulatorTracePath,
+        "-MaxConnections",
+        "1"
+    )
+    $emulatorProcess = Start-Process -FilePath $powerShellExe -ArgumentList $emulatorArgs -WindowStyle Minimized -PassThru
+    Write-Host "Started ARL emulator PID $($emulatorProcess.Id)"
+    Start-Sleep -Milliseconds 750
+}
+
 $process = Start-Process -FilePath $DosboxExe -ArgumentList @("-conf", $confPath) -PassThru
 Write-Host "Started DOSBox-X ARL PID $($process.Id)"
 
 $watcherProcess = $null
 if ($AutoPrintLpt -and -not $usesEmulator) {
-    $powerShellExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
     $watcherArgs = [ordered]@{
         CapturePath = $lptPath
         PrinterName = $PrinterName
@@ -373,6 +413,9 @@ if ($Wait) {
     $process.WaitForExit()
     if ($null -ne $watcherProcess) {
         $watcherProcess.WaitForExit(10000) | Out-Null
+    }
+    if ($null -ne $emulatorProcess) {
+        $emulatorProcess.WaitForExit(10000) | Out-Null
     }
     if (Test-Path -Path $interfacPath -PathType Leaf) {
         Copy-Item -Path $interfacPath -Destination (Join-ArlPath $runDir "INTERFAC.DAT.after") -Force

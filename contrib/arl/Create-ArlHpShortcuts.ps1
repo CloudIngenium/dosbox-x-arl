@@ -71,6 +71,16 @@ $shortcuts = @(
         BuildRequired = $false
     },
     @{
+        Name = "90 EMU GOOD-THEN-REJECT"
+        Target = "Launch-ArlImpactEmulatorTrace.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "91 EMU REJECT-FIRST"
+        Target = "Launch-ArlImpactEmulatorRejectFirstTrace.cmd"
+        BuildRequired = $false
+    },
+    @{
         Name = "99 FORCELINES - 6000 SIMPLE386"
         Target = "Launch-ArlImpactCycles6000Simple386ForceLinesTrace.cmd"
         BuildRequired = $true
@@ -96,7 +106,7 @@ if (-not $NoCleanup) {
     Get-ChildItem -Path $DesktopPath -Filter "*.lnk" -File |
         Where-Object {
             $name = $_.Name.ToLowerInvariant()
-            ($_.BaseName -match "ARL|IMPACT|CYCLES|SIMPLE|TRACE|TICS|UARTDATA|FORCELINES|HOLDRTS|RX4000|SAFE SERIAL|STABILITY|NOINT33|NO MOUSE") -and
+            ($_.BaseName -match "ARL|IMPACT|CYCLES|SIMPLE|TRACE|TICS|UARTDATA|FORCELINES|HOLDRTS|RX4000|SAFE SERIAL|STABILITY|NOINT33|NO MOUSE|EMU") -and
             -not $desiredNames.ContainsKey($name)
         } |
         Remove-Item -Force
@@ -104,7 +114,7 @@ if (-not $NoCleanup) {
     Get-ChildItem -Path $DesktopPath -File |
         Where-Object {
             $_.Extension -ne ".lnk" -and
-            $_.BaseName -match "ARL|IMPACT|CYCLES|SIMPLE|TRACE|TICS|UARTDATA|FORCELINES|HOLDRTS|RX4000|SAFE SERIAL|STABILITY"
+            $_.BaseName -match "ARL|IMPACT|CYCLES|SIMPLE|TRACE|TICS|UARTDATA|FORCELINES|HOLDRTS|RX4000|SAFE SERIAL|STABILITY|EMU"
         } |
         Remove-Item -Force
 }

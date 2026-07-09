@@ -111,6 +111,8 @@ Current status after repair:
   - `10 UNMASKDISKIO - 6000 SIMPLE386`
   - `11 NOINT33 - 6000 SIMPLE386`
   - `00 BASELINE - 6000 486`
+  - `90 EMU GOOD-THEN-REJECT`
+  - `91 EMU REJECT-FIRST`
   - `Diagnostics - Serial Traces`
 - `FORCELINES` and `HOLDRTS-DTR` are not recreated unless
   `-IncludeBuildRequired` is passed explicitly.
@@ -120,6 +122,8 @@ Current status after repair:
   `arlholdrts:1 arlholddtr:1`.
 - The no-launch verification directories were removed so they do not appear as
   real ARL diagnostic runs.
+- Emulator shortcuts are hardware-safe: they use DOSBox-X `nullmodem` on
+  `127.0.0.1:3460` and must not contain `directserial`, `realport`, or `COM5`.
 
 ## Avoid Inline PowerShell Quoting
 

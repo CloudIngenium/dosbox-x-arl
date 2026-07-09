@@ -1244,3 +1244,47 @@ Current read:
   `scaler=none`.
 - This is intended to improve RDP readability without changing IMPACT's DOS
   video mode.
+
+2026-07-09 timing conclusion:
+
+- `sample-analysis-20260708-173311` is the strongest mixed reference:
+  7 accepted rows and 1 rejected row.
+- Accepted timing: first RX avg/max `14.143/16 ms`, row duration avg/max
+  `745.286/772 ms`, IMPACT response avg/max `6/7 ms`.
+- Rejected timing: first RX `15 ms`, row duration `757 ms`, IMPACT response
+  `5 ms`.
+- This makes a simple "row arrived too late/incomplete" explanation unlikely.
+  IMPACT had a complete checksum-valid row at nearly the same timing and still
+  replied `?`.
+- Current working hypotheses:
+  - row content/range/alloy/curve acceptance;
+  - accumulated IMPACT state after several burns;
+  - emulator/DOS memory or parser state that does not exist on FreeDOS;
+  - missing pre-result context that changes how IMPACT interprets `#rd`.
+
+2026-07-09 emulator setup:
+
+- Added `New-ArlEmulatorProfileFromTrace.ps1` to distill real result rows from
+  `result-timing.csv` into safe localhost-only emulator profiles.
+- Added `Start-ArlTraceRun.ps1 -StartEmulator` so emulator launchers start the
+  TCP emulator before DOSBox-X opens the `nullmodem` connection.
+- Created HP profiles:
+  - `C:\ARL\DOSBox-X-ARL\profiles\impact-6000-good7-then-reject.json`
+    from `sample-analysis-20260708-173311`; self-test OK, 10 rules.
+  - `C:\ARL\DOSBox-X-ARL\profiles\impact-6000-rejectfirst-current.json`
+    from `sample-analysis-20260708-232928`; self-test OK, 3 rules.
+- Recreated public desktop shortcuts:
+  - `90 EMU GOOD-THEN-REJECT`
+  - `91 EMU REJECT-FIRST`
+- Dry-run verified the emulator config uses
+  `serial1 = nullmodem server:127.0.0.1 port:3460 transparent:1 rxdelay:1000`
+  and does not open `COM5`.
+
+Next emulator interpretation:
+
+- Run `91 EMU REJECT-FIRST` first when the ARL is not needed. If IMPACT rejects
+  that row as the first result, content/format/range becomes likely.
+- Then run `90 EMU GOOD-THEN-REJECT`. If IMPACT accepts several emulated rows
+  and then rejects the same transition, accumulated IMPACT state becomes likely.
+- If emulator behavior does not match real ARL behavior, improve the emulator
+  with more pre-`#rd` context from traces before touching real COM settings.

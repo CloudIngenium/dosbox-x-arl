@@ -485,6 +485,44 @@ Emulator modes:
 The default `profiles\arl3460-baseline.json` is synthetic. Replace its
 responses only with bytes confirmed by real `serial.ndjson` traces.
 
+Trace-derived profiles are now generated with:
+
+```powershell
+C:\ARL\DOSBox-X-ARL\New-ArlEmulatorProfileFromTrace.ps1 `
+  -RunPath C:\ARL\diagnostics\sample-analysis-20260708-173311 `
+  -OutPath C:\ARL\DOSBox-X-ARL\profiles\impact-6000-good7-then-reject.json `
+  -Name impact-6000-good7-then-reject `
+  -Mode sequence `
+  -LineEnding CR
+```
+
+Current HP profiles:
+
+- `profiles\impact-6000-good7-then-reject.json`: seven accepted result rows
+  followed by the checksum-valid row that IMPACT rejected with `?`.
+- `profiles\impact-6000-rejectfirst-current.json`: the current baseline
+  reject row as the first emulator result.
+
+Operator emulator shortcuts:
+
+- `90 EMU GOOD-THEN-REJECT`: starts the localhost emulator automatically and
+  runs IMPACT through DOSBox-X `nullmodem`.
+- `91 EMU REJECT-FIRST`: same transport, but returns the rejected row first.
+
+Both shortcuts are safe for hardware: they never open `COM5`; generated configs
+must show `serial1 = nullmodem server:127.0.0.1 port:3460 ...`.
+
+Use these tests to distinguish row content from accumulated IMPACT state:
+
+- If `91 EMU REJECT-FIRST` is rejected immediately, suspect row content,
+  format, checksum interpretation, range checks, or alloy/curve-specific
+  acceptance logic.
+- If `91 EMU REJECT-FIRST` is accepted but `90 EMU GOOD-THEN-REJECT` fails
+  later, suspect accumulated IMPACT session state, memory/layout, or result
+  counter state.
+- If both emulator profiles behave differently from the real ARL trace, suspect
+  unmodeled status/control-line/timing context before `#rd`.
+
 ## TICS Diagnosis
 
 Use TICS separately from IMPACT to validate the ACS/ICS link. Close IMPACT before
