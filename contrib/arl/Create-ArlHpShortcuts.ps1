@@ -71,6 +71,26 @@ $shortcuts = @(
         BuildRequired = $false
     },
     @{
+        Name = "20 INI ICSDELAY200 - 6000"
+        Target = "Launch-ArlImpactIniIcsDelay200Trace.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "21 INI ICSDELAY300 - 6000"
+        Target = "Launch-ArlImpactIniIcsDelay300Trace.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "22 INI BOOTSTATUS OFF - 6000"
+        Target = "Launch-ArlImpactIniBootStatusOffTrace.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "23 INI TRACE OFF - 6000"
+        Target = "Launch-ArlImpactIniTraceOffTrace.cmd"
+        BuildRequired = $false
+    },
+    @{
         Name = "90 EMU GOOD-THEN-REJECT"
         Target = "Launch-ArlImpactEmulatorTrace.cmd"
         BuildRequired = $false

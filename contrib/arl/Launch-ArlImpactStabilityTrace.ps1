@@ -34,6 +34,7 @@ param(
     [string]$PrinterName = "EPSON LX-350",
     [switch]$NoAutoPrintLpt,
     [switch]$NoLptFormFeed,
+    [string[]]$ImpactIniSet = @(),
     [switch]$NoLaunch
 )
 
@@ -83,6 +84,7 @@ $runArgs = @{
     McbCorruptionBecomesApplicationFreeMemory = $McbCorruptionBecomesApplicationFreeMemory
     Share = $Share
     UnmaskTimerOnDiskIo = $UnmaskTimerOnDiskIo
+    ImpactIniSet = $ImpactIniSet
     HangMs = 30000
 }
 if ($ArlForceCts) { $runArgs.ArlForceCts = $true }

@@ -55,6 +55,7 @@ param(
     [int]$LptPollMs = 500,
     [switch]$NoLptFormFeed,
     [bool]$CleanImpactTemp = $true,
+    [string[]]$ImpactIniSet = @(),
     [switch]$Wait,
     [switch]$NoLaunch
 )
@@ -169,6 +170,80 @@ function Invoke-ImpactTempCleanup([string]$ImpactPath, [string]$BackupRoot) {
     }
 }
 
+function Set-ImpactIniValues([string]$ImpactPath, [string]$BackupRoot, [string[]]$Assignments) {
+    if ($Assignments.Count -eq 0) {
+        return $null
+    }
+
+    $iniPath = Join-ArlPath $ImpactPath "IMPACT.INI"
+    if (-not (Test-Path -Path $iniPath -PathType Leaf)) {
+        throw "IMPACT.INI not found: $iniPath"
+    }
+
+    $backupDir = Join-ArlPath $BackupRoot "impact-ini-before-start"
+    New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
+    $backupPath = Join-ArlPath $backupDir "IMPACT.INI"
+    Copy-Item -Path $iniPath -Destination $backupPath -Force
+
+    $lines = New-Object System.Collections.Generic.List[string]
+    foreach ($line in [System.IO.File]::ReadAllLines($iniPath)) {
+        [void]$lines.Add($line)
+    }
+
+    $applied = New-Object System.Collections.Generic.List[object]
+    foreach ($assignment in $Assignments) {
+        if ($assignment -notmatch '^\s*([^=]+?)\s*=\s*(.*?)\s*$') {
+            throw "Invalid IMPACT.INI assignment '$assignment'. Use 'Key=Value'."
+        }
+
+        $key = $Matches[1].Trim()
+        $value = $Matches[2].Trim()
+        if ([string]::IsNullOrWhiteSpace($key)) {
+            throw "Invalid IMPACT.INI assignment '$assignment'. Empty key."
+        }
+
+        $found = $false
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match '^\s*([^;][^=]*?)\s*=') {
+                $existingKey = $Matches[1].Trim()
+                if ([string]::Equals($existingKey, $key, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $oldValue = $lines[$i]
+                    $lines[$i] = "$existingKey = $value"
+                    [void]$applied.Add([pscustomobject]@{
+                        key = $existingKey
+                        old_line = $oldValue
+                        new_line = $lines[$i]
+                    })
+                    $found = $true
+                    break
+                }
+            }
+        }
+
+        if (-not $found) {
+            throw "IMPACT.INI key not found: $key"
+        }
+    }
+
+    [System.IO.File]::WriteAllLines($iniPath, $lines, [System.Text.Encoding]::ASCII)
+    $manifestPath = Join-ArlPath $backupDir "manifest.json"
+    $manifest = [pscustomobject]@{
+        ini_path = $iniPath
+        backup_path = $backupPath
+        assignments = @($Assignments)
+        applied = @($applied.ToArray())
+    }
+    $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path $manifestPath -Encoding UTF8
+
+    return [pscustomobject]@{
+        ini_path = $iniPath
+        backup_path = $backupPath
+        manifest_path = $manifestPath
+        assignments = @($Assignments)
+        applied = @($applied.ToArray())
+    }
+}
+
 $xmsText = ConvertTo-ArlDosOption $Xms "Xms" @("true", "false")
 $emsText = ConvertTo-ArlDosOption $Ems "Ems" @("true", "false", "emsboard", "emm386")
 $umbText = ConvertTo-ArlDosOption $Umb "Umb" @("true", "false")
@@ -189,6 +264,8 @@ $impactTempCleanup = $null
 if ($CleanImpactTemp) {
     $impactTempCleanup = Invoke-ImpactTempCleanup -ImpactPath $ImplusPath -BackupRoot $runDir
 }
+
+$impactIniOverride = Set-ImpactIniValues -ImpactPath $ImplusPath -BackupRoot $runDir -Assignments $ImpactIniSet
 
 $tracePath = Join-ArlPath $runDir "serial.ndjson"
 $emulatorTracePath = Join-ArlPath $runDir "emulator.ndjson"
@@ -349,6 +426,7 @@ $metadata = [pscustomobject]@{
     auxdevice = $AuxDevice
     clean_impact_temp = $CleanImpactTemp
     impact_temp_cleanup = $impactTempCleanup
+    impact_ini_override = $impactIniOverride
     zero_memory_on_ems_memory_allocation = $ZeroMemoryOnEmsAllocation
     zero_memory_on_xms_memory_allocation = $ZeroMemoryOnXmsAllocation
     mcb_corruption_becomes_application_free_memory = $McbCorruptionBecomesApplicationFreeMemory
@@ -388,6 +466,10 @@ if ($usesEmulator) {
 Write-Host "Log: $logPath"
 
 if ($NoLaunch) {
+    if ($null -ne $impactIniOverride -and (Test-Path -Path $impactIniOverride.backup_path -PathType Leaf)) {
+        Copy-Item -Path $impactIniOverride.backup_path -Destination $impactIniOverride.ini_path -Force
+        Write-Host "NoLaunch set; restored IMPACT.INI from $($impactIniOverride.backup_path)"
+    }
     Write-Host "NoLaunch set; DOSBox-X was not started."
     exit 0
 }
@@ -447,6 +529,41 @@ if ($usesEmulator -and $StartEmulator) {
 $process = Start-Process -FilePath $DosboxExe -ArgumentList @("-conf", $confPath) -PassThru
 Write-Host "Started DOSBox-X ARL PID $($process.Id)"
 
+$iniRestoreProcess = $null
+if ($null -ne $impactIniOverride) {
+    $restoreScriptPath = Join-ArlPath $runDir "restore-impact-ini-after-dosbox.ps1"
+    $restoreLogPath = Join-ArlPath $runDir "restore-impact-ini.log"
+    $restoreErrPath = Join-ArlPath $runDir "restore-impact-ini.err.log"
+    $restoreScript = @(
+        '$ErrorActionPreference = "Stop"',
+        "`$pidToWait = $($process.Id)",
+        "`$iniPath = $(Quote-PowerShellLiteral $impactIniOverride.ini_path)",
+        "`$backupPath = $(Quote-PowerShellLiteral $impactIniOverride.backup_path)",
+        'try {',
+        '    $p = Get-Process -Id $pidToWait -ErrorAction SilentlyContinue',
+        '    if ($null -ne $p) { $p.WaitForExit() }',
+        '    if (Test-Path -Path $backupPath -PathType Leaf) {',
+        '        Copy-Item -Path $backupPath -Destination $iniPath -Force',
+        '        Write-Host "Restored IMPACT.INI from $backupPath"',
+        '    } else {',
+        '        Write-Warning "Backup IMPACT.INI not found: $backupPath"',
+        '    }',
+        '} catch {',
+        '    Write-Error $_',
+        '    exit 1',
+        '}'
+    )
+    $restoreScript | Set-Content -Path $restoreScriptPath -Encoding UTF8
+    $iniRestoreProcess = Start-Process -FilePath $powerShellExe `
+        -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $restoreScriptPath) `
+        -RedirectStandardOutput $restoreLogPath `
+        -RedirectStandardError $restoreErrPath `
+        -WindowStyle Hidden `
+        -PassThru
+    Write-Host "IMPACT.INI overrides active for this run only: $($ImpactIniSet -join '; ')"
+    Write-Host "Started IMPACT.INI restore watcher PID $($iniRestoreProcess.Id)"
+}
+
 $watcherProcess = $null
 if ($AutoPrintLpt -and -not $usesEmulator) {
     $watcherArgs = [ordered]@{
@@ -504,6 +621,9 @@ if ($Wait) {
     }
     if ($null -ne $emulatorProcess) {
         $emulatorProcess.WaitForExit(10000) | Out-Null
+    }
+    if ($null -ne $iniRestoreProcess) {
+        $iniRestoreProcess.WaitForExit(10000) | Out-Null
     }
     if (Test-Path -Path $interfacPath -PathType Leaf) {
         Copy-Item -Path $interfacPath -Destination (Join-ArlPath $runDir "INTERFAC.DAT.after") -Force

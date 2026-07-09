@@ -1470,3 +1470,85 @@ Next emulator interpretation:
 - Validation target: close all DOSBox windows, launch `96 EMU FORMAT EQUIV`
   once from a cold state, and confirm whether it passes the first status read
   without needing a second IMPACT launch.
+
+2026-07-09 safe format sweep and file reverse engineering:
+
+- User ran `98 EMU FORMAT SAFE` after profile regeneration and temp-file
+  cleanup.
+- Main run: `C:\ARL\diagnostics\impact-emulator-20260709-084028`.
+- Profile: `C:\ARL\DOSBox-X-ARL\profiles\impact-format-equivalence-safe-sweep.json`.
+- Outcome:
+  - 32 format-equivalence case rows were sent.
+  - IMPACT accepted all 32 with `#em 242\r`.
+  - IMPACT sent 0 `?` rejects.
+  - The final visible `Please Run Sample` was expected profile exhaustion:
+    IMPACT sent another `#rd 246\r` after `case32`, and the emulator had no
+    `case33`.
+  - `LPTCAP.PRN` was generated and reached `81720` bytes, proving that the
+    emulator reached store/print/report flows.
+- Interpretation:
+  - The safe ASCII transformation strategy works in the emulator when leading
+    whitespace is avoided.
+  - Leading zeros, plus signs, and extra precision can be accepted by IMPACT if
+    the final checksum validates.
+  - The next real-ARL fix candidate is a receive-side canonicalization filter
+    that logs original ARL rows and transformed rows before IMPACT consumes
+    them.
+- First-launch improvement:
+  - The latest metadata shows `clean_impact_temp=true`.
+  - Before launch, the runner backed up and deleted `notdone.flg`, `telex.dat`,
+    and `telex.def`.
+  - This, plus the emulator's new generic `ms/rs/st` acknowledgements, explains
+    why `98` loaded on the first launch instead of requiring the usual second
+    IMPACT restart.
+- File analysis snapshot:
+  - `INTERFAC.DAT` is plain text and is the cleanest contract for Zap or an
+    IMPACT replacement.
+  - `.RES` files are plain ASCII historical result stores.
+  - `LPTCAP.PRN` is plain ASCII and includes intensities, correction stages,
+    normalization, and final concentration.
+  - `.CAL` files are dBase/FoxBase DBF files with standard names and element
+    metadata.
+  - `IMPACT.INI` has useful knobs such as `ICS Delay Time = 100`,
+    `Use Trace Mode = ON`, and `Store Partial Results = OFF`.
+- Added detailed notes in
+  `docs/ARL-IMPACT-FILE-REVERSE-ENGINEERING-2026-07.md`.
+
+2026-07-09 IMPACT.INI flag analysis and reversible override support:
+
+- Compared current `IMPACT.INI` against archived `18_01_05\IMPACT.INI` and
+  `ROMAN\IMPACT.INI`.
+- Differences found:
+  - old `Use Trace Mode = OFF`, current `ON`;
+  - old `Use Compac & Telex = ON`, current `OFF`;
+  - status-channel calibration/limits differ for `Vacuum` and `C-temp`.
+- Extracted strings from `IMPACT.EXE`, `SAMPANAL.EXE`, `INIFILE.EXE`, and
+  `TICS.EXE`.
+- Confirmed IMPACT reads these config keys directly:
+  `Use Trace Mode`, `Use Offline Mode`, `Use Bootup Status`,
+  `Use Kilopulses`, `Use Single Shot Analysis`,
+  `Use Programmable Attenuators`, `Use Compac & Telex`,
+  `ICS Delay Time`, `Use Quality Sort`, `Use Charge Correction`,
+  `Q34000 Support`, `Use QS/CC in auto mode`, `Stand 1`, `Stand 2`,
+  `Source 1`, `Source 2`, `Use Impact in EGA mode`, `Temp Opt`,
+  `Temp Choice`, `Store Partial Results`, and `Use dBase Regression support`.
+- Most useful communication candidate:
+  - `ICS Delay Time = 100`; new launchers test `200` and `300` safely.
+- Isolation candidates:
+  - `Use Bootup Status = OFF` to bypass/compare startup status path;
+  - `Use Trace Mode = OFF` to test whether IMPACT's own trace/file writes
+    perturb timing.
+- Added `-ImpactIniSet "Key=Value"` to `Start-ArlTraceRun.ps1`.
+  - It backs up `IMPACT.INI`, applies only known existing keys, records the
+    override in run metadata, and restores the original INI after DOSBox exits.
+  - `-NoLaunch` now restores immediately so test generation cannot leave the
+    HP in a modified INI state.
+- Added and deployed Public Desktop shortcuts:
+  - `20 INI ICSDELAY200 - 6000`
+  - `21 INI ICSDELAY300 - 6000`
+  - `22 INI BOOTSTATUS OFF - 6000`
+  - `23 INI TRACE OFF - 6000`
+- Validation:
+  - PowerShell parse passed for all `contrib/arl/*.ps1`.
+  - Remote `-NoLaunch -ImpactIniSet 'ICS Delay Time=222'` test restored
+    `IMPACT.INI` back to `ICS Delay Time = 100`.
