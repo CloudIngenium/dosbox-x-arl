@@ -1552,3 +1552,32 @@ Next emulator interpretation:
   - PowerShell parse passed for all `contrib/arl/*.ps1`.
   - Remote `-NoLaunch -ImpactIniSet 'ICS Delay Time=222'` test restored
     `IMPACT.INI` back to `ICS Delay Time = 100`.
+
+2026-07-09 next offline emulator test set:
+
+- Added `Analyze-ArlEmulatorLog.ps1`.
+  - It classifies emulator logs as `all_cases_accepted`,
+    `impact_rejected_cases`, `profile_no_match`, or
+    `profile_exhausted_after_all_cases_accepted`.
+  - Validated against the latest `98` log:
+    `32` cases, `32` accepted, `0` rejected, final `#rd 246\r` no-match
+    correctly classified as profile exhaustion after success.
+- Added emulator sequence wrapping support through `sequence_wrap_keys`.
+  - New profile `impact-format-equivalence-safe-loop.json` wraps
+    `format-case-row` back to `0` after the 32 safe rows.
+  - Purpose: long offline IMPACT stress tests without the misleading final
+    `Please Run Sample` caused by finite profile exhaustion.
+- Added offline/emulator shortcuts:
+  - `80 EMU SAFE LOOP`
+  - `81 EMU COMPAC ON SAFE LOOP`
+  - `82 EMU COMPAC AUTO SAFE LOOP`
+  - `83 EMU STORE PARTIAL SAFE LOOP`
+- For override runs, the restore watcher now copies post-run IMPACT artifacts
+  into `impact-post-run-files` before restoring `IMPACT.INI`. This is intended
+  to capture `TELEX.*`, `TEMP.TMP`, `RESULT.TMP`, `INTERFAC.DAT`, and related
+  files for reverse engineering.
+- Recommendation while ARL is unavailable:
+  1. Run `80 EMU SAFE LOOP` briefly to confirm the loop path behaves normally.
+  2. Run `81 EMU COMPAC ON SAFE LOOP` and close after one accepted/store flow.
+  3. Compare `impact-post-run-files` against baseline.
+  4. Only then run `82 EMU COMPAC AUTO SAFE LOOP`.

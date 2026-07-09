@@ -91,6 +91,26 @@ $shortcuts = @(
         BuildRequired = $false
     },
     @{
+        Name = "80 EMU SAFE LOOP"
+        Target = "Launch-ArlImpactEmulatorFormatSafeLoopTrace.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "81 EMU COMPAC ON SAFE LOOP"
+        Target = "Launch-ArlImpactEmulatorCompacOnSafeLoopTrace.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "82 EMU COMPAC AUTO SAFE LOOP"
+        Target = "Launch-ArlImpactEmulatorCompacAutoSafeLoopTrace.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "83 EMU STORE PARTIAL SAFE LOOP"
+        Target = "Launch-ArlImpactEmulatorStorePartialSafeLoopTrace.cmd"
+        BuildRequired = $false
+    },
+    @{
         Name = "90 EMU GOOD-THEN-REJECT"
         Target = "Launch-ArlImpactEmulatorTrace.cmd"
         BuildRequired = $false

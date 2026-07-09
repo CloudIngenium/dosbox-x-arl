@@ -17,6 +17,8 @@ param(
 
     [string]$CpuType = "486",
 
+    [string[]]$ImpactIniSet = @(),
+
     [switch]$NoLaunch
 )
 
@@ -54,5 +56,6 @@ if (-not (Test-Path -Path $ProfilePath -PathType Leaf)) {
     -VideoOutput "default" `
     -Aspect $false `
     -Scaler "normal2x" `
+    -ImpactIniSet $ImpactIniSet `
     -HangMs 30000 `
     -NoLaunch:$NoLaunch

@@ -342,3 +342,46 @@ Recommended first tests:
    isolation experiment, then restore the normal status path.
 4. Test `Use Trace Mode=OFF` only if we suspect IMPACT's own trace/file writes
    perturb timing. Keep DOSBox-X-ARL serial tracing enabled.
+
+## Compac/Telex Offline Tests
+
+`Use Compac & Telex` is unlikely to fix ARL/ICS communication directly. The
+strings in `SAMPANAL.EXE` point to result export/reporting:
+
+- `TELEX.DAT`
+- `TELEX.DEF`
+- `TELEX.SAV`
+- `Send This Run to Compac or Telex?`
+- `Automaticly transmit runs`
+- `Transmit Average Only`
+
+This makes it useful for reverse engineering the post-analysis export layer and
+for a future IMPACT replacement.
+
+Prepared emulator-only shortcuts:
+
+| Shortcut | Purpose | INI overrides |
+|---|---|---|
+| `80 EMU SAFE LOOP` | Long-running safe accepted-row loop, no Compac/Telex changes | none |
+| `81 EMU COMPAC ON SAFE LOOP` | See files/prompts generated when Compac/Telex is enabled but automatic transmit is disabled | `Use Compac & Telex=ON`, `Automaticly transmit runs=OFF`, `Transmit Average Only=ON` |
+| `82 EMU COMPAC AUTO SAFE LOOP` | See whether IMPACT writes/sends additional export state automatically after accepted runs | `Use Compac & Telex=ON`, `Automaticly transmit runs=ON`, `Transmit Average Only=ON` |
+| `83 EMU STORE PARTIAL SAFE LOOP` | Learn whether rejected/partial result paths write additional files | `Store Partial Results=ON` |
+
+All four use `serial1=nullmodem` through the emulator and never open `COM5`.
+
+When an INI override is active, the runner now captures these post-run files
+under the diagnostic folder before restoring `IMPACT.INI`:
+
+- `INTERFAC.DAT`
+- `TELEX.DAT`
+- `TELEX.DEF`
+- `TELEX.SAV`
+- `TEMP.TMP`
+- `RESULT.TMP`
+- `IMPACT.DBF`
+- `SENTFILE.DAT`
+- `NOTDONE.FLG`
+- `REPORT.X`
+
+Use `Analyze-ArlEmulatorLog.ps1 -WriteFiles` after a run to classify the
+emulator outcome and write `emulator-summary.json` plus `emulator-summary.md`.

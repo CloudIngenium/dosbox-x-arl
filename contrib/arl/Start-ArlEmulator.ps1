@@ -211,6 +211,43 @@ function Find-MatchingRule([byte[]]$InputBytes) {
             return $rule
         }
     }
+
+    $wrapKeys = Get-PropValue $script:Profile "sequence_wrap_keys"
+    if ($null -ne $wrapKeys) {
+        $didWrap = $false
+        foreach ($property in $wrapKeys.PSObject.Properties) {
+            $key = [string]$property.Name
+            $settings = $property.Value
+            $wrapAt = [int](Get-PropValue $settings "wrap_at" 0)
+            $resetTo = [int](Get-PropValue $settings "reset_to" 0)
+            $actual = 0
+            if ($script:SequenceState.ContainsKey($key)) {
+                $actual = [int]$script:SequenceState[$key]
+            }
+
+            if ($wrapAt -gt 0 -and $actual -ge $wrapAt) {
+                $script:SequenceState[$key] = $resetTo
+                $didWrap = $true
+                Write-EmulatorEvent @{
+                    event = "sequence_wrap"
+                    sequence_key = $key
+                    previous_index = $actual
+                    reset_to = $resetTo
+                    input_hex = Format-HexBytes $InputBytes
+                    input_ascii = Format-AsciiBytes $InputBytes
+                }
+            }
+        }
+
+        if ($didWrap) {
+            foreach ($rule in @($script:Profile.responses)) {
+                if ((Test-RuleMatch $rule $inputHex $inputAscii) -and (Test-RuleSequenceReady $rule)) {
+                    return $rule
+                }
+            }
+        }
+    }
+
     return $null
 }
 
