@@ -1309,6 +1309,15 @@ Current read:
   IMPACT so it sends `sc`. `Start-ArlEmulator.ps1` now handles a standalone
   `0x7F` immediately instead of waiting for the generic transaction-idle path,
   using the profile rule `impact-sync-7f-ready` with response `#`.
+- After the sync fix, IMPACT sent `sc 2,0,1,0,1,0,0,0,0,0 134\r` but the
+  emulator did not process it while IMPACT remained on the configuration
+  screen. `Start-ArlEmulator.ps1` now also processes any buffered transaction
+  immediately when it receives carriage return (`0x0D`), matching the ARL
+  protocol's command terminator instead of depending only on idle timing.
+- Cleaned IMPACT transient files after backing them up to
+  `C:\ARL\diagnostics\impact-temp-backup-20260709-002351`. Files actually found
+  and deleted were `telex.dat`, `telex.def`, and `report.x`; manifest includes
+  hashes and paths.
 
 2026-07-09 AUTOEXEC/CONFIG audit:
 

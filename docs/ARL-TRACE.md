@@ -511,6 +511,9 @@ Current HP profiles:
   IMPACT otherwise repeats `0x7F` every 10 seconds and never sends `sc`. If an
   old emulator is still listening on port `3460`, the launcher stops it before
   starting the next emulated run.
+- The emulator also processes buffered input immediately on command terminator
+  `CR` (`0x0D`), because IMPACT can wait on the next response without leaving
+  enough idle time for a timer-only transaction splitter.
 
 Operator emulator shortcuts:
 

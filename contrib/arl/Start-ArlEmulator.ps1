@@ -327,6 +327,12 @@ function Invoke-ClientSession([System.Net.Sockets.TcpClient]$Client) {
                     $lastActivityTick = [Environment]::TickCount64
                     if ($closeAfterTransaction) { break }
                 }
+                if ($buffer.Count -gt 0 -and $byte -eq 0x0d) {
+                    $closeAfterTransaction = Invoke-Transaction $stream ([byte[]]$buffer.ToArray())
+                    $buffer.Clear()
+                    $lastActivityTick = [Environment]::TickCount64
+                    if ($closeAfterTransaction) { break }
+                }
                 continue
             }
 
