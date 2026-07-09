@@ -232,6 +232,11 @@ Observed on 2026-07-08/09:
 
 Next preferred isolation test:
 
+- `00 BASELINE - 6000 486`
+  - restores the best-known good profile from
+    `sample-analysis-20260708-173311`
+  - `core=normal`, `cputype=486`, `cycles=fixed 6000`, `rxdelay:3000`
+  - uses normal mouse/EMS/XMS/UMB, auto-print, and old default video scaling
 - `11 NOINT33 - 6000 SIMPLE386`
   - `core=simple`, `cputype=386`, `cycles=fixed 6000`, `rxdelay:3000`
   - disables `DOS\MOUSE.COM`, `int33`, `biosps2`, and keyboard `aux`

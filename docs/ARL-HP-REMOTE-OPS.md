@@ -110,6 +110,7 @@ Current status after repair:
   - `09 NOSHARE - 6000 SIMPLE386`
   - `10 UNMASKDISKIO - 6000 SIMPLE386`
   - `11 NOINT33 - 6000 SIMPLE386`
+  - `00 BASELINE - 6000 486`
   - `Diagnostics - Serial Traces`
 - `FORCELINES` and `HOLDRTS-DTR` are not recreated unless
   `-IncludeBuildRequired` is passed explicitly.

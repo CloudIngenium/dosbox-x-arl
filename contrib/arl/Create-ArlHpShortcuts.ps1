@@ -11,6 +11,11 @@ $ErrorActionPreference = "Stop"
 
 $shortcuts = @(
     @{
+        Name = "00 BASELINE - 6000 486"
+        Target = "Launch-ArlImpactCycles6000Trace.cmd"
+        BuildRequired = $false
+    },
+    @{
         Name = "01 NOAUTOPRINT - 6000 SIMPLE386"
         Target = "Launch-ArlImpactCycles6000Simple386NoAutoPrintTrace.cmd"
         BuildRequired = $false

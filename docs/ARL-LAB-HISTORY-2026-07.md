@@ -1227,6 +1227,16 @@ Current read:
   `DOS\MOUSE.COM`, DOSBox-X `int33`, BIOS PS/2 mouse emulation, and keyboard
   AUX mouse emulation, with auto-print off for the test.
 
+2026-07-09 rollback insight:
+
+- After shortcuts `01-11`, the operator noted none of the active matrix
+  profiles reproduced the earlier useful behavior.
+- The best earlier run was not `SIMPLE386`; it was `ARL IMPACT+ CYCLES6000
+  TRACE` with `core=normal`, `cputype=486`, `rxdelay=3000`, normal mouse,
+  normal EMS/XMS/UMB, and auto-print enabled.
+- Restore that as `00 BASELINE - 6000 486` before spending more burns on
+  deeper compatibility variants.
+
 2026-07-09 display adjustment:
 
 - Generated configs now default to a larger 4:3 operator window:

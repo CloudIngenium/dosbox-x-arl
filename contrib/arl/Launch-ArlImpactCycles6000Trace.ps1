@@ -19,6 +19,12 @@ $args = @{
     DosboxExe = $DosboxExe
     Cycles = 6000
     RxDelay = $RxDelay
+    Core = "normal"
+    CpuType = "486"
+    WindowResolution = "original"
+    VideoOutput = "default"
+    Aspect = $false
+    Scaler = "normal2x"
     PrinterName = $PrinterName
 }
 if ($NoAutoPrintLpt) { $args.NoAutoPrintLpt = $true }
