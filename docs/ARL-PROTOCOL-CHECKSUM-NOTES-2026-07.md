@@ -341,6 +341,12 @@ Follow-up after continuing past the dialog:
   - remove every row with a numeric field that begins with whitespace;
   - keep only eight accepted-style value-equivalent variants with valid
     checksums `000`, `023`, `055`, `089`, and `099`.
+- First `98` run: `C:\ARL\diagnostics\impact-emulator-20260709-083351`.
+  IMPACT accepted all eight safe rows with `#em`; it then stayed at
+  `Please Run Sample` because the profile had no ninth row. This is profile
+  exhaustion, not a safe-format failure.
+- `98` was expanded to four rounds of the eight safe rows (`32` result rows
+  total) so manual testing can run longer before exhausting the profile.
 
 ### `97 EMU CHECKSUM GRAMMAR`
 

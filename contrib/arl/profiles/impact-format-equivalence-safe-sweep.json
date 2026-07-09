@@ -753,7 +753,7 @@
       "note": "Command-level trace replay before the first #rd. This preserves sc/#sw/#st/#ms/#rs responses instead of collapsing them into broad candidates."
     },
     {
-      "label": "format-equiv-100-to-000-leading-zero-plus-precision",
+      "label": "format-equiv-100-to-000-leading-zero-plus-precision-round1",
       "phase": "analysis-result",
       "match": "exact_ascii",
       "pattern_ascii": "#rd 246\r",
@@ -765,10 +765,10 @@
       "computed_checksum": 0,
       "checksum_text": "000",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
     },
     {
-      "label": "format-equiv-100-to-023-leading-zero-plus-precision",
+      "label": "format-equiv-100-to-023-leading-zero-plus-precision-round1",
       "phase": "analysis-result",
       "match": "exact_ascii",
       "pattern_ascii": "#rd 246\r",
@@ -780,10 +780,10 @@
       "computed_checksum": 23,
       "checksum_text": "023",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
     },
     {
-      "label": "format-equiv-100-to-089-plus-precision",
+      "label": "format-equiv-100-to-089-plus-precision-round1",
       "phase": "analysis-result",
       "match": "exact_ascii",
       "pattern_ascii": "#rd 246\r",
@@ -795,10 +795,10 @@
       "computed_checksum": 89,
       "checksum_text": "089",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
     },
     {
-      "label": "format-equiv-100-to-099-leading-zero-plus-precision",
+      "label": "format-equiv-100-to-099-leading-zero-plus-precision-round1",
       "phase": "analysis-result",
       "match": "exact_ascii",
       "pattern_ascii": "#rd 246\r",
@@ -810,10 +810,10 @@
       "computed_checksum": 99,
       "checksum_text": "099",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 099. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 099. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
     },
     {
-      "label": "format-equiv-101-to-089-leading-zero-plus-precision",
+      "label": "format-equiv-101-to-089-leading-zero-plus-precision-round1",
       "phase": "analysis-result",
       "match": "exact_ascii",
       "pattern_ascii": "#rd 246\r",
@@ -825,10 +825,10 @@
       "computed_checksum": 89,
       "checksum_text": "089",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-03-valid-decimal101; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-03-valid-decimal101; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
     },
     {
-      "label": "format-equiv-117-to-000-leading-zero-plus-precision",
+      "label": "format-equiv-117-to-000-leading-zero-plus-precision-round1",
       "phase": "analysis-result",
       "match": "exact_ascii",
       "pattern_ascii": "#rd 246\r",
@@ -840,10 +840,10 @@
       "computed_checksum": 0,
       "checksum_text": "000",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
     },
     {
-      "label": "format-equiv-117-to-055-leading-zero-plus-precision",
+      "label": "format-equiv-117-to-055-leading-zero-plus-precision-round1",
       "phase": "analysis-result",
       "match": "exact_ascii",
       "pattern_ascii": "#rd 246\r",
@@ -855,10 +855,10 @@
       "computed_checksum": 55,
       "checksum_text": "055",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 055. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 055. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
     },
     {
-      "label": "format-equiv-231-to-023-leading-zero-precision",
+      "label": "format-equiv-231-to-023-leading-zero-precision-round1",
       "phase": "analysis-result",
       "match": "exact_ascii",
       "pattern_ascii": "#rd 246\r",
@@ -870,10 +870,370 @@
       "computed_checksum": 23,
       "checksum_text": "023",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-13-valid-decimal231; ASCII formatting changed (leading-zero, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-13-valid-decimal231; ASCII formatting changed (leading-zero, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
     },
     {
-      "label": "safe-format-recovery-01-055",
+      "label": "format-equiv-100-to-000-leading-zero-plus-precision-round2",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+20.00,+25.258,+030.52,+0035.40500,40.66,45.922,2.16,7.420,12.68,17.568,22.83,28.084,32.97,38.231,43.49 000\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 8,
+      "sequence_next": 9,
+      "computed_checksum": 0,
+      "checksum_text": "000",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-023-leading-zero-plus-precision-round2",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+20,+25.258,+0030.5200,35.405,40.66,45.922,2.16,7.420,12.68,17.568,22.83,28.084,32.97,38.231,43.49 023\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 9,
+      "sequence_next": 10,
+      "computed_checksum": 23,
+      "checksum_text": "023",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-089-plus-precision-round2",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+20,+25.258,+30.52,+35.405,+40.66,+45.922,+2.16,+7.420,+12.68,17.568,22.83,28.084,32.97,38.231,43.49 089\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 10,
+      "sequence_next": 11,
+      "computed_checksum": 89,
+      "checksum_text": "089",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-099-leading-zero-plus-precision-round2",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+20,+25.258,+30.52,+35.405,+40.66,+45.922,+002.16,7.420,12.68,17.568,22.83,28.084,32.97,38.231,43.49 099\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 11,
+      "sequence_next": 12,
+      "computed_checksum": 99,
+      "checksum_text": "099",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 099. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-101-to-089-leading-zero-plus-precision-round2",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+0042.97,+48.231,+4.84,+9.730,+14.99,+20.246,+25.14,+30.393,+35.65,+40.541,+045.80,+002.40800,7.30,12.555,17.81 089\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 12,
+      "sequence_next": 13,
+      "computed_checksum": 89,
+      "checksum_text": "089",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-03-valid-decimal101; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-117-to-000-leading-zero-plus-precision-round2",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+0005.41,10.664,15.92,20.811,26.07,31.327,36.22,41.474,46.73,2.973,8.23,13.489,18.38,23.637,28.89 000\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 13,
+      "sequence_next": 14,
+      "computed_checksum": 0,
+      "checksum_text": "000",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-117-to-055-leading-zero-plus-precision-round2",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+05.41,+10.664,+15.92,+20.811,+26.07,+0031.32700,36.22,41.474,46.73,2.973,8.23,13.489,18.38,23.637,28.89 055\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 14,
+      "sequence_next": 15,
+      "computed_checksum": 55,
+      "checksum_text": "055",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 055. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-231-to-023-leading-zero-precision-round2",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#00011.89,17.150,22.41,27.297,32.56,37.814,42.70,47.961,4.57,9.459,14.72,19.976,24.86,30.123,35.38 023\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 15,
+      "sequence_next": 16,
+      "computed_checksum": 23,
+      "checksum_text": "023",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-13-valid-decimal231; ASCII formatting changed (leading-zero, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-000-leading-zero-plus-precision-round3",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+20.00,+25.258,+030.52,+0035.40500,40.66,45.922,2.16,7.420,12.68,17.568,22.83,28.084,32.97,38.231,43.49 000\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 16,
+      "sequence_next": 17,
+      "computed_checksum": 0,
+      "checksum_text": "000",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-023-leading-zero-plus-precision-round3",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+20,+25.258,+0030.5200,35.405,40.66,45.922,2.16,7.420,12.68,17.568,22.83,28.084,32.97,38.231,43.49 023\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 17,
+      "sequence_next": 18,
+      "computed_checksum": 23,
+      "checksum_text": "023",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-089-plus-precision-round3",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+20,+25.258,+30.52,+35.405,+40.66,+45.922,+2.16,+7.420,+12.68,17.568,22.83,28.084,32.97,38.231,43.49 089\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 18,
+      "sequence_next": 19,
+      "computed_checksum": 89,
+      "checksum_text": "089",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-099-leading-zero-plus-precision-round3",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+20,+25.258,+30.52,+35.405,+40.66,+45.922,+002.16,7.420,12.68,17.568,22.83,28.084,32.97,38.231,43.49 099\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 19,
+      "sequence_next": 20,
+      "computed_checksum": 99,
+      "checksum_text": "099",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 099. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-101-to-089-leading-zero-plus-precision-round3",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+0042.97,+48.231,+4.84,+9.730,+14.99,+20.246,+25.14,+30.393,+35.65,+40.541,+045.80,+002.40800,7.30,12.555,17.81 089\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 20,
+      "sequence_next": 21,
+      "computed_checksum": 89,
+      "checksum_text": "089",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-03-valid-decimal101; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-117-to-000-leading-zero-plus-precision-round3",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+0005.41,10.664,15.92,20.811,26.07,31.327,36.22,41.474,46.73,2.973,8.23,13.489,18.38,23.637,28.89 000\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 21,
+      "sequence_next": 22,
+      "computed_checksum": 0,
+      "checksum_text": "000",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-117-to-055-leading-zero-plus-precision-round3",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+05.41,+10.664,+15.92,+20.811,+26.07,+0031.32700,36.22,41.474,46.73,2.973,8.23,13.489,18.38,23.637,28.89 055\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 22,
+      "sequence_next": 23,
+      "computed_checksum": 55,
+      "checksum_text": "055",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 055. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-231-to-023-leading-zero-precision-round3",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#00011.89,17.150,22.41,27.297,32.56,37.814,42.70,47.961,4.57,9.459,14.72,19.976,24.86,30.123,35.38 023\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 23,
+      "sequence_next": 24,
+      "computed_checksum": 23,
+      "checksum_text": "023",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-13-valid-decimal231; ASCII formatting changed (leading-zero, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-000-leading-zero-plus-precision-round4",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+20.00,+25.258,+030.52,+0035.40500,40.66,45.922,2.16,7.420,12.68,17.568,22.83,28.084,32.97,38.231,43.49 000\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 24,
+      "sequence_next": 25,
+      "computed_checksum": 0,
+      "checksum_text": "000",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-023-leading-zero-plus-precision-round4",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+20,+25.258,+0030.5200,35.405,40.66,45.922,2.16,7.420,12.68,17.568,22.83,28.084,32.97,38.231,43.49 023\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 25,
+      "sequence_next": 26,
+      "computed_checksum": 23,
+      "checksum_text": "023",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-089-plus-precision-round4",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+20,+25.258,+30.52,+35.405,+40.66,+45.922,+2.16,+7.420,+12.68,17.568,22.83,28.084,32.97,38.231,43.49 089\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 26,
+      "sequence_next": 27,
+      "computed_checksum": 89,
+      "checksum_text": "089",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-099-leading-zero-plus-precision-round4",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+20,+25.258,+30.52,+35.405,+40.66,+45.922,+002.16,7.420,12.68,17.568,22.83,28.084,32.97,38.231,43.49 099\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 27,
+      "sequence_next": 28,
+      "computed_checksum": 99,
+      "checksum_text": "099",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 099. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-101-to-089-leading-zero-plus-precision-round4",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+0042.97,+48.231,+4.84,+9.730,+14.99,+20.246,+25.14,+30.393,+35.65,+40.541,+045.80,+002.40800,7.30,12.555,17.81 089\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 28,
+      "sequence_next": 29,
+      "computed_checksum": 89,
+      "checksum_text": "089",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-03-valid-decimal101; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-117-to-000-leading-zero-plus-precision-round4",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+0005.41,10.664,15.92,20.811,26.07,31.327,36.22,41.474,46.73,2.973,8.23,13.489,18.38,23.637,28.89 000\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 29,
+      "sequence_next": 30,
+      "computed_checksum": 0,
+      "checksum_text": "000",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-117-to-055-leading-zero-plus-precision-round4",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#+05.41,+10.664,+15.92,+20.811,+26.07,+0031.32700,36.22,41.474,46.73,2.973,8.23,13.489,18.38,23.637,28.89 055\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 30,
+      "sequence_next": 31,
+      "computed_checksum": 55,
+      "checksum_text": "055",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 055. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-231-to-023-leading-zero-precision-round4",
+      "phase": "analysis-result",
+      "match": "exact_ascii",
+      "pattern_ascii": "#rd 246\r",
+      "response_ascii": "#00011.89,17.150,22.41,27.297,32.56,37.814,42.70,47.961,4.57,9.459,14.72,19.976,24.86,30.123,35.38 023\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-case-row",
+      "sequence_index": 31,
+      "sequence_next": 32,
+      "computed_checksum": 23,
+      "checksum_text": "023",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-13-valid-decimal231; ASCII formatting changed (leading-zero, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "safe-format-recovery-01-055-r1",
       "phase": "reject-recovery",
       "match": "exact_ascii",
       "pattern_ascii": "?",
@@ -888,7 +1248,7 @@
       "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
     },
     {
-      "label": "safe-format-recovery-02-061",
+      "label": "safe-format-recovery-02-061-r1",
       "phase": "reject-recovery",
       "match": "exact_ascii",
       "pattern_ascii": "?",
@@ -903,7 +1263,7 @@
       "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
     },
     {
-      "label": "safe-format-recovery-03-040",
+      "label": "safe-format-recovery-03-040-r1",
       "phase": "reject-recovery",
       "match": "exact_ascii",
       "pattern_ascii": "?",
@@ -918,7 +1278,7 @@
       "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
     },
     {
-      "label": "safe-format-recovery-04-062",
+      "label": "safe-format-recovery-04-062-r1",
       "phase": "reject-recovery",
       "match": "exact_ascii",
       "pattern_ascii": "?",
@@ -933,7 +1293,7 @@
       "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
     },
     {
-      "label": "safe-format-recovery-05-093",
+      "label": "safe-format-recovery-05-093-r1",
       "phase": "reject-recovery",
       "match": "exact_ascii",
       "pattern_ascii": "?",
@@ -948,7 +1308,7 @@
       "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
     },
     {
-      "label": "safe-format-recovery-06-089",
+      "label": "safe-format-recovery-06-089-r1",
       "phase": "reject-recovery",
       "match": "exact_ascii",
       "pattern_ascii": "?",
@@ -963,7 +1323,7 @@
       "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
     },
     {
-      "label": "safe-format-recovery-07-023",
+      "label": "safe-format-recovery-07-023-r1",
       "phase": "reject-recovery",
       "match": "exact_ascii",
       "pattern_ascii": "?",
@@ -978,7 +1338,7 @@
       "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
     },
     {
-      "label": "safe-format-recovery-08-000",
+      "label": "safe-format-recovery-08-000-r1",
       "phase": "reject-recovery",
       "match": "exact_ascii",
       "pattern_ascii": "?",
@@ -993,7 +1353,7 @@
       "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
     },
     {
-      "label": "safe-format-recovery-09-055",
+      "label": "safe-format-recovery-09-055-r1",
       "phase": "reject-recovery",
       "match": "exact_ascii",
       "pattern_ascii": "?",
@@ -1008,7 +1368,7 @@
       "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
     },
     {
-      "label": "safe-format-recovery-10-061",
+      "label": "safe-format-recovery-10-061-r1",
       "phase": "reject-recovery",
       "match": "exact_ascii",
       "pattern_ascii": "?",
@@ -1023,7 +1383,7 @@
       "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
     },
     {
-      "label": "safe-format-recovery-11-040",
+      "label": "safe-format-recovery-11-040-r1",
       "phase": "reject-recovery",
       "match": "exact_ascii",
       "pattern_ascii": "?",
@@ -1038,7 +1398,7 @@
       "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
     },
     {
-      "label": "safe-format-recovery-12-062",
+      "label": "safe-format-recovery-12-062-r1",
       "phase": "reject-recovery",
       "match": "exact_ascii",
       "pattern_ascii": "?",
@@ -1053,7 +1413,7 @@
       "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
     },
     {
-      "label": "safe-format-recovery-13-093",
+      "label": "safe-format-recovery-13-093-r1",
       "phase": "reject-recovery",
       "match": "exact_ascii",
       "pattern_ascii": "?",
@@ -1062,6 +1422,396 @@
       "sequence_key": "format-recovery-row",
       "sequence_index": 12,
       "sequence_next": 13,
+      "computed_checksum": 93,
+      "checksum_text": "093",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-01-055-r2",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "25.7297,27.07,28.32,29.666,31.009,32.35,33.69,035.036,36.38,0037.6301,38.973,40.32,41.6575,43.000,44.34 055\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 13,
+      "sequence_next": 14,
+      "computed_checksum": 55,
+      "checksum_text": "055",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-02-061-r2",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "10.76,12.10,13.353,14.700,16.0376,17.380,18.72,020.0650,21.407,0022.66,24.001,25.34,26.69,28.0289,29.371 061\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 14,
+      "sequence_next": 15,
+      "computed_checksum": 61,
+      "checksum_text": "061",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-03-040-r2",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "00028.090,29.43,30.7716,32.023,33.37,34.71,36.051,37.390,38.7355,40.078,41.33,042.6720,44.014,0045.36,46.699 040\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 15,
+      "sequence_next": 16,
+      "computed_checksum": 40,
+      "checksum_text": "040",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-04-062-r2",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "49.32,50.6618,52.004,53.35,54.6893,56.032,57.28,0.9957,2.34,03.68,5.0231,006.366,7.710,8.96,10.302 062\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 16,
+      "sequence_next": 17,
+      "computed_checksum": 62,
+      "checksum_text": "062",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-05-093-r2",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "00032.090,33.436,34.78,36.1214,37.464,38.81,40.0578,41.400,42.74,44.0852,45.43,046.77,48.1127,0049.364,50.710 093\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 17,
+      "sequence_next": 18,
+      "computed_checksum": 93,
+      "checksum_text": "093",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-06-089-r2",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "49.22,50.5592,51.902,53.24,54.5867,55.84,057.18,0.8931,002.236,3.580,4.92,6.263,7.51,8.8569,10.199 089\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 18,
+      "sequence_next": 19,
+      "computed_checksum": 89,
+      "checksum_text": "089",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-07-023-r2",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "00030.340,31.6835,33.026,34.28,35.6199,36.96,38.30,39.647,40.990,42.33,43.58,044.926,46.27,0047.6113,48.954 023\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 19,
+      "sequence_next": 20,
+      "computed_checksum": 23,
+      "checksum_text": "023",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-08-000-r2",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "00023.580,24.9205,26.263,27.51,28.8569,30.20,31.54,32.884,34.227,35.57,36.82,038.163,39.51,0040.8482,42.191 000\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 20,
+      "sequence_next": 21,
+      "computed_checksum": 0,
+      "checksum_text": "000",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-09-055-r2",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "4.51,5.8512,7.19,8.54,9.879,11.221,12.56,13.81,015.158,16.50,0017.8425,19.185,20.53,21.8699,23.121 055\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 21,
+      "sequence_next": 22,
+      "computed_checksum": 55,
+      "checksum_text": "055",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-10-061-r2",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "44.9133,46.26,47.60,48.941,50.283,51.63,52.97,054.220,55.56,0056.9046,0.617,1.96,3.3020,4.644,5.90 061\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 22,
+      "sequence_next": 23,
+      "computed_checksum": 61,
+      "checksum_text": "061",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-11-040-r2",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "00036.600,37.9451,39.288,40.63,41.9725,43.31,44.57,45.909,47.251,48.59,49.94,051.279,52.62,0053.8728,55.215 040\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 23,
+      "sequence_next": 24,
+      "computed_checksum": 40,
+      "checksum_text": "040",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-12-062-r2",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "38.7543,40.10,41.44,42.782,44.124,45.38,46.72,048.061,49.40,0050.7456,52.088,53.43,54.6821,56.025,57.37 062\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 24,
+      "sequence_next": 25,
+      "computed_checksum": 62,
+      "checksum_text": "062",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-13-093-r2",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "4.510,5.8512,7.194,8.54,09.8786,11.221,0012.56,13.815,15.16,16.50,17.8425,19.185,20.53,21.87,23.121 093\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 25,
+      "sequence_next": 26,
+      "computed_checksum": 93,
+      "checksum_text": "093",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-01-055-r3",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "25.7297,27.07,28.32,29.666,31.009,32.35,33.69,035.036,36.38,0037.6301,38.973,40.32,41.6575,43.000,44.34 055\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 26,
+      "sequence_next": 27,
+      "computed_checksum": 55,
+      "checksum_text": "055",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-02-061-r3",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "10.76,12.10,13.353,14.700,16.0376,17.380,18.72,020.0650,21.407,0022.66,24.001,25.34,26.69,28.0289,29.371 061\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 27,
+      "sequence_next": 28,
+      "computed_checksum": 61,
+      "checksum_text": "061",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-03-040-r3",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "00028.090,29.43,30.7716,32.023,33.37,34.71,36.051,37.390,38.7355,40.078,41.33,042.6720,44.014,0045.36,46.699 040\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 28,
+      "sequence_next": 29,
+      "computed_checksum": 40,
+      "checksum_text": "040",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-04-062-r3",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "49.32,50.6618,52.004,53.35,54.6893,56.032,57.28,0.9957,2.34,03.68,5.0231,006.366,7.710,8.96,10.302 062\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 29,
+      "sequence_next": 30,
+      "computed_checksum": 62,
+      "checksum_text": "062",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-05-093-r3",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "00032.090,33.436,34.78,36.1214,37.464,38.81,40.0578,41.400,42.74,44.0852,45.43,046.77,48.1127,0049.364,50.710 093\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 30,
+      "sequence_next": 31,
+      "computed_checksum": 93,
+      "checksum_text": "093",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-06-089-r3",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "49.22,50.5592,51.902,53.24,54.5867,55.84,057.18,0.8931,002.236,3.580,4.92,6.263,7.51,8.8569,10.199 089\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 31,
+      "sequence_next": 32,
+      "computed_checksum": 89,
+      "checksum_text": "089",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-07-023-r3",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "00030.340,31.6835,33.026,34.28,35.6199,36.96,38.30,39.647,40.990,42.33,43.58,044.926,46.27,0047.6113,48.954 023\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 32,
+      "sequence_next": 33,
+      "computed_checksum": 23,
+      "checksum_text": "023",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-08-000-r3",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "00023.580,24.9205,26.263,27.51,28.8569,30.20,31.54,32.884,34.227,35.57,36.82,038.163,39.51,0040.8482,42.191 000\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 33,
+      "sequence_next": 34,
+      "computed_checksum": 0,
+      "checksum_text": "000",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-09-055-r3",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "4.51,5.8512,7.19,8.54,9.879,11.221,12.56,13.81,015.158,16.50,0017.8425,19.185,20.53,21.8699,23.121 055\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 34,
+      "sequence_next": 35,
+      "computed_checksum": 55,
+      "checksum_text": "055",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-10-061-r3",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "44.9133,46.26,47.60,48.941,50.283,51.63,52.97,054.220,55.56,0056.9046,0.617,1.96,3.3020,4.644,5.90 061\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 35,
+      "sequence_next": 36,
+      "computed_checksum": 61,
+      "checksum_text": "061",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-11-040-r3",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "00036.600,37.9451,39.288,40.63,41.9725,43.31,44.57,45.909,47.251,48.59,49.94,051.279,52.62,0053.8728,55.215 040\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 36,
+      "sequence_next": 37,
+      "computed_checksum": 40,
+      "checksum_text": "040",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-12-062-r3",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "38.7543,40.10,41.44,42.782,44.124,45.38,46.72,048.061,49.40,0050.7456,52.088,53.43,54.6821,56.025,57.37 062\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 37,
+      "sequence_next": 38,
+      "computed_checksum": 62,
+      "checksum_text": "062",
+      "checksum_valid": true,
+      "note": "Distinct low-checksum recovery row after rejected format/checksum grammar cases."
+    },
+    {
+      "label": "safe-format-recovery-13-093-r3",
+      "phase": "reject-recovery",
+      "match": "exact_ascii",
+      "pattern_ascii": "?",
+      "response_ascii": "4.510,5.8512,7.194,8.54,09.8786,11.221,0012.56,13.815,15.16,16.50,17.8425,19.185,20.53,21.87,23.121 093\r",
+      "repeat_policy": "sequence",
+      "sequence_key": "format-recovery-row",
+      "sequence_index": 38,
+      "sequence_next": 39,
       "computed_checksum": 93,
       "checksum_text": "093",
       "checksum_valid": true,
@@ -1348,57 +2098,203 @@
   ],
   "format_equivalence_safe_cases": [
     {
-      "label": "format-equiv-100-to-000-leading-zero-plus-precision",
+      "label": "format-equiv-100-to-000-leading-zero-plus-precision-round1",
       "checksum_text": "000",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
     },
     {
-      "label": "format-equiv-100-to-023-leading-zero-plus-precision",
+      "label": "format-equiv-100-to-023-leading-zero-plus-precision-round1",
       "checksum_text": "023",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
     },
     {
-      "label": "format-equiv-100-to-089-plus-precision",
+      "label": "format-equiv-100-to-089-plus-precision-round1",
       "checksum_text": "089",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
     },
     {
-      "label": "format-equiv-100-to-099-leading-zero-plus-precision",
+      "label": "format-equiv-100-to-099-leading-zero-plus-precision-round1",
       "checksum_text": "099",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 099. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 099. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
     },
     {
-      "label": "format-equiv-101-to-089-leading-zero-plus-precision",
+      "label": "format-equiv-101-to-089-leading-zero-plus-precision-round1",
       "checksum_text": "089",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-03-valid-decimal101; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-03-valid-decimal101; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
     },
     {
-      "label": "format-equiv-117-to-000-leading-zero-plus-precision",
+      "label": "format-equiv-117-to-000-leading-zero-plus-precision-round1",
       "checksum_text": "000",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
     },
     {
-      "label": "format-equiv-117-to-055-leading-zero-plus-precision",
+      "label": "format-equiv-117-to-055-leading-zero-plus-precision-round1",
       "checksum_text": "055",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 055. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 055. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
     },
     {
-      "label": "format-equiv-231-to-023-leading-zero-precision",
+      "label": "format-equiv-231-to-023-leading-zero-precision-round1",
       "checksum_text": "023",
       "checksum_valid": true,
-      "note": "Same numeric values as sweep-case-13-valid-decimal231; ASCII formatting changed (leading-zero, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted."
+      "note": "Same numeric values as sweep-case-13-valid-decimal231; ASCII formatting changed (leading-zero, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 1/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-000-leading-zero-plus-precision-round2",
+      "checksum_text": "000",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-023-leading-zero-plus-precision-round2",
+      "checksum_text": "023",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-089-plus-precision-round2",
+      "checksum_text": "089",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-099-leading-zero-plus-precision-round2",
+      "checksum_text": "099",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 099. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-101-to-089-leading-zero-plus-precision-round2",
+      "checksum_text": "089",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-03-valid-decimal101; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-117-to-000-leading-zero-plus-precision-round2",
+      "checksum_text": "000",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-117-to-055-leading-zero-plus-precision-round2",
+      "checksum_text": "055",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 055. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-231-to-023-leading-zero-precision-round2",
+      "checksum_text": "023",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-13-valid-decimal231; ASCII formatting changed (leading-zero, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 2/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-000-leading-zero-plus-precision-round3",
+      "checksum_text": "000",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-023-leading-zero-plus-precision-round3",
+      "checksum_text": "023",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-089-plus-precision-round3",
+      "checksum_text": "089",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-099-leading-zero-plus-precision-round3",
+      "checksum_text": "099",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 099. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-101-to-089-leading-zero-plus-precision-round3",
+      "checksum_text": "089",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-03-valid-decimal101; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-117-to-000-leading-zero-plus-precision-round3",
+      "checksum_text": "000",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-117-to-055-leading-zero-plus-precision-round3",
+      "checksum_text": "055",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 055. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-231-to-023-leading-zero-precision-round3",
+      "checksum_text": "023",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-13-valid-decimal231; ASCII formatting changed (leading-zero, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 3/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-000-leading-zero-plus-precision-round4",
+      "checksum_text": "000",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-023-leading-zero-plus-precision-round4",
+      "checksum_text": "023",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-089-plus-precision-round4",
+      "checksum_text": "089",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-100-to-099-leading-zero-plus-precision-round4",
+      "checksum_text": "099",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-02-valid-decimal100; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 099. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-101-to-089-leading-zero-plus-precision-round4",
+      "checksum_text": "089",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-03-valid-decimal101; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 089. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-117-to-000-leading-zero-plus-precision-round4",
+      "checksum_text": "000",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 000. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-117-to-055-leading-zero-plus-precision-round4",
+      "checksum_text": "055",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-10-valid-decimal117; ASCII formatting changed (leading-zero, plus, precision) to compute checksum 055. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
+    },
+    {
+      "label": "format-equiv-231-to-023-leading-zero-precision-round4",
+      "checksum_text": "023",
+      "checksum_valid": true,
+      "note": "Same numeric values as sweep-case-13-valid-decimal231; ASCII formatting changed (leading-zero, precision) to compute checksum 023. Safe v2: no numeric field begins with whitespace; known-rejected controls omitted. Repeated safe round 4/4 to avoid profile exhaustion during manual IMPACT testing."
     }
   ],
   "safe_profile_policy": {
     "omit_known_rejected_controls": true,
     "omit_leading_field_space": true,
-    "source_run": "impact-emulator-20260709-081355"
+    "source_run": "impact-emulator-20260709-083351",
+    "rounds": 4,
+    "safe_case_count_per_round": 8
   }
 }
