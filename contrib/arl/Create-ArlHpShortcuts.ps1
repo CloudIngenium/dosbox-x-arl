@@ -111,6 +111,46 @@ $shortcuts = @(
         BuildRequired = $false
     },
     @{
+        Name = "84 INSPECT CURRENT RUN"
+        Target = "Inspect-ArlCurrentRun.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "85 OPEN EMU CONTROL"
+        Target = "Open-ArlLatestEmulatorControl.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "86 PRINT EPSON RAW DRYRUN"
+        Target = "Print-LatestArlLpt-Epson-Raw-DryRun.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "87 PRINT HP TEXT DRYRUN"
+        Target = "Print-LatestArlLpt-HPSmartTank-Text-DryRun.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "88 PRINT EPSON RAW SEND"
+        Target = "Print-LatestArlLpt-Epson-Raw-Send.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "89 PRINT HP TEXT SEND"
+        Target = "Print-LatestArlLpt-HPSmartTank-Text-Send.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "89A EMU CONTROL LOWCHECK"
+        Target = "Control-NextEmuResult-KnownLowChecksum.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "89B EMU CONTROL DISABLE"
+        Target = "Control-DisableEmuOverride.cmd"
+        BuildRequired = $false
+    },
+    @{
         Name = "90 EMU GOOD-THEN-REJECT"
         Target = "Launch-ArlImpactEmulatorTrace.cmd"
         BuildRequired = $false
@@ -181,7 +221,7 @@ if (-not $NoCleanup) {
     Get-ChildItem -Path $DesktopPath -Filter "*.lnk" -File |
         Where-Object {
             $name = $_.Name.ToLowerInvariant()
-            ($_.BaseName -match "ARL|IMPACT|CYCLES|SIMPLE|TRACE|TICS|UARTDATA|FORCELINES|HOLDRTS|RX4000|SAFE SERIAL|STABILITY|NOINT33|NO MOUSE|EMU") -and
+            ($_.BaseName -match "ARL|IMPACT|CYCLES|SIMPLE|TRACE|TICS|UARTDATA|FORCELINES|HOLDRTS|RX4000|SAFE SERIAL|STABILITY|NOINT33|NO MOUSE|EMU|PRINT|INSPECT") -and
             -not $desiredNames.ContainsKey($name)
         } |
         Remove-Item -Force
@@ -189,7 +229,7 @@ if (-not $NoCleanup) {
     Get-ChildItem -Path $DesktopPath -File |
         Where-Object {
             $_.Extension -ne ".lnk" -and
-            $_.BaseName -match "ARL|IMPACT|CYCLES|SIMPLE|TRACE|TICS|UARTDATA|FORCELINES|HOLDRTS|RX4000|SAFE SERIAL|STABILITY|EMU"
+            $_.BaseName -match "ARL|IMPACT|CYCLES|SIMPLE|TRACE|TICS|UARTDATA|FORCELINES|HOLDRTS|RX4000|SAFE SERIAL|STABILITY|EMU|PRINT|INSPECT"
         } |
         Remove-Item -Force
 }

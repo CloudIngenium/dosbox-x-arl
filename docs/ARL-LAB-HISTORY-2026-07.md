@@ -1744,3 +1744,38 @@ Next emulator interpretation:
     the real ARL, guarded by an explicit config flag and full trace logging;
   - do not enable any real-ARL mutation until emulator evidence shows the exact
     transformation is accepted and scientifically acceptable.
+
+2026-07-09 next prepared operator tests:
+
+- Added desktop/operator helpers:
+  - `84 INSPECT CURRENT RUN`: summarizes the active/latest run without closing
+    DOSBox;
+  - `85 OPEN EMU CONTROL`: opens the latest `emulator-control.json` in Notepad;
+  - `86 PRINT EPSON RAW DRYRUN`;
+  - `87 PRINT HP TEXT DRYRUN`;
+  - `88 PRINT EPSON RAW SEND`;
+  - `89 PRINT HP TEXT SEND`;
+  - `89A EMU CONTROL LOWCHECK`: programs the next emulator `#rd 246\r`
+    response with a known low-checksum row (`000`);
+  - `89B EMU CONTROL DISABLE`: disables hot-control overrides.
+- Next emulator test:
+  1. Start `80 EMU SAFE LOOP`.
+  2. Let IMPACT accept a few normal results.
+  3. Run `84 INSPECT CURRENT RUN` and confirm `no_match=0`, `errors=0`.
+  4. Run `89A EMU CONTROL LOWCHECK` before the next analysis read.
+  5. Trigger/continue the next analysis in IMPACT.
+  6. Run `84 INSPECT CURRENT RUN` again and look for `control_response_match`
+     and `#em`.
+  7. Run `89B EMU CONTROL DISABLE`.
+- If `89A` is accepted:
+  - hot control works for same-session protocol experiments;
+  - next test is to program an exact historically rejected high-checksum row,
+    followed by a safe low-checksum variant.
+- UI automation note:
+  - Playwright is not useful for the DOSBox-X native window because it targets
+    browsers and webviews.
+  - A future full-automation route should use Windows UI Automation,
+    AutoHotkey, or a small PowerShell/Win32 input helper to click/type in the
+    DOSBox window and take screenshots.
+  - Keep operator-driven tests for now because the current protocol work still
+    depends on lab timing and visual confirmation.
