@@ -63,7 +63,26 @@ if (Test-Path -Path $emulatorLog -PathType Leaf) {
     $errors = @($events | Where-Object { $_.event -eq "transaction_error" })
 
     Write-Host ""
+    if ($errors.Count -gt 0 -or $noMatch.Count -gt 0 -or $rejected.Count -gt 0) {
+        Write-Host "RESULTADO: REVISAR - hubo rechazo, no_match o error."
+    } elseif ($control.Count -gt 0 -and $accepted.Count -gt 0) {
+        Write-Host "RESULTADO: BIEN - el control del emulador se aplico e IMPACT respondio #em."
+    } elseif ($resultReads.Count -gt 0 -and $accepted.Count -gt 0) {
+        Write-Host "RESULTADO: BIEN - IMPACT acepto resultados del emulador."
+    } elseif ($resultReads.Count -gt 0) {
+        Write-Host "RESULTADO: INCOMPLETO - hubo #rd pero no se ve #em todavia."
+    } else {
+        Write-Host "RESULTADO: SIN ANALISIS - todavia no se ve una lectura #rd."
+    }
     Write-Host "EMULATOR_COUNTS lines=$($lines.Count) events=$($events.Count) rd_done=$($resultReads.Count) accepted_em=$($accepted.Count) reject_q=$($rejected.Count) fast=$($fast.Count) control=$($control.Count) no_match=$($noMatch.Count) errors=$($errors.Count)"
+    if ($control.Count -gt 0) {
+        $lastControl = $control | Select-Object -Last 1
+        Write-Host "ULTIMO_CONTROL label=$($lastControl.rule) input=$($lastControl.input_ascii)"
+    }
+    if ($accepted.Count -gt 0) {
+        $lastAccepted = $accepted | Select-Object -Last 1
+        Write-Host "ULTIMO_ACCEPT input=$($lastAccepted.input_ascii)"
+    }
     Write-Host "LAST_EMULATOR_EVENTS"
     $lines | Select-Object -Last $Tail | ForEach-Object { $_ }
 }

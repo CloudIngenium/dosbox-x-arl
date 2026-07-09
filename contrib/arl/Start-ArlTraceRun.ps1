@@ -12,6 +12,10 @@ param(
     [string]$EmulatorMode = "happy-path",
     [string]$EmulatorProfilePath = (Join-Path $PSScriptRoot "profiles\arl3460-baseline.json"),
     [switch]$StartEmulator,
+    [string]$EmulatorInitialControlLabel = "",
+    [string]$EmulatorInitialControlResponseAscii = "",
+    [string]$EmulatorInitialControlMatchAscii = "#rd 246`r",
+    [int]$EmulatorInitialControlDelayMs = 0,
     [string]$WindowResolution = "1280x960",
     [ValidateSet("default", "surface", "opengl", "openglnb", "openglpp", "direct3d", "ttf")]
     [string]$VideoOutput = "openglnb",
@@ -415,6 +419,8 @@ $metadata = [pscustomobject]@{
     emulator_profile = if ($usesEmulator) { $EmulatorProfilePath } else { $null }
     emulator_command = if ($usesEmulator) { $emulatorCommand } else { $null }
     emulator_auto_started = if ($usesEmulator) { [bool]$StartEmulator } else { $null }
+    emulator_initial_control_label = if ($usesEmulator -and -not [string]::IsNullOrWhiteSpace($EmulatorInitialControlResponseAscii)) { $EmulatorInitialControlLabel } else { $null }
+    emulator_initial_control_match_ascii = if ($usesEmulator -and -not [string]::IsNullOrWhiteSpace($EmulatorInitialControlResponseAscii)) { $EmulatorInitialControlMatchAscii } else { $null }
     rxdelay = $RxDelay
     cycles = $Cycles
     core = $Core
@@ -506,9 +512,30 @@ if ($usesEmulator -and $StartEmulator) {
         throw "ARL emulator profile not found: $EmulatorProfilePath"
     }
     Stop-StaleArlEmulatorProcesses -Port $EmulatorPort
+    $initialControlEnabled = -not [string]::IsNullOrWhiteSpace($EmulatorInitialControlResponseAscii)
+    $initialControlLabel = if ([string]::IsNullOrWhiteSpace($EmulatorInitialControlLabel)) { "initial-control-response" } else { $EmulatorInitialControlLabel }
+    $initialControlRules = @()
+    if ($initialControlEnabled) {
+        $initialControlResponseAscii = $EmulatorInitialControlResponseAscii.Replace("\r", "`r").Replace("\n", "`n")
+        $initialControlMatchAscii = $EmulatorInitialControlMatchAscii.Replace("\r", "`r").Replace("\n", "`n")
+        $initialControlRules = @(
+            [ordered]@{
+                label = $initialControlLabel
+                phase = "analysis-result"
+                match = "exact_ascii"
+                pattern_ascii = $initialControlMatchAscii
+                response_ascii = $initialControlResponseAscii
+                delay_ms = $EmulatorInitialControlDelayMs
+            }
+        )
+    }
     $controlTemplate = [ordered]@{
-        enabled = $false
-        note = "Hot control file. Set enabled=true and add rules to override emulator responses without restarting IMPACT."
+        enabled = $initialControlEnabled
+        note = if ($initialControlEnabled) {
+            "Initial emulator control enabled by launcher. This avoids operator timing during checksum experiments."
+        } else {
+            "Hot control file. Set enabled=true and add rules to override emulator responses without restarting IMPACT."
+        }
         examples = @(
             [ordered]@{
                 label = "override-next-result-read"
@@ -518,7 +545,7 @@ if ($usesEmulator -and $StartEmulator) {
                 delay_ms = 0
             }
         )
-        rules = @()
+        rules = $initialControlRules
     }
     $controlTemplate | ConvertTo-Json -Depth 8 | Set-Content -Path $emulatorControlPath -Encoding UTF8
     $emulatorArgs = @(

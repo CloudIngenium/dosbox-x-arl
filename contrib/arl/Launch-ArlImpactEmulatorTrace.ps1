@@ -19,6 +19,14 @@ param(
 
     [string[]]$ImpactIniSet = @(),
 
+    [string]$InitialControlLabel = "",
+
+    [string]$InitialControlResponseAscii = "",
+
+    [string]$InitialControlMatchAscii = "#rd 246`r",
+
+    [int]$InitialControlDelayMs = 0,
+
     [switch]$NoLaunch
 )
 
@@ -56,6 +64,10 @@ if (-not (Test-Path -Path $ProfilePath -PathType Leaf)) {
     -VideoOutput "default" `
     -Aspect $false `
     -Scaler "normal2x" `
+    -EmulatorInitialControlLabel $InitialControlLabel `
+    -EmulatorInitialControlResponseAscii $InitialControlResponseAscii `
+    -EmulatorInitialControlMatchAscii $InitialControlMatchAscii `
+    -EmulatorInitialControlDelayMs $InitialControlDelayMs `
     -ImpactIniSet $ImpactIniSet `
     -HangMs 30000 `
     -NoLaunch:$NoLaunch

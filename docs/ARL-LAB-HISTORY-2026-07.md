@@ -1779,3 +1779,38 @@ Next emulator interpretation:
     DOSBox window and take screenshots.
   - Keep operator-driven tests for now because the current protocol work still
     depends on lab timing and visual confirmation.
+
+2026-07-09 simplification after operator trial:
+
+- The manual `80` + `89A` + next-read timing flow was too fragile for lab use.
+- The latest log (`impact-emulator-20260709-121124`) showed the control override
+  did work technically:
+  - `control_response_match = 4`;
+  - `reject_q = 0`;
+  - IMPACT answered `#em 242\r` after the low-checksum `000` row.
+- The main failure was ergonomics and observability, not the emulator control
+  mechanism.
+- Added `81 EMU LOWCHECK START`, which starts IMPACT/emulator with the
+  low-checksum `000` response already armed at launch time. This removes the
+  need to run `89A` at the right moment.
+- Updated `84 INSPECT CURRENT RUN` to print a short top-line diagnosis:
+  `RESULTADO: BIEN`, `RESULTADO: REVISAR`, `RESULTADO: INCOMPLETO`, or
+  `RESULTADO: SIN ANALISIS`.
+- Simplified the public desktop emulator shortcuts to:
+  - `80 EMU NORMAL LOOP`;
+  - `81 EMU LOWCHECK START`;
+  - `84 INSPECT CURRENT RUN`;
+  - print helpers `86` through `89`.
+- The older emulator experiment launchers remain in the toolkit folder and
+  repository, but are no longer exposed as the main desktop menu.
+
+Simplified next emulator test:
+
+1. Start `81 EMU LOWCHECK START`.
+2. Let IMPACT reach Sample Analysis.
+3. Run one analysis/read in IMPACT.
+4. Run `84 INSPECT CURRENT RUN`.
+5. If `84` says `RESULTADO: BIEN - el control del emulador se aplico e IMPACT
+   respondio #em`, the low-checksum override is accepted.
+6. Close DOSBox and repeat only with `80 EMU NORMAL LOOP` if a normal control
+   comparison is needed.

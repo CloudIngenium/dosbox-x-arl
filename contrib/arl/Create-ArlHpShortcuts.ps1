@@ -91,33 +91,18 @@ $shortcuts = @(
         BuildRequired = $false
     },
     @{
-        Name = "80 EMU SAFE LOOP"
+        Name = "80 EMU NORMAL LOOP"
         Target = "Launch-ArlImpactEmulatorFormatSafeLoopTrace.cmd"
         BuildRequired = $false
     },
     @{
-        Name = "81 EMU COMPAC ON SAFE LOOP"
-        Target = "Launch-ArlImpactEmulatorCompacOnSafeLoopTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "82 EMU COMPAC AUTO SAFE LOOP"
-        Target = "Launch-ArlImpactEmulatorCompacAutoSafeLoopTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "83 EMU STORE PARTIAL SAFE LOOP"
-        Target = "Launch-ArlImpactEmulatorStorePartialSafeLoopTrace.cmd"
+        Name = "81 EMU LOWCHECK START"
+        Target = "Launch-ArlImpactEmulatorLowChecksumStartTrace.cmd"
         BuildRequired = $false
     },
     @{
         Name = "84 INSPECT CURRENT RUN"
         Target = "Inspect-ArlCurrentRun.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "85 OPEN EMU CONTROL"
-        Target = "Open-ArlLatestEmulatorControl.cmd"
         BuildRequired = $false
     },
     @{
@@ -138,61 +123,6 @@ $shortcuts = @(
     @{
         Name = "89 PRINT HP TEXT SEND"
         Target = "Print-LatestArlLpt-HPSmartTank-Text-Send.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "89A EMU CONTROL LOWCHECK"
-        Target = "Control-NextEmuResult-KnownLowChecksum.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "89B EMU CONTROL DISABLE"
-        Target = "Control-DisableEmuOverride.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "90 EMU GOOD-THEN-REJECT"
-        Target = "Launch-ArlImpactEmulatorTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "91 EMU REJECT-FIRST"
-        Target = "Launch-ArlImpactEmulatorRejectFirstTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "92 EMU CLAMP SUSPECTS"
-        Target = "Launch-ArlImpactEmulatorClampedSuspectsTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "93 EMU CHECKSUM099"
-        Target = "Launch-ArlImpactEmulatorChecksum099Trace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "94 EMU CHECKSUM100"
-        Target = "Launch-ArlImpactEmulatorChecksum100Trace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "95 EMU CHECKSUM SWEEP"
-        Target = "Launch-ArlImpactEmulatorChecksumSweepTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "96 EMU FORMAT EQUIV"
-        Target = "Launch-ArlImpactEmulatorFormatEquivalenceTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "97 EMU CHECKSUM GRAMMAR"
-        Target = "Launch-ArlImpactEmulatorChecksumGrammarTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "98 EMU FORMAT SAFE"
-        Target = "Launch-ArlImpactEmulatorFormatSafeTrace.cmd"
         BuildRequired = $false
     },
     @{
