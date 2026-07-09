@@ -229,30 +229,37 @@ Write-Host "Started DOSBox-X ARL PID $($process.Id)"
 $watcherProcess = $null
 if ($AutoPrintLpt -and -not $usesEmulator) {
     $powerShellExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
-    $watcherArgs = @(
-        "-CapturePath", $lptPath,
-        "-PrinterName", $PrinterName,
-        "-SpoolDir", $lptSpoolDir,
-        "-PrintScriptPath", $printScriptPath,
-        "-ParentPid", "$($process.Id)",
-        "-IdleMs", "$LptIdleMs",
-        "-PollMs", "$LptPollMs",
-        "-Send"
-    )
+    $watcherArgs = [ordered]@{
+        CapturePath = $lptPath
+        PrinterName = $PrinterName
+        SpoolDir = $lptSpoolDir
+        PrintScriptPath = $printScriptPath
+        ParentPid = $process.Id
+        IdleMs = $LptIdleMs
+        PollMs = $LptPollMs
+        Send = $true
+    }
     if (-not $NoLptFormFeed) {
-        $watcherArgs += "-AppendFormFeed"
+        $watcherArgs.AppendFormFeed = $true
     }
 
     $watcherLaunch = @(
         '$ErrorActionPreference = "Stop"',
-        '$watcherArgs = @('
+        '$watcherArgs = @{'
     )
-    for ($i = 0; $i -lt $watcherArgs.Count; $i++) {
-        $separator = if ($i -lt ($watcherArgs.Count - 1)) { "," } else { "" }
-        $watcherLaunch += "    $(Quote-PowerShellLiteral $watcherArgs[$i])$separator"
+    foreach ($entry in $watcherArgs.GetEnumerator()) {
+        $value = $entry.Value
+        if ($value -is [bool]) {
+            $renderedValue = if ($value) { '$true' } else { '$false' }
+        } elseif ($value -is [int]) {
+            $renderedValue = [string]$value
+        } else {
+            $renderedValue = Quote-PowerShellLiteral ([string]$value)
+        }
+        $watcherLaunch += "    $($entry.Key) = $renderedValue"
     }
     $watcherLaunch += @(
-        ')',
+        '}',
         "& $(Quote-PowerShellLiteral $watcherScriptPath) @watcherArgs"
     )
     $watcherLaunch | Set-Content -Path $lptWatchLaunchPath -Encoding UTF8

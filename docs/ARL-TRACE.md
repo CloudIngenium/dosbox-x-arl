@@ -101,6 +101,17 @@ change less while testing the most suspicious old-DOS memory variables.
 run does not prove that `NOEMS` failed, and it should not be used as a stability
 setting because the UART register trace volume can perturb timing.
 
+`CYCLES6000 SIMPLE TRACE` produced a successful first analysis and then two
+completed analyses were reported by the operator. Its run metadata confirmed
+`core=simple`, `cputype=486`, `cycles=fixed 6000`, and `rxdelay:3000`.
+
+The same run proved LPT capture worked: `LPTCAP.PRN` contained 5242 bytes. A
+watcher-launch bug was fixed after this run: `Start-ArlTraceRun.ps1` now writes
+named hashtable splatting for `Watch-ArlLptCapture.ps1` instead of positional
+array splatting. If a RAW print job reaches the `EPSON LX-350` queue but does
+not physically print, troubleshoot Windows/USB/printer state rather than IMPACT
+LPT capture.
+
 Before each burn, close DOSBox-X, confirm no `dosbox` process remains, and have
 the operator reinitialize ARL/ICS. A passing run is a result row followed by
 `#em`, `INTERFAC.DAT` update, and LPT capture/print job if IMPACT reaches print.

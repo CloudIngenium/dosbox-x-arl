@@ -1041,3 +1041,31 @@ Correction after operator note:
 - `UARTDATA` is now treated as diagnostic-only because it adds high-volume UART
   register tracing and may perturb the same timing path being measured. Use
   `basic` trace launchers for stability tests.
+
+## 2026-07-08 CYCLES6000 SIMPLE First Success And LPT Watcher Fix
+
+Observed:
+
+- `ARL IMPACT+ CYCLES6000 SIMPLE TRACE` completed at least the first analysis
+  successfully, then the operator reported two completed analyses.
+- Remote metadata confirmed:
+  - `cycles=6000`
+  - `rxdelay=3000`
+  - `core=simple`
+  - `cputype=486`
+  - `trace_level=basic`
+  - EMS/XMS/UMB normal.
+- `LPTCAP.PRN` grew to 5242 bytes, so IMPACT did generate printer output.
+
+Print issue:
+
+- The auto-print watcher failed to start because `Start-ArlTraceRun.ps1`
+  generated `$watcherArgs` as an array. PowerShell splatted it positionally into
+  `Watch-ArlLptCapture.ps1`, so `-SpoolDir` was interpreted as the `ParentPid`
+  argument.
+- Fixed by generating a hashtable and splatting named parameters.
+- Manual replay of `LPTCAP.PRN` sent 5243 RAW bytes, including an appended form
+  feed, to `EPSON LX-350` on `USB001`.
+- Windows showed the print job in the EPSON queue with status `Normal`; if no
+  paper moved, the remaining issue is printer/driver/USB consumption, not LPT
+  capture.
