@@ -188,6 +188,69 @@ function Get-RunArtifacts {
     }
 }
 
+function Get-AuditFileEntry([string]$Path, [string]$Kind) {
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $null }
+    if (-not (Test-Path -Path $Path -PathType Leaf)) { return $null }
+    $item = Get-Item -Path $Path
+    $hash = Get-FileHash -Path $Path -Algorithm SHA256
+    return [pscustomobject]@{
+        name = $item.Name
+        kind = $Kind
+        path = $item.FullName
+        size_bytes = $item.Length
+        modified_at = $item.LastWriteTime.ToString("o")
+        sha256 = $hash.Hash.ToLowerInvariant()
+    }
+}
+
+function Get-AuditFileEntries([string]$Directory) {
+    $entries = New-Object System.Collections.Generic.List[object]
+    $preferred = @(
+        @{ path = $TracePath; kind = "serial-trace" },
+        @{ path = (Join-Path $Directory "run-metadata.json"); kind = "run-metadata" },
+        @{ path = (Join-Path $Directory "dosbox.log"); kind = "dosbox-log" },
+        @{ path = (Join-Path $Directory "INTERFAC.DAT"); kind = "interfac" },
+        @{ path = (Join-Path $Directory "LPTCAP.PRN"); kind = "lpt-capture" }
+    )
+
+    foreach ($candidate in $preferred) {
+        $entry = Get-AuditFileEntry $candidate.path $candidate.kind
+        if ($null -ne $entry) { $entries.Add($entry) }
+    }
+
+    $known = @{}
+    foreach ($entry in $entries) {
+        $known[$entry.path.ToLowerInvariant()] = $true
+    }
+
+    foreach ($file in @(Get-ChildItem -Path $Directory -File -ErrorAction SilentlyContinue | Sort-Object Name)) {
+        if ($known.ContainsKey($file.FullName.ToLowerInvariant())) { continue }
+        $kind = "artifact"
+        $lower = $file.Name.ToLowerInvariant()
+        if ($lower.EndsWith(".ndjson") -or $lower.Contains("serial")) { $kind = "serial-trace" }
+        elseif ($lower.EndsWith(".log")) { $kind = "log" }
+        elseif ($lower.Contains("interfac")) { $kind = "interfac" }
+        elseif ($lower.Contains("lpt") -or $lower.EndsWith(".prn")) { $kind = "lpt-capture" }
+        elseif ($lower.Contains("summary")) { $kind = "summary" }
+        elseif ($lower.Contains("suspect")) { $kind = "analysis" }
+        elseif ($lower.Contains("protocol")) { $kind = "protocol" }
+        elseif ($lower.Contains("lab-next")) { $kind = "recommendation" }
+        elseif ($lower.Contains("timeline")) { $kind = "timeline" }
+        $entry = Get-AuditFileEntry $file.FullName $kind
+        if ($null -ne $entry) { $entries.Add($entry) }
+    }
+
+    $printJobDir = Join-Path $Directory "print-jobs"
+    if (Test-Path -Path $printJobDir -PathType Container) {
+        foreach ($file in @(Get-ChildItem -Path $printJobDir -File -ErrorAction SilentlyContinue | Sort-Object Name)) {
+            $entry = Get-AuditFileEntry $file.FullName "print-job"
+            if ($null -ne $entry) { $entries.Add($entry) }
+        }
+    }
+
+    return @($entries.ToArray())
+}
+
 function Get-ResultReadMetrics {
     $serialEvents = @(
         $events |
@@ -804,6 +867,8 @@ $labNextLines = @(
 $labNextLines | Set-Content -Path $labNextTestMdPath -Encoding UTF8
 
 $summaryPath = Join-Path $OutDir "summary.md"
+$auditManifestPath = Join-Path $OutDir "audit-manifest.json"
+$auditManifestMdPath = Join-Path $OutDir "audit-manifest.md"
 $classificationText = ($reasons | ForEach-Object { "- $_" }) -join "`n"
 if ([string]::IsNullOrWhiteSpace($classificationText)) { $classificationText = "- none" }
 
@@ -863,9 +928,76 @@ $summaryLines = @(
     "- Protocol candidates JSON: $($protocolWorkbook.json)",
     "- Suspect JSON: $suspectPath",
     "- Lab next test MD: $labNextTestMdPath",
-    "- Lab next test JSON: $labNextTestJsonPath"
+    "- Lab next test JSON: $labNextTestJsonPath",
+    "- Audit manifest MD: $auditManifestMdPath",
+    "- Audit manifest JSON: $auditManifestPath"
 )
 $summaryLines | Set-Content -Path $summaryPath -Encoding UTF8
+
+$auditFiles = Get-AuditFileEntries $OutDir
+$auditManifest = [pscustomobject]@{
+    schema = "arl.diagnostics.audit.v1"
+    generated_at = (Get-Date).ToString("o")
+    run_dir = (Resolve-Path $OutDir).Path
+    trace_path = (Resolve-Path $TracePath).Path
+    trace_mb = $traceMb
+    analyzer = @{
+        script = $MyInvocation.MyCommand.Name
+        timeline_written = [bool]$writeTimeline
+        timeline_max_mb = $TimelineMaxMb
+        no_timeline = [bool]$NoTimeline
+        transaction_gap_ms = $TransactionGapMs
+        idle_after_tx_ms = $IdleAfterTxMs
+    }
+    metadata = $runMetadata
+    counts = @{
+        events = $events.Count
+        parse_errors = $badLines.Count
+        tx_bytes = $tx.Count
+        rx_bytes = $rx.Count
+        guest_thr_writes = $uartWrites.Count
+        guest_rhr_reads = $uartReads.Count
+        hang_snapshots = $hangs.Count
+        protocol_candidates = $protocolWorkbook.count
+        result_read_transactions = $resultReadMetrics.rd_transaction_count
+        accepted_results = $resultReadMetrics.accepted_count
+        rejected_results = $resultReadMetrics.rejected_count
+        accepted_before_first_reject = $resultReadMetrics.accepted_before_first_reject
+        lpt_artifacts = $runArtifacts.lpt_artifact_count
+        interfac_artifacts = $runArtifacts.interfac_artifact_count
+        print_jobs = $runArtifacts.print_job_count
+    }
+    classification = @($reasons)
+    recommendation = $labNextTest.recommendation
+    next_variables = @($labNextTest.next_variables)
+    post_result_poll_loop = $postResultPollLoop
+    first_reject = $resultReadMetrics.first_reject
+    files = $auditFiles
+}
+$auditManifest | ConvertTo-Json -Depth 14 | Set-Content -Path $auditManifestPath -Encoding UTF8
+
+$auditLines = New-Object System.Collections.Generic.List[string]
+$auditLines.Add("# ARL Run Audit Manifest")
+$auditLines.Add("")
+$auditLines.Add("Run directory: $OutDir")
+$auditLines.Add("")
+$auditLines.Add("## Outcome")
+$auditLines.Add("")
+$auditLines.Add("- Classification: $(@($reasons) -join ', ')")
+$auditLines.Add("- Recommendation: $($labNextTest.recommendation)")
+$auditLines.Add("- Result reads: $($resultReadMetrics.rd_transaction_count)")
+$auditLines.Add("- Accepted results: $($resultReadMetrics.accepted_count)")
+$auditLines.Add("- Rejected results: $($resultReadMetrics.rejected_count)")
+$auditLines.Add("- Accepted before first reject: $($resultReadMetrics.accepted_before_first_reject)")
+$auditLines.Add("")
+$auditLines.Add("## Files")
+$auditLines.Add("")
+$auditLines.Add("| Kind | Name | Bytes | SHA-256 |")
+$auditLines.Add("|---|---|---:|---|")
+foreach ($file in $auditFiles) {
+    $auditLines.Add("| $($file.kind) | ``$($file.name)`` | $($file.size_bytes) | ``$($file.sha256)`` |")
+}
+$auditLines | Set-Content -Path $auditManifestMdPath -Encoding UTF8
 
 Write-Host "Wrote $summaryPath"
 Write-Host "Wrote $timelinePath"
@@ -874,3 +1006,5 @@ Write-Host "Wrote $($protocolWorkbook.json)"
 Write-Host "Wrote $suspectPath"
 Write-Host "Wrote $labNextTestMdPath"
 Write-Host "Wrote $labNextTestJsonPath"
+Write-Host "Wrote $auditManifestMdPath"
+Write-Host "Wrote $auditManifestPath"

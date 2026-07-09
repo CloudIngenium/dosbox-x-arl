@@ -859,6 +859,10 @@ Offline toolkit updates:
   `lab-next-test.json`.
 - These files summarize result-read acceptance count, first rejected checksum,
   `INTERFAC.DAT`/LPT artifacts, and the next recommended variable.
+- `Analyze-ArlTrace.ps1` now also writes `audit-manifest.md` and
+  `audit-manifest.json` with SHA-256 hashes, file sizes, classification,
+  result-read counts, and the selected next-step recommendation. Use this as
+  the evidence index before moving a run into ARL.BauxTP.com or R2.
 
 Original next test idea, superseded later the same day:
 
