@@ -184,12 +184,12 @@ if ($IncludeProtocolPrelude) {
     )
 
     $responses.Add([pscustomobject][ordered]@{
-        label = "impact-sync-ignore-7f"
+        label = "impact-sync-7f-ready"
         phase = "init-sync"
         match = "exact_hex"
         pattern_hex = "7F"
-        response_ascii = ""
-        note = "IMPACT may send an initial 0x7F sync byte before ICS commands; the real ARL did not answer it as a standalone transaction."
+        response_ascii = "#"
+        note = "Real ARL eventually answered the initial 0x7F sync with '#', which lets IMPACT continue into the sc command."
     })
 
     for ($p = 0; $p -lt $preludeCandidates.Count; $p++) {
@@ -202,12 +202,17 @@ if ($IncludeProtocolPrelude) {
         if ([string]::IsNullOrWhiteSpace($pattern)) {
             continue
         }
+        $responseAscii = [string]$candidate.rx_ascii
+        $candidateHex = [string]$candidate.tx_hex
+        if ($candidateHex.StartsWith("7F") -and $responseAscii.StartsWith("##")) {
+            $responseAscii = $responseAscii.Substring(1)
+        }
         $responses.Add([pscustomobject][ordered]@{
             label = "impact-prelude-$($p + 1)-candidate-$($candidate.index)"
             phase = "init-status"
             match = "ascii_contains"
             pattern_ascii = $pattern
-            response_ascii = [string]$candidate.rx_ascii
+            response_ascii = $responseAscii
             source_candidate_index = [int]$candidate.index
             source_tx_preview = $txPreview
             source_rx_count = [int]$candidate.rx_count

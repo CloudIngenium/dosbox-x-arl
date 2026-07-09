@@ -1303,6 +1303,12 @@ Current read:
   stops stale `Start-ArlEmulator.ps1` PowerShell processes before starting a new
   emulator, and prelude rules now match concrete command patterns (`sc`, `#sw`,
   `#rs`, `ns`) instead of arbitrary bytes.
+- A later live emulator run still stuck in "Configuring ICS" showed only
+  repeated `0x7F` bytes every 10 seconds. Comparing against the real ARL trace
+  showed the ARL sends `#` after the sync byte, and that `#` appears to unlock
+  IMPACT so it sends `sc`. `Start-ArlEmulator.ps1` now handles a standalone
+  `0x7F` immediately instead of waiting for the generic transaction-idle path,
+  using the profile rule `impact-sync-7f-ready` with response `#`.
 
 2026-07-09 AUTOEXEC/CONFIG audit:
 

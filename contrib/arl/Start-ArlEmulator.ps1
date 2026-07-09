@@ -321,6 +321,12 @@ function Invoke-ClientSession([System.Net.Sockets.TcpClient]$Client) {
                 Write-ByteEvent "tx" $byte
                 $lastInputTick = [Environment]::TickCount64
                 $lastActivityTick = $lastInputTick
+                if ($buffer.Count -eq 1 -and $byte -eq 0x7f) {
+                    $closeAfterTransaction = Invoke-Transaction $stream ([byte[]]$buffer.ToArray())
+                    $buffer.Clear()
+                    $lastActivityTick = [Environment]::TickCount64
+                    if ($closeAfterTransaction) { break }
+                }
                 continue
             }
 
