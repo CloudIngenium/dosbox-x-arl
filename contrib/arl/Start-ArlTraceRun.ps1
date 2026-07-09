@@ -294,6 +294,7 @@ if ($AutoPrintLpt -and -not $usesEmulator) {
         SpoolDir = $lptSpoolDir
         PrintScriptPath = $printScriptPath
         ParentPid = $process.Id
+        ParentStartTime = $process.StartTime.ToString("o")
         IdleMs = $LptIdleMs
         PollMs = $LptPollMs
         Send = $true

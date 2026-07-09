@@ -1,5 +1,5 @@
 param(
-    [string]$DosboxExe = "C:\ARL\DOSBox-X-ARL\dosbox-x-arl-96994b1.exe",
+    [string]$DosboxExe = "C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe",
     [int]$Cycles = 8000,
     [int]$RxDelay = 3000,
     [string]$PrinterName = "EPSON LX-350",
@@ -20,7 +20,7 @@ if (-not (Test-Path -Path $launcher -PathType Leaf)) {
 }
 
 if (-not (Test-Path -Path $DosboxExe -PathType Leaf)) {
-    $candidate = Join-Path $root "dosbox-x-arl-96994b1.exe"
+    $candidate = Join-Path $root "dosbox-x-arl.exe"
     if (Test-Path -Path $candidate -PathType Leaf) {
         $DosboxExe = $candidate
     } else {

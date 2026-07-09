@@ -21,7 +21,7 @@ As of 2026-07-08, the HP bench PC (`LABORATORIO-ARL`) is using ARL trace build
 `96994b1`:
 
 - `C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe`
-- `C:\ARL\DOSBox-X-ARL\dosbox-x-arl-96994b1.exe`
+- `C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe`
 - SHA256:
   `499A1F9D992F28CD022429F6F2CCAAFA0F03D898F68B606B7659CA29819571DA`
 - previous backup:
@@ -231,11 +231,20 @@ If those do not move the failure, use the deeper DOS compatibility launchers:
 - `ARL IMPACT+ CYCLES6000 SIMPLE386 NOSHARE TRACE`
 - `ARL IMPACT+ CYCLES6000 SIMPLE386 UNMASKDISKIO TRACE`
 
-The following are build-required; do not expose them as operator-default
-shortcuts until the newer artifact is installed:
+The following require a build with modem-line options. They are installed on the
+HP as of build `9663306`, but the first lab result did not make either one a
+better default:
 
 - `ARL IMPACT+ CYCLES6000 SIMPLE386 FORCELINES TRACE`
 - `ARL IMPACT+ CYCLES6000 SIMPLE386 HOLDRTS-DTR TRACE`
+
+Observed 2026-07-08:
+
+- `FORCELINES` received a checksum-valid result row and then IMPACT sent `?`
+  repeatedly instead of `#em`.
+- `HOLDRTS-DTR` did not produce a useful analysis/result-read transaction.
+- Continue with `NOAUTOPRINT`, then the DOS memory-layout launchers, before
+  returning to modem-line forcing.
 
 Emulator profiles derived from the run:
 

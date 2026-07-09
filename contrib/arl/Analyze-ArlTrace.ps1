@@ -192,14 +192,21 @@ function Get-AuditFileEntry([string]$Path, [string]$Kind) {
     if ([string]::IsNullOrWhiteSpace($Path)) { return $null }
     if (-not (Test-Path -Path $Path -PathType Leaf)) { return $null }
     $item = Get-Item -Path $Path
-    $hash = Get-FileHash -Path $Path -Algorithm SHA256
+    $hash = $null
+    $hashError = $null
+    try {
+        $hash = Get-FileHash -Path $Path -Algorithm SHA256
+    } catch {
+        $hashError = $_.Exception.Message
+    }
     return [pscustomobject]@{
         name = $item.Name
         kind = $Kind
         path = $item.FullName
         size_bytes = $item.Length
         modified_at = $item.LastWriteTime.ToString("o")
-        sha256 = $hash.Hash.ToLowerInvariant()
+        sha256 = if ($null -ne $hash) { $hash.Hash.ToLowerInvariant() } else { $null }
+        hash_error = $hashError
     }
 }
 

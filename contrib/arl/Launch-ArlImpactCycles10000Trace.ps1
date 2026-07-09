@@ -1,5 +1,5 @@
 param(
-    [string]$DosboxExe = "C:\ARL\DOSBox-X-ARL\dosbox-x-arl-96994b1.exe",
+    [string]$DosboxExe = "C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe",
     [int]$RxDelay = 3000,
     [string]$PrinterName = "EPSON LX-350",
     [switch]$NoAutoPrintLpt,

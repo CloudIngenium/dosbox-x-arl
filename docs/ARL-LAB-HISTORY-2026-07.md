@@ -76,12 +76,14 @@ Fork:
 - Local working branch during this investigation: `arl-trace-push`.
 - Upstream base: normal DOSBox-X `2026.07.02`, tag `dosbox-x-v2026.07.02`.
 
-Important lab build:
+Important lab builds:
 
-- HP uses `C:\ARL\DOSBox-X-ARL\dosbox-x-arl-96994b1.exe` for the current trace
-  tests.
-- This build moved UART data-register tracing to the code paths IMPACT actually
+- `96994b1` moved UART data-register tracing to the code paths IMPACT actually
   uses, so `uartdata` can prove guest `THR/RHR` access.
+- `9663306` added the SIMPLE386 reject-test matrix and modem-line options.
+- As of the 2026-07-08 remote repair, HP uses
+  `C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe` with SHA256
+  `4FD862333CE71A86F942CCF46B14490D534A7623D95CEE3D63CA6B7BBD1FF8E6`.
 
 Recent commits in the fork:
 
@@ -1144,13 +1146,35 @@ Additional no-rebuild DOS compatibility launchers:
 - `ARL IMPACT+ CYCLES6000 SIMPLE386 UNMASKDISKIO TRACE`
   - `unmask timer on disk io=true`.
 
-Build-required launchers prepared but not valid until a newer DOSBox-X-ARL
-artifact is installed:
+Build-required launchers now installed on the HP:
 
 - `ARL IMPACT+ CYCLES6000 SIMPLE386 FORCELINES TRACE`
   - adds `arlforcects:1 arlforcedsr:1 arlforcedcd:1`.
 - `ARL IMPACT+ CYCLES6000 SIMPLE386 HOLDRTS-DTR TRACE`
   - adds `arlholdrts:1 arlholddtr:1`.
+
+2026-07-08 modem-line test result:
+
+- `FORCELINES` reached the analysis/result-read phase, but IMPACT rejected the
+  first checksum-valid row and sent `?` repeatedly. The ARL/DOSBox trace showed
+  `#rd`, a valid 15-value result row with checksum `214`, then repeated rows
+  while IMPACT kept polling with `?`. This reproduces the valid-row reject
+  pattern; it is not an ARL-silent failure.
+- `HOLDRTS-DTR` was worse as an operator test: the captured sessions did not
+  reach a useful result-read transaction. One run reached status read and got a
+  valid status row, but no `pa`/`dc`/`#rd` analysis transaction followed before
+  close.
+- Conclusion: do not continue with `FORCELINES` or `HOLDRTS-DTR` as the next
+  default. The next useful isolation test is `NOAUTOPRINT`, because it keeps the
+  serial profile close to the best SIMPLE386 baseline while removing LPT watcher
+  and print side effects.
+
+LPT watcher durability fix after this test:
+
+- `Watch-ArlLptCapture.ps1` now accepts `ParentStartTime` so it can detect when
+  Windows reuses the DOSBox PID for a different process.
+- The analyzer now skips hash failures on locked log files instead of failing
+  the whole trace analysis.
 
 Test rule:
 
