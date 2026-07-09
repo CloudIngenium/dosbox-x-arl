@@ -143,6 +143,34 @@ Confirmed from this run:
 - Distinct low-checksum recovery rows continue to be accepted, so the rejection
   is still tied to checksum presentation/validation rather than value similarity.
 
+### Next `95` Sweep Revision
+
+The next profile revision uses the early cases for new information instead of
+repeating already-settled variants:
+
+| Case | Test |
+|---:|---|
+| 01 | Low-checksum control `099` |
+| 02 | Valid decimal checksum `100` |
+| 03 | Valid decimal checksum `101` |
+| 04 | Payload computes to 100, checksum field sent as hex `64` |
+| 05 | Payload computes to 101, checksum field sent as hex `65` |
+| 06 | Payload computes to 100, checksum field sent as single text byte `d` |
+| 07 | Distinct shaped/control row with checksum `005` |
+| 08 | Distinct shaped/control row with checksum `023` |
+| 09 | Distinct shaped/control row with checksum `000` |
+| 10 | Valid decimal checksum `117` |
+| 11 | Payload computes to 117, checksum field sent as hex `75` |
+| 12 | Payload computes to 117, checksum field sent as decimal last two digits `17` |
+| 13 | Valid decimal checksum `231` |
+| 14 | Payload computes to 231, checksum field sent as hex `E7` |
+| 15 | Payload computes to 231, checksum field sent as decimal last two digits `31` |
+| 16 | Payload computes to 100, checksum field sent as decimal last two digits `00` |
+| 17 | Payload computes to 101, checksum field sent as decimal last two digits `01` |
+
+All case rows and recovery rows use distinct values to avoid triggering IMPACT's
+stable/repeated-sample `Store Result?` behavior during the checksum experiment.
+
 ## Implementation Notes
 
 - The emulator profile must avoid using the same recovery row immediately after
