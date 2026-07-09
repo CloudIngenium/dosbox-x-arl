@@ -34,7 +34,8 @@
     "Use with serial1=nullmodem, never directserial.",
     "Clamped suspected fields from rejected row: 2=13.354, 8=62.237, 12=10.276, 15=62.237.",
     "Changed field 6 from 65.430 to 65.420 to move checksum from 100 to 099.",
-    "After ?, recovery rows intentionally omit the leading # because real ARL reject-loop repeats the row body without #."
+    "After ?, recovery rows intentionally omit the leading # because real ARL reject-loop repeats the row body without #.",
+    "Checksum sweep includes es 248 -> # because IMPACT may end a sample after recovery/two displayed rows."
   ],
   "responses": [
     {
@@ -756,6 +757,14 @@
       "pattern_ascii": "#em 242\r",
       "response_ascii": "",
       "note": "Generic prep response used by checksum sweep after each accepted or recovered row."
+    },
+    {
+      "label": "sweep-end-sample-es",
+      "phase": "sweep-control",
+      "match": "exact_ascii",
+      "pattern_ascii": "es 248\r",
+      "response_ascii": "#",
+      "note": "Real ARL answers es 248 with # after IMPACT ends a two-line sample/result set."
     },
     {
       "label": "sweep-prep-pa",
