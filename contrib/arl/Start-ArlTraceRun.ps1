@@ -13,6 +13,9 @@ param(
     [string]$EmulatorProfilePath = (Join-Path $PSScriptRoot "profiles\arl3460-baseline.json"),
     [int]$RxDelay = 1000,
     [int]$Cycles = 12000,
+    [ValidateSet("normal", "simple", "dynamic", "auto")]
+    [string]$Core = "normal",
+    [string]$CpuType = "486",
     [ValidateSet("basic", "uartdata", "uart", "full")]
     [string]$TraceLevel = "basic",
     [int]$HangMs = 15000,
@@ -112,8 +115,8 @@ memsize = 16
 logfile = $logPath
 
 [cpu]
-core = normal
-cputype = 486
+core = $Core
+cputype = $CpuType
 cycles = fixed $Cycles
 
 [serial]
@@ -160,6 +163,8 @@ $metadata = [pscustomobject]@{
     emulator_command = if ($usesEmulator) { $emulatorCommand } else { $null }
     rxdelay = $RxDelay
     cycles = $Cycles
+    core = $Core
+    cputype = $CpuType
     trace_level = if ($usesEmulator) { $null } else { $TraceLevel }
     hang_ms = $HangMs
     trace_max_mb = if ($usesEmulator) { $null } else { $TraceMaxMb }

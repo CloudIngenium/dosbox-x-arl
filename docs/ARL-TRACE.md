@@ -69,6 +69,17 @@ constant and vary only CPU timing. Use one burn per DOSBox launch:
 - `Launch-ArlImpactCycles6000Trace.ps1`: `cycles=fixed 6000`, `rxdelay:3000`
 - `Launch-ArlImpactCycles10000Trace.ps1`: `cycles=fixed 10000`, `rxdelay:3000`
 
+After `3500` accepted only one burn and `4000` failed status reads, do not keep
+walking cycles downward. The next useful no-rebuild tests keep the best observed
+transport setting and change the emulated DOS machine profile:
+
+- `Launch-ArlImpactCycles6000SimpleTrace.ps1`: `core=simple`, `cputype=486`,
+  `cycles=fixed 6000`, `rxdelay:3000`
+- `Launch-ArlImpactCycles6000Cpu386Trace.ps1`: `core=normal`, `cputype=386`,
+  `cycles=fixed 6000`, `rxdelay:3000`
+- `Launch-ArlImpactCycles6000Simple386Trace.ps1`: `core=simple`,
+  `cputype=386`, `cycles=fixed 6000`, `rxdelay:3000`
+
 Before each burn, close DOSBox-X, confirm no `dosbox` process remains, and have
 the operator reinitialize ARL/ICS. A passing run is a result row followed by
 `#em`, `INTERFAC.DAT` update, and LPT capture/print job if IMPACT reaches print.

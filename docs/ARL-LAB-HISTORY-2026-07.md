@@ -939,3 +939,38 @@ Test order:
    try `CYCLES4000 TRACE`.
 4. Stop after the first failure loop and run `Analyze-ArlTrace.ps1 -NoTimeline`
    on the run folder.
+
+Follow-up:
+
+- `CYCLES3500 TRACE` read status and accepted the first burn, but the second
+  burn fell back into the same "Please Run Sample" loop.
+- `CYCLES4000 TRACE` did not read status channels.
+- This weakens "find one magic cycle count" as the main fix. Cycle count still
+  influences whether IMPACT reaches a usable state, but the accepted-vs-rejected
+  traces show complete checksum-valid result rows being received before IMPACT
+  sends `?`.
+- The next no-rebuild variables should hold the best transport setting
+  (`cycles=fixed 6000`, `rxdelay:3000`) and change DOSBox-X CPU personality:
+  `core=simple`, `cputype=386`, then both together.
+
+New launchers prepared:
+
+- `ARL IMPACT+ CYCLES6000 SIMPLE TRACE`
+  - `core=simple`
+  - `cputype=486`
+  - `cycles=fixed 6000`
+  - `rxdelay:3000`
+- `ARL IMPACT+ CYCLES6000 CPU386 TRACE`
+  - `core=normal`
+  - `cputype=386`
+  - `cycles=fixed 6000`
+  - `rxdelay:3000`
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 TRACE`
+  - `core=simple`
+  - `cputype=386`
+  - `cycles=fixed 6000`
+  - `rxdelay:3000`
+
+Test these in that order. Stop a launcher after the first result-reject loop and
+preserve/analyze the run instead of continuing to burn in the same stuck
+conversation.

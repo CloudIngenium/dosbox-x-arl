@@ -2,6 +2,9 @@ param(
     [string]$DosboxExe = "C:\ARL\DOSBox-X-ARL\dosbox-x-arl-96994b1.exe",
     [int]$Cycles = 8000,
     [int]$RxDelay = 3000,
+    [ValidateSet("normal", "simple", "dynamic", "auto")]
+    [string]$Core = "normal",
+    [string]$CpuType = "486",
     [string]$PrinterName = "EPSON LX-350",
     [switch]$NoAutoPrintLpt,
     [switch]$NoLptFormFeed,
@@ -34,6 +37,8 @@ $runArgs = @{
     TraceLevel = "basic"
     Cycles = $Cycles
     RxDelay = $RxDelay
+    Core = $Core
+    CpuType = $CpuType
     HangMs = 30000
 }
 
