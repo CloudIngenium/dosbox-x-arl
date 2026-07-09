@@ -85,13 +85,21 @@ buffer paths when EMS/XMS/UMB are present:
 
 - `Launch-ArlImpactCycles6000NoEmsTrace.ps1`: `memsize=16`, `xms=true`,
   `ems=false`, `umb=true`
+- `Launch-ArlImpactCycles6000NoUmbTrace.ps1`: `memsize=16`, `xms=true`,
+  `ems=true`, `umb=false`
+- `Launch-ArlImpactCycles6000NoMouseTrace.ps1`: `memsize=16`, `xms=true`,
+  `ems=true`, `umb=true`, does not load `DOS\MOUSE.COM`
 - `Launch-ArlImpactCycles6000LowMemTrace.ps1`: `memsize=4`, `xms=true`,
   `ems=false`, `umb=true`
 - `Launch-ArlImpactCycles6000ConventionalTrace.ps1`: `memsize=4`,
   `xms=false`, `ems=false`, `umb=false`
 
-Use `NOEMS` before `LOWMEM` or `CONVENTIONAL`; it changes the least while
-testing the most suspicious old-DOS memory variable.
+Use `NOEMS`, `NOUMB`, then `NOMOUSE` before `LOWMEM` or `CONVENTIONAL`; they
+change less while testing the most suspicious old-DOS memory variables.
+
+`UARTDATA` launchers are diagnostic-only. A failed `CYCLES6000 UARTDATA TRACE`
+run does not prove that `NOEMS` failed, and it should not be used as a stability
+setting because the UART register trace volume can perturb timing.
 
 Before each burn, close DOSBox-X, confirm no `dosbox` process remains, and have
 the operator reinitialize ARL/ICS. A passing run is a result row followed by

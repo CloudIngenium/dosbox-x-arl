@@ -10,6 +10,7 @@ param(
     [bool]$Xms = $true,
     [bool]$Ems = $true,
     [bool]$Umb = $true,
+    [bool]$LoadMouse = $true,
     [string]$PrinterName = "EPSON LX-350",
     [switch]$NoAutoPrintLpt,
     [switch]$NoLptFormFeed,
@@ -48,6 +49,7 @@ $runArgs = @{
     Xms = $Xms
     Ems = $Ems
     Umb = $Umb
+    LoadMouse = $LoadMouse
     HangMs = 30000
 }
 

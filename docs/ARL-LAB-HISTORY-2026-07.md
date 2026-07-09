@@ -1004,16 +1004,40 @@ New launchers prepared:
   - `rxdelay:3000`
   - `memsize=4`
   - `xms=false`, `ems=false`, `umb=false`
+- `ARL IMPACT+ CYCLES6000 NOUMB TRACE`
+  - `cycles=fixed 6000`
+  - `rxdelay:3000`
+  - `memsize=16`
+  - `xms=true`, `ems=true`, `umb=false`
+- `ARL IMPACT+ CYCLES6000 NOMOUSE TRACE`
+  - `cycles=fixed 6000`
+  - `rxdelay:3000`
+  - `memsize=16`
+  - `xms=true`, `ems=true`, `umb=true`
+  - does not load `DOS\MOUSE.COM`
 
 Test order:
 
 1. `NOEMS` first. It is the least disruptive memory change and directly tests
    whether EMS detection changes IMPACT's buffering/result parser path.
-2. `LOWMEM` second if `NOEMS` still rejects rows.
-3. `CONVENTIONAL` last. It may reduce free memory enough to expose other DOS
+2. `NOUMB` second if `NOEMS` still rejects rows. This keeps EMS enabled but
+   removes upper-memory placement effects.
+3. `NOMOUSE` third if the user can operate IMPACT from keyboard. This removes
+   one resident DOS driver without changing EMS/XMS.
+4. `LOWMEM` fourth if the softer memory-layout tests still reject rows.
+5. `CONVENTIONAL` last. It may reduce free memory enough to expose other DOS
    limits, but it is useful if IMPACT was written for a very plain DOS memory
    environment.
 
 For each memory variant, use a fresh IMPACT launch and stop after the first
 reject loop. Do not combine memory changes with cycle/core/cputype changes until
 one memory variant has a clear signal.
+
+Correction after operator note:
+
+- The failed run initially believed to be `NOEMS` was actually
+  `ARL IMPACT+ CYCLES6000 UARTDATA TRACE`.
+- Therefore `NOEMS` remains untested as of this note.
+- `UARTDATA` is now treated as diagnostic-only because it adds high-volume UART
+  register tracing and may perturb the same timing path being measured. Use
+  `basic` trace launchers for stability tests.
