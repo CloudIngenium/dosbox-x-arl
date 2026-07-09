@@ -105,5 +105,9 @@ if ($null -ne $lpt) {
     Write-Host ""
     Write-Host "LPT=$($lpt.FullName) SIZE=$($lpt.Length) MTIME=$($lpt.LastWriteTime)"
     Write-Host "LPT_MARKERS FinalConcentration=$(([regex]::Matches($text, 'Final Concentration')).Count) Normalization=$(([regex]::Matches($text, '100% normalization')).Count) Absolute=$(([regex]::Matches($text, 'Absolute Intensities')).Count)"
+    $telemetryExporter = Join-Path $PSScriptRoot 'Export-ArlLptTelemetry.ps1'
+    if (Test-Path -LiteralPath $telemetryExporter -PathType Leaf) {
+        & $telemetryExporter -CapturePath $lpt.FullName -OutputDirectory $latest.FullName
+    }
     Read-SharedLines $lpt.FullName $Tail | ForEach-Object { $_ }
 }

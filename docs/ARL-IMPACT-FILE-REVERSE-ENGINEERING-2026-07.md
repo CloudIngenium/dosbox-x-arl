@@ -122,6 +122,22 @@ Implications:
 - If we replace IMPACT, we should initially emit both `INTERFAC.DAT` and an
   IMPACT-like text report so operators can compare output.
 
+### Telemetry export
+
+`Export-ArlLptTelemetry.ps1` converts a completed `LPTCAP.PRN` into three
+sidecar artifacts in the same diagnostic-run directory:
+
+- `arl-telemetry.csv`: long-form data for Excel, Power BI, or later ingestion.
+- `arl-telemetry.json`: the same values with capture checksum and provenance.
+- `arl-telemetry-summary.md`: compact parse/coverage summary.
+
+It exports the fourteen elements from every available calculation stage. This
+gives us a statistically useful history of absolute intensity, ratioed
+intensity, drift-corrected intensity, calibration/interference corrections,
+normalization, and final concentration. A capture made through an emulator is
+explicitly test data: it validates the calculation/report pathway but must not
+be combined with real ARL process statistics.
+
 ### `.CAL`
 
 `AL.CAL` and `SS-413BD.CAL` are dBase/FoxBase DBF files.

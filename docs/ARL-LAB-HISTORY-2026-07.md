@@ -1688,6 +1688,27 @@ Next emulator interpretation:
     matching transaction before the normal profile/fast path;
   - matches are logged as `control_response_match`.
 - Initial control file shape:
+
+2026-07-09 emulator low-checksum validation and LPT telemetry export:
+
+- Validated run: `C:\ARL\diagnostics\impact-emulator-20260709-122659`.
+- It ran through TCP/nullmodem only; it did not open `COM5` or communicate with
+  the physical ARL.
+- The startup control rule `known-low-checksum-000` supplied a complete result
+  row ending in checksum field `000` six times.
+- For all six rows, IMPACT replied `#em 242\r`; there were zero `?`, zero
+  `no_match`, and zero logged errors. The ACK followed the start of each
+  injected response by `1273`-`1403` ms.
+- `LPTCAP.PRN` reached `15726` bytes and contains three final-concentration
+  reports plus the intermediate calculation stages. This validates the full
+  emulator -> IMPACT -> report/print pathway for the controlled row.
+- Added `Export-ArlLptTelemetry.ps1`; it exports `arl-telemetry.csv`,
+  `arl-telemetry.json`, and `arl-telemetry-summary.md` beside every inspected
+  `LPTCAP.PRN`. For this run it parsed 630 values: six reports each for the
+  seven intermediate stages and three final-concentration reports.
+- Provenance rule: this telemetry is useful for validating parsing and report
+  calculations, but must stay labeled `emulator` and must not be mixed with
+  real-ARL process/control statistics.
   ```json
   {
     "enabled": true,
