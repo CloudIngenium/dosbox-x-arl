@@ -1423,3 +1423,25 @@ Next emulator interpretation:
 - Next action: close the stuck DOSBox session, relaunch `95 EMU CHECKSUM SWEEP`,
   and continue the sweep. The updated profile should recover from many more
   rejected cases before stopping.
+
+2026-07-09 full checksum sweep result:
+
+- User ran several tandas of updated `95 EMU CHECKSUM SWEEP`.
+- Main run: `C:\ARL\diagnostics\impact-emulator-20260709-020832`.
+- The emulator consumed all defined cases `01` through `17`.
+- Final stop condition: after `case17` and recovery, IMPACT prepared another
+  analysis and sent `#rd 246\r`; the emulator logged `no_match` because the
+  profile had no `case18`.
+- Interpretation: the sweep finished its defined test space. This was not a new
+  serial/nullmodem failure.
+- Store/print flow worked during the sweep: `LPTCAP.PRN` exists and is `42136`
+  bytes.
+- Accepted directly: `099`, `023`, `000`.
+- Rejected directly: decimal `100`, `101`, `117`, `231`; hex `64`, `65`, `75`,
+  `E7`; two-digit/truncated `00`, `01`, `17`, `31`; low checksum `005`.
+- Recovered successfully after rejects using checksums `055`, `061`, `040`,
+  `062`, `093`, `089`, `023`, and `000`.
+- Next emulator task: create a `96 EMU FORMAT EQUIVALENCE SWEEP` that keeps the
+  same numeric values but changes ASCII representation to target accepted
+  checksums. This directly tests whether a future DOSBox-X-ARL receive-side
+  formatting filter can fix IMPACT without changing chemistry.

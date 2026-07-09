@@ -221,6 +221,63 @@ New conclusions from this run:
   also reject some rows based on numeric ranges, field formatting, or alloy
   plausibility. The checksum boundary remains strong, but not exclusive.
 
+### 2026-07-09 02:08 - Full `95 EMU CHECKSUM SWEEP`
+
+Run folder: `C:\ARL\diagnostics\impact-emulator-20260709-020832`.
+
+This run consumed all 17 sweep cases and stopped only because IMPACT requested
+another `#rd 246\r` after the profile had no `case18`. The final `no_match` is
+therefore expected profile exhaustion, not a transport failure.
+
+The run also produced `LPTCAP.PRN` (`42136` bytes), confirming that IMPACT
+reached store/print flows during the emulator sweep.
+
+| Case | Test | IMPACT response | Recovery |
+|---:|---|---|---|
+| 01 | Low checksum `099` | `#em` | Direct accept |
+| 02 | Valid decimal checksum `100` | `?` | `055` accepted |
+| 03 | Valid decimal checksum `101` | `?` | `061` accepted |
+| 04 | Hex `64` for computed `100` | `?` | `040` accepted |
+| 05 | Hex `65` for computed `101` | `?` | `062` accepted |
+| 06 | Text byte `d` for computed `100` | `?` | `093` accepted |
+| 07 | Low checksum `005` | `?` | `089` accepted |
+| 08 | Low checksum `023` | `#em` | Direct accept |
+| 09 | Low checksum `000` | `#em` | Direct accept |
+| 10 | Valid decimal checksum `117` | `?` | `023` accepted |
+| 11 | Hex `75` for computed `117` | `?` | `000` accepted |
+| 12 | Decimal last-two-digits `17` for computed `117` | `?` | `055` accepted |
+| 13 | Valid decimal checksum `231` | `?` | `061` accepted |
+| 14 | Hex `E7` for computed `231` | `?` | `040` accepted |
+| 15 | Decimal last-two-digits `31` for computed `231` | `?` | `062` accepted |
+| 16 | Decimal last-two-digits `00` for computed `100` | `?` | `093` accepted |
+| 17 | Decimal last-two-digits `01` for computed `101` | `?` | `089` accepted |
+
+What this proves:
+
+- The emulator can keep IMPACT alive across many reject/recovery cycles and
+  multiple analysis groups.
+- Hex, single-character, and two-digit checksum representations are not accepted
+  by this IMPACT copy for high-checksum rows.
+- A low checksum by itself is not sufficient: `005` failed.
+- `000`, `023`, `040`, `055`, `061`, `062`, `089`, `093`, and `099` have been
+  accepted in at least one sweep context.
+
+What this does not prove yet:
+
+- It does not prove that changing only the textual representation of the same
+  numeric result will work. The recovery rows use different numeric values.
+- It does not yet isolate whether IMPACT rejects some rows because of checksum
+  text, numeric field formatting, alloy plausibility/range checks, or a
+  combination.
+
+Next protocol test:
+
+- Build `96 EMU FORMAT EQUIVALENCE SWEEP`: take rejected numeric rows and emit
+  value-equivalent ASCII variants (`.059` vs `0.059`, extra trailing zeros,
+  leading zeros, fixed width) until the checksum lands on an already-accepted
+  value. If IMPACT accepts those variants, a receive-side canonicalization
+  filter becomes viable without changing the chemical values.
+
 ## Implementation Notes
 
 - The emulator profile must avoid using the same recovery row immediately after
