@@ -1626,3 +1626,38 @@ Next emulator interpretation:
   - relaunch `80 EMU SAFE LOOP`;
   - confirm the log now shows `transaction_start` and `transaction_done` after
     the recurring `#m1 1 015\r` prep command.
+
+2026-07-09 print/result-file clarification:
+
+- Operator clarified that IMPACT printed several report pages and saved
+  accepted results into a result file shown as `0`.
+- Confirmed on HP:
+  - `C:\ARL\IMPLUS\0.RES` is the active historical result file for
+    `Result File 0`;
+  - `0.RES` was modified at `09-Jul-2026 09:43`;
+  - `C:\ARL\IMPLUS\INTERFAC.DAT` was modified at `09-Jul-2026 09:43`
+    and contains the last exported result.
+- Recent `0.RES` tail contains emulator-derived accepted rows:
+  - `09-Jul-2026 09:22`: row with `Mn 0.500`, `Ni 1.715`,
+    `Cu 5.0958`, `Al 75.49`, `P 1.6636`;
+  - `09-Jul-2026 09:24`: same accepted row repeated;
+  - `09-Jul-2026 09:25`: row with `Mn 0.444`, `Ni 2.590`,
+    `Cu 14.4824`, `Cr 23.407`, `Pb 10.589`, `Al 29.06`;
+  - `09-Jul-2026 09:43`: same `0.500/1.715/.../75.49` accepted row.
+- `INTERFAC.DAT` at `09:43` matches the `09:43` accepted row in `0.RES`.
+- LPT observations:
+  - `impact-emulator-20260709-092144\LPTCAP.PRN` has `22782` bytes;
+  - it does not contain ASCII form-feed bytes, so page boundaries are visual
+    or Epson-driver dependent rather than `0x0C` delimited;
+  - it contains multiple IMPACT report sections, including:
+    `Absolute Intensities`, `Ratioed Intensities`,
+    `Drift Corrected Intensities`, `Calibration Curve Evaluation`,
+    `Interelement Interference Corrections`, `Type Standardization`,
+    `100% normalization`, and `Final Concentration`.
+- Practical conclusion:
+  - for an IMPACT replacement, `INTERFAC.DAT` is the latest-result contract;
+  - `0.RES` is the append-only historical result contract for selected
+    `Result File 0`;
+  - `LPTCAP.PRN` is the rich audit/print artifact with intermediate intensity
+    stages and final concentration, but page parsing must infer boundaries from
+    report headings/spacing rather than form-feed bytes.
