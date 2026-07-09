@@ -49,6 +49,7 @@ bool CDirectSerial::traceOpenCurrentPath()
 	arltrace_start_tick = GetTicks();
 	arltrace_last_io_tick = arltrace_start_tick;
 	arltrace_last_hang_tick = arltrace_start_tick;
+	arltrace_limit_reached = false;
 	arltrace_fp = fopen(arltrace_path.c_str(), "ab");
 	if (!arltrace_fp) {
 		LOG_MSG("Serial%d: ARL trace file \"%s\" could not be opened.",
@@ -103,6 +104,34 @@ void CDirectSerial::traceCommonFields(const char *event)
 	traceJsonString(event);
 }
 
+void CDirectSerial::traceFlush()
+{
+	if (!arltrace_fp) return;
+	fflush(arltrace_fp);
+	traceCheckLimit();
+}
+
+void CDirectSerial::traceCheckLimit()
+{
+	if (!arltrace_fp || !arltrace_max_bytes || arltrace_limit_reached) return;
+
+	const long offset = ftell(arltrace_fp);
+	if (offset < 0 || (unsigned long long)offset < arltrace_max_bytes) return;
+
+	arltrace_limit_reached = true;
+	traceCommonFields("trace_limit");
+	fprintf(arltrace_fp,
+	        ",\"message\":\"ARL trace size limit reached; closing trace\","
+	        "\"current_bytes\":%ld,\"max_bytes\":%llu}\n",
+	        offset, arltrace_max_bytes);
+	fflush(arltrace_fp);
+	fclose(arltrace_fp);
+	arltrace_fp = nullptr;
+	trace_last_error = "trace_limit";
+	LOG_MSG("Serial%d: ARL trace size limit reached; trace file closed.",
+	        (int)COMNUMBER);
+}
+
 void CDirectSerial::traceMessage(const char *event, const char *message)
 {
 	if (!arltrace_fp) return;
@@ -111,7 +140,7 @@ void CDirectSerial::traceMessage(const char *event, const char *message)
 	fputs(",\"message\":", arltrace_fp);
 	traceJsonString(message);
 	fputs("}\n", arltrace_fp);
-	fflush(arltrace_fp);
+	traceFlush();
 }
 
 const char *CDirectSerial::traceAscii(uint8_t val, char *buffer, size_t buffer_size)
@@ -173,7 +202,7 @@ void CDirectSerial::traceByte(const char *event, uint8_t val, uint8_t error)
 	        getCD() ? "true" : "false",
 	        getRI() ? "true" : "false",
 	        trace_break ? "true" : "false");
-	fflush(arltrace_fp);
+	traceFlush();
 }
 
 void CDirectSerial::traceConfig(int baudrate, char parity, uint8_t stopbits,
@@ -192,7 +221,7 @@ void CDirectSerial::traceConfig(int baudrate, char parity, uint8_t stopbits,
 	        "\"stop_bits\":%u,\"accepted\":%s}\n",
 	        trace_baudrate, (unsigned int)trace_bytelength, trace_parity,
 	        (unsigned int)trace_stopbits, accepted ? "true" : "false");
-	fflush(arltrace_fp);
+	traceFlush();
 	traceHostState("host_config");
 }
 
@@ -203,19 +232,36 @@ void CDirectSerial::traceModemStatus(int status)
 
 	if (!arltrace_fp) return;
 
+	const bool raw_cts = (status & SERIAL_CTS) ? true : false;
+	const bool raw_dsr = (status & SERIAL_DSR) ? true : false;
+	const bool raw_dcd = (status & SERIAL_CD) ? true : false;
+	const bool raw_ri = (status & SERIAL_RI) ? true : false;
+	const bool guest_cts = raw_cts || arl_force_cts;
+	const bool guest_dsr = raw_dsr || arl_force_dsr;
+	const bool guest_dcd = raw_dcd || arl_force_dcd;
+
 	traceCommonFields("modem");
 	fprintf(arltrace_fp,
 	        ",\"cts\":%s,\"dsr\":%s,\"dcd\":%s,\"ri\":%s,"
+	        "\"raw_cts\":%s,\"raw_dsr\":%s,\"raw_dcd\":%s,\"raw_ri\":%s,"
+	        "\"forced_cts\":%s,\"forced_dsr\":%s,\"forced_dcd\":%s,"
 	        "\"raw_status\":%d,\"rts\":%s,\"dtr\":%s,\"break\":%s}\n",
-	        (status & SERIAL_CTS) ? "true" : "false",
-	        (status & SERIAL_DSR) ? "true" : "false",
-	        (status & SERIAL_CD) ? "true" : "false",
-	        (status & SERIAL_RI) ? "true" : "false",
+	        guest_cts ? "true" : "false",
+	        guest_dsr ? "true" : "false",
+	        guest_dcd ? "true" : "false",
+	        raw_ri ? "true" : "false",
+	        raw_cts ? "true" : "false",
+	        raw_dsr ? "true" : "false",
+	        raw_dcd ? "true" : "false",
+	        raw_ri ? "true" : "false",
+	        arl_force_cts ? "true" : "false",
+	        arl_force_dsr ? "true" : "false",
+	        arl_force_dcd ? "true" : "false",
 	        status,
 	        trace_rts ? "true" : "false",
 	        trace_dtr ? "true" : "false",
 	        trace_break ? "true" : "false");
-	fflush(arltrace_fp);
+	traceFlush();
 }
 
 void CDirectSerial::traceControlLines(const char *event)
@@ -233,7 +279,7 @@ void CDirectSerial::traceControlLines(const char *event)
 	        getCD() ? "true" : "false",
 	        getRI() ? "true" : "false",
 	        trace_break ? "true" : "false");
-	fflush(arltrace_fp);
+	traceFlush();
 }
 
 void CDirectSerial::traceSnapshot(const char *event, const SerialTraceSnapshot &snapshot)
@@ -267,7 +313,7 @@ void CDirectSerial::traceSnapshot(const char *event, const SerialTraceSnapshot &
 	        snapshot.loopback ? "true" : "false",
 	        (unsigned int)trace_tx_count, (unsigned int)trace_rx_count,
 	        (unsigned int)trace_tx_errors);
-	fflush(arltrace_fp);
+	traceFlush();
 }
 
 void CDirectSerial::traceHostState(const char *event)
@@ -310,7 +356,7 @@ void CDirectSerial::traceHostState(const char *event)
 	        state.write_total_timeout_multiplier,
 	        state.write_total_timeout_constant,
 	        state.modem_status);
-	fflush(arltrace_fp);
+	traceFlush();
 }
 
 void CDirectSerial::traceHangSnapshot()
@@ -371,6 +417,7 @@ std::string CDirectSerial::arlTraceStatus()
 	         "  tx_count: %u last_tx: %s%02X\n"
 	         "  rx_count: %u last_rx: %s%02X error: %u\n"
 	         "  lines: RTS=%d DTR=%d CTS=%d DSR=%d DCD=%d RI=%d BREAK=%d\n"
+	         "  line_options: forceCTS=%d forceDSR=%d forceDCD=%d holdRTS=%d holdDTR=%d\n"
 	         "  rx_state=%u rx_retry=%u rx_retry_max=%u hang_ms=%u\n"
 	         "  last_error: %s\n",
 	         (int)COMNUMBER,
@@ -393,6 +440,11 @@ std::string CDirectSerial::arlTraceStatus()
 	         getCD() ? 1 : 0,
 	         getRI() ? 1 : 0,
 	         trace_break ? 1 : 0,
+	         arl_force_cts ? 1 : 0,
+	         arl_force_dsr ? 1 : 0,
+	         arl_force_dcd ? 1 : 0,
+	         arl_hold_rts ? 1 : 0,
+	         arl_hold_dtr ? 1 : 0,
 	         (unsigned int)rx_state,
 	         (unsigned int)rx_retry,
 	         (unsigned int)rx_retry_max,
@@ -462,7 +514,7 @@ void CDirectSerial::arlTraceUartEvent(const char *direction, const char *reg,
 	        (unsigned int)snapshot.fcr, (unsigned int)snapshot.waiting_interrupts,
 	        snapshot.irq_active ? "true" : "false",
 	        snapshot.loopback ? "true" : "false");
-	fflush(arltrace_fp);
+	traceFlush();
 }
 
 CDirectSerial::CDirectSerial (Bitu id, CommandLine* cmd)
@@ -502,11 +554,41 @@ CDirectSerial::CDirectSerial (Bitu id, CommandLine* cmd)
 		else if (trace_level == "uartdata") arltrace_level = ARL_TRACE_UARTDATA;
 		else arltrace_level = ARL_TRACE_BASIC;
 	}
+	Bitu line_option = 0;
+	if (getBituSubstring("arlforcects:", &line_option, cmd))
+		arl_force_cts = line_option != 0;
+	line_option = 0;
+	if (getBituSubstring("arlforcedsr:", &line_option, cmd))
+		arl_force_dsr = line_option != 0;
+	line_option = 0;
+	if (getBituSubstring("arlforcedcd:", &line_option, cmd))
+		arl_force_dcd = line_option != 0;
+	line_option = 0;
+	if (getBituSubstring("arlholdrts:", &line_option, cmd))
+		arl_hold_rts = line_option != 0;
+	line_option = 0;
+	if (getBituSubstring("arlholddtr:", &line_option, cmd))
+		arl_hold_dtr = line_option != 0;
 	getBituSubstring("arltracehangms:", &arltrace_hang_ms, cmd);
 	if (arltrace_hang_ms > 3600000) arltrace_hang_ms = 3600000;
+	Bitu arltrace_max_mb = 0;
+	getBituSubstring("arltracemaxmb:", &arltrace_max_mb, cmd);
+	if (arltrace_max_mb > 4096) arltrace_max_mb = 4096;
+	arltrace_max_bytes = (unsigned long long)arltrace_max_mb * 1024ULL * 1024ULL;
 
 	if (cmd->FindStringBegin("arltrace:", trace_path, false)) {
 		traceOpen(trace_path);
+	}
+	if (arl_force_cts || arl_force_dsr || arl_force_dcd ||
+	    arl_hold_rts || arl_hold_dtr) {
+		traceMessage("line_options", "ARL modem-line compatibility options active");
+		LOG_MSG("Serial%d: ARL modem-line options: force CTS=%d DSR=%d DCD=%d, hold RTS=%d DTR=%d",
+		        (int)COMNUMBER,
+		        arl_force_cts ? 1 : 0,
+		        arl_force_dsr ? 1 : 0,
+		        arl_force_dcd ? 1 : 0,
+		        arl_hold_rts ? 1 : 0,
+		        arl_hold_dtr ? 1 : 0);
 	}
 
 	// rxdelay: How many milliseconds to wait before causing an
@@ -784,10 +866,10 @@ void CDirectSerial::updateMSR () {
 	int new_status = SERIAL_getmodemstatus(comport);
 	traceModemStatus(new_status);
 
-	setCTS((new_status&SERIAL_CTS)? true:false);
-	setDSR((new_status&SERIAL_DSR)? true:false);
+	setCTS(((new_status&SERIAL_CTS) || arl_force_cts) ? true:false);
+	setDSR(((new_status&SERIAL_DSR) || arl_force_dsr) ? true:false);
 	setRI((new_status&SERIAL_RI)? true:false);
-	setCD((new_status&SERIAL_CD)? true:false);
+	setCD(((new_status&SERIAL_CD) || arl_force_dcd) ? true:false);
 }
 
 void CDirectSerial::transmitByte (uint8_t val, bool first) {
@@ -813,24 +895,28 @@ void CDirectSerial::setBreak (bool value) {
 
 // updateModemControlLines(mcr) sets DTR and RTS. 
 void CDirectSerial::setRTSDTR(bool rts, bool dtr) {
-	trace_rts = rts;
-	trace_dtr = dtr;
-	SERIAL_setRTS(comport,rts);
-	SERIAL_setDTR(comport,dtr);
+	const bool host_rts = arl_hold_rts ? true : rts;
+	const bool host_dtr = arl_hold_dtr ? true : dtr;
+	trace_rts = host_rts;
+	trace_dtr = host_dtr;
+	SERIAL_setRTS(comport,host_rts);
+	SERIAL_setDTR(comport,host_dtr);
 	traceControlLines("control");
 	traceHostState("host_control");
 }
 
 void CDirectSerial::setRTS(bool val) {
-	trace_rts = val;
-	SERIAL_setRTS(comport,val);
+	const bool host_rts = arl_hold_rts ? true : val;
+	trace_rts = host_rts;
+	SERIAL_setRTS(comport,host_rts);
 	traceControlLines("control");
 	traceHostState("host_control");
 }
 
 void CDirectSerial::setDTR(bool val) {
-	trace_dtr = val;
-	SERIAL_setDTR(comport,val);
+	const bool host_dtr = arl_hold_dtr ? true : val;
+	trace_dtr = host_dtr;
+	SERIAL_setDTR(comport,host_dtr);
 	traceControlLines("control");
 	traceHostState("host_control");
 }

@@ -2,7 +2,10 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$CapturePath,
 
-    [string]$PrinterName = "EPSON LX-350",
+    [string[]]$PrinterName = @("EPSON LX-350"),
+
+    [ValidateSet("Raw", "Text")]
+    [string]$PrintMode = "Raw",
 
     [string]$SpoolDir = "",
 
@@ -10,11 +13,15 @@ param(
 
     [int]$ParentPid = 0,
 
+    [string]$ParentStartTime = "",
+
     [int]$IdleMs = 2500,
 
     [int]$PollMs = 500,
 
     [int]$MinBytes = 1,
+
+    [int]$MaxWatchMs = 43200000,
 
     [switch]$AppendFormFeed,
 
@@ -74,17 +81,60 @@ if ($Send -and -not (Test-Path -Path $PrintScriptPath -PathType Leaf)) {
 
 Write-Log "Watching LPT capture: $CapturePath"
 Write-Log "Spool directory: $SpoolDir"
-Write-Log "Printer: $PrinterName"
+Write-Log "Printer: $($PrinterName -join ', ')"
+Write-Log "Print mode: $PrintMode"
 Write-Log "Send enabled: $Send"
 Write-Log "Append form feed: $AppendFormFeed"
 if ($ParentPid -gt 0) {
     Write-Log "Parent DOSBox PID: $ParentPid"
+    if (-not [string]::IsNullOrWhiteSpace($ParentStartTime)) {
+        Write-Log "Parent DOSBox start time: $ParentStartTime"
+    }
 }
 
 $offset = 0L
 $lastSize = -1L
 $lastChange = Get-Date
+$watchStarted = Get-Date
 $jobIndex = 0
+$parentStart = $null
+if (-not [string]::IsNullOrWhiteSpace($ParentStartTime)) {
+    try {
+        $parentStart = [datetime]::Parse(
+            $ParentStartTime,
+            [Globalization.CultureInfo]::InvariantCulture,
+            [Globalization.DateTimeStyles]::RoundtripKind
+        )
+    } catch {
+        Write-Log "Could not parse ParentStartTime '$ParentStartTime': $($_.Exception.Message)"
+    }
+}
+
+function Test-ParentAlive {
+    param(
+        [int]$ParentProcessId,
+        [Nullable[datetime]]$ExpectedStartTime
+    )
+
+    if ($ParentProcessId -le 0) { return $true }
+
+    $parent = Get-Process -Id $ParentProcessId -ErrorAction SilentlyContinue
+    if ($null -eq $parent) { return $false }
+
+    if ($null -ne $ExpectedStartTime) {
+        try {
+            $delta = [math]::Abs(($parent.StartTime - $ExpectedStartTime.Value).TotalSeconds)
+            if ($delta -gt 1) {
+                Write-Log "Parent PID $ParentProcessId was reused by a different process; treating parent as exited."
+                return $false
+            }
+        } catch {
+            Write-Log "Could not verify parent process start time: $($_.Exception.Message)"
+        }
+    }
+
+    return $true
+}
 
 while ($true) {
     $now = Get-Date
@@ -131,6 +181,7 @@ while ($true) {
                 length = $count
                 sha256 = $hash.Hash
                 printer_name = $PrinterName
+                print_mode = $PrintMode
                 send_enabled = [bool]$Send
                 append_form_feed = [bool]$AppendFormFeed
                 parent_pid = if ($ParentPid -gt 0) { $ParentPid } else { $null }
@@ -143,6 +194,7 @@ while ($true) {
                     $printArgs = @(
                         "-CapturePath", $jobPath,
                         "-PrinterName", $PrinterName,
+                        "-PrintMode", $PrintMode,
                         "-Send"
                     )
                     if ($AppendFormFeed) {
@@ -161,13 +213,15 @@ while ($true) {
         }
     }
 
-    $parentAlive = $true
-    if ($ParentPid -gt 0) {
-        $parentAlive = $null -ne (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue)
-    }
+    $parentAlive = Test-ParentAlive -ParentProcessId $ParentPid -ExpectedStartTime $parentStart
 
     if (-not $parentAlive -and $size -le $offset -and $idleFor -ge $IdleMs) {
         Write-Log "Parent exited and all LPT bytes were processed."
+        break
+    }
+
+    if ($MaxWatchMs -gt 0 -and (($now - $watchStarted).TotalMilliseconds -ge $MaxWatchMs)) {
+        Write-Log "Maximum LPT watcher lifetime reached: ${MaxWatchMs}ms."
         break
     }
 

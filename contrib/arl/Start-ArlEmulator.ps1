@@ -7,6 +7,7 @@ param(
     [int]$Port = 3460,
     [string]$Session = "impact-emulator",
     [string]$LogPath = "",
+    [string]$ControlPath = "",
     [int]$MaxConnections = 0,
     [int]$ExitAfterIdleMs = 0,
     [switch]$SelfTest
@@ -113,6 +114,64 @@ function Write-ByteEvent([string]$Direction, [byte]$Byte, $Rule = $null) {
     Write-EmulatorEvent $fields
 }
 
+function Read-ControlProfile {
+    if ([string]::IsNullOrWhiteSpace($ControlPath)) { return $null }
+    if (-not (Test-Path -Path $ControlPath -PathType Leaf)) { return $null }
+
+    $item = Get-Item -Path $ControlPath
+    $lastWriteUtc = $item.LastWriteTimeUtc
+    if ($null -ne $script:ControlProfile -and $script:ControlLastWriteUtc -eq $lastWriteUtc) {
+        return $script:ControlProfile
+    }
+
+    try {
+        $control = Get-Content -Path $ControlPath -Raw | ConvertFrom-Json
+        $script:ControlProfile = $control
+        $script:ControlLastWriteUtc = $lastWriteUtc
+        Write-EmulatorEvent @{
+            event = "control_loaded"
+            control_path = $ControlPath
+            last_write_utc = $lastWriteUtc.ToString("o")
+            enabled = [bool](Get-PropValue $control "enabled" $false)
+            note = Get-PropValue $control "note" ""
+        }
+        return $control
+    } catch {
+        Write-EmulatorEvent @{
+            event = "control_load_error"
+            control_path = $ControlPath
+            error = $_.Exception.Message
+        }
+        return $null
+    }
+}
+
+function Get-ControlResponseRule([byte[]]$InputBytes, [string]$InputText, [string]$InputHex, [string]$InputAscii) {
+    $control = Read-ControlProfile
+    if ($null -eq $control) { return $null }
+    if (-not [bool](Get-PropValue $control "enabled" $false)) { return $null }
+
+    $rules = @(Get-PropValue $control "rules" @())
+    foreach ($rule in $rules) {
+        if ((Test-RuleMatch $rule $InputHex $InputText) -or (Test-RuleMatch $rule $InputHex $InputAscii)) {
+            $label = Get-PropValue $rule "label" "control-response"
+            $phase = Get-PropValue $rule "phase" "control"
+            $responseHex = Get-PropValue $rule "response_hex"
+            $responseAscii = Get-PropValue $rule "response_ascii"
+            $delayMs = [int](Get-PropValue $rule "delay_ms" 0)
+            return [pscustomobject]@{
+                label = "control:$label"
+                phase = $phase
+                response_hex = $responseHex
+                response_ascii = $responseAscii
+                delay_ms = $delayMs
+            }
+        }
+    }
+
+    return $null
+}
+
 function Get-ResponseBytes($Rule, [string]$CurrentMode) {
     if ($CurrentMode -eq "bad-response") {
         $badHex = Get-PropValue $Rule "bad_response_hex"
@@ -138,48 +197,181 @@ function Get-RuleDelayMs($Rule, [string]$CurrentMode) {
     return [int](Get-PropValue $Rule "delay_ms" (Get-PropValue $script:Profile "default_response_delay_ms" 25))
 }
 
+function Test-RuleMatch($Rule, [string]$InputHex, [string]$InputAscii) {
+    $matchType = Get-PropValue $Rule "match" "exact_hex"
+    switch ($matchType) {
+        "any" { return $true }
+        "exact_hex" {
+            return $InputHex -eq (Normalize-Hex (Get-PropValue $Rule "pattern_hex" ""))
+        }
+        "prefix_hex" {
+            $pattern = Normalize-Hex (Get-PropValue $Rule "pattern_hex" "")
+            return (-not [string]::IsNullOrWhiteSpace($pattern) -and $InputHex.StartsWith($pattern))
+        }
+        "contains_hex" {
+            $pattern = Normalize-Hex (Get-PropValue $Rule "pattern_hex" "")
+            return (-not [string]::IsNullOrWhiteSpace($pattern) -and $InputHex.Contains($pattern))
+        }
+        "exact_ascii" {
+            return $InputAscii -eq (Get-PropValue $Rule "pattern_ascii" "")
+        }
+        "prefix_ascii" {
+            $pattern = Get-PropValue $Rule "pattern_ascii" ""
+            return (-not [string]::IsNullOrWhiteSpace($pattern) -and $InputAscii.StartsWith($pattern))
+        }
+        "ascii_contains" {
+            $pattern = Get-PropValue $Rule "pattern_ascii" ""
+            return (-not [string]::IsNullOrWhiteSpace($pattern) -and $InputAscii.Contains($pattern))
+        }
+        default {
+            throw "Unknown emulator match type '$matchType' in rule '$((Get-PropValue $Rule "label" "unknown"))'"
+        }
+    }
+}
+
+function Get-RuleSequenceKey($Rule) {
+    $key = Get-PropValue $Rule "sequence_key" ""
+    if ([string]::IsNullOrWhiteSpace($key)) { return $null }
+    return [string]$key
+}
+
+function Test-RuleSequenceReady($Rule) {
+    $repeatPolicy = Get-PropValue $Rule "repeat_policy" ""
+    if ($repeatPolicy -ne "sequence") { return $true }
+
+    $key = Get-RuleSequenceKey $Rule
+    if ([string]::IsNullOrWhiteSpace($key)) {
+        throw "Rule '$((Get-PropValue $Rule "label" "unknown"))' uses repeat_policy=sequence without sequence_key"
+    }
+
+    $expected = [int](Get-PropValue $Rule "sequence_index" 0)
+    $actual = 0
+    if ($script:SequenceState.ContainsKey($key)) {
+        $actual = [int]$script:SequenceState[$key]
+    }
+    return $actual -eq $expected
+}
+
+function Advance-RuleSequence($Rule) {
+    $repeatPolicy = Get-PropValue $Rule "repeat_policy" ""
+    if ($repeatPolicy -ne "sequence") { return }
+
+    $key = Get-RuleSequenceKey $Rule
+    $next = [int](Get-PropValue $Rule "sequence_next" ([int](Get-PropValue $Rule "sequence_index" 0) + 1))
+    $script:SequenceState[$key] = $next
+}
+
 function Find-MatchingRule([byte[]]$InputBytes) {
     $inputHex = Format-HexCompact $InputBytes
     $inputAscii = [System.Text.Encoding]::ASCII.GetString($InputBytes)
 
     foreach ($rule in @($script:Profile.responses)) {
-        $matchType = Get-PropValue $rule "match" "exact_hex"
-        switch ($matchType) {
-            "any" { return $rule }
-            "exact_hex" {
-                if ($inputHex -eq (Normalize-Hex (Get-PropValue $rule "pattern_hex" ""))) { return $rule }
+        if ((Test-RuleMatch $rule $inputHex $inputAscii) -and (Test-RuleSequenceReady $rule)) {
+            return $rule
+        }
+    }
+
+    $wrapKeys = Get-PropValue $script:Profile "sequence_wrap_keys"
+    if ($null -ne $wrapKeys) {
+        $didWrap = $false
+        foreach ($property in $wrapKeys.PSObject.Properties) {
+            $key = [string]$property.Name
+            $settings = $property.Value
+            $wrapAt = [int](Get-PropValue $settings "wrap_at" 0)
+            $resetTo = [int](Get-PropValue $settings "reset_to" 0)
+            $actual = 0
+            if ($script:SequenceState.ContainsKey($key)) {
+                $actual = [int]$script:SequenceState[$key]
             }
-            "prefix_hex" {
-                $pattern = Normalize-Hex (Get-PropValue $rule "pattern_hex" "")
-                if (-not [string]::IsNullOrWhiteSpace($pattern) -and $inputHex.StartsWith($pattern)) { return $rule }
+
+            if ($wrapAt -gt 0 -and $actual -ge $wrapAt) {
+                $script:SequenceState[$key] = $resetTo
+                $didWrap = $true
+                Write-EmulatorEvent @{
+                    event = "sequence_wrap"
+                    sequence_key = $key
+                    previous_index = $actual
+                    reset_to = $resetTo
+                    input_hex = Format-HexBytes $InputBytes
+                    input_ascii = Format-AsciiBytes $InputBytes
+                }
             }
-            "contains_hex" {
-                $pattern = Normalize-Hex (Get-PropValue $rule "pattern_hex" "")
-                if (-not [string]::IsNullOrWhiteSpace($pattern) -and $inputHex.Contains($pattern)) { return $rule }
-            }
-            "exact_ascii" {
-                if ($inputAscii -eq (Get-PropValue $rule "pattern_ascii" "")) { return $rule }
-            }
-            "prefix_ascii" {
-                $pattern = Get-PropValue $rule "pattern_ascii" ""
-                if (-not [string]::IsNullOrWhiteSpace($pattern) -and $inputAscii.StartsWith($pattern)) { return $rule }
-            }
-            "ascii_contains" {
-                $pattern = Get-PropValue $rule "pattern_ascii" ""
-                if (-not [string]::IsNullOrWhiteSpace($pattern) -and $inputAscii.Contains($pattern)) { return $rule }
-            }
-            default {
-                throw "Unknown emulator match type '$matchType' in rule '$((Get-PropValue $rule "label" "unknown"))'"
+        }
+
+        if ($didWrap) {
+            foreach ($rule in @($script:Profile.responses)) {
+                if ((Test-RuleMatch $rule $inputHex $inputAscii) -and (Test-RuleSequenceReady $rule)) {
+                    return $rule
+                }
             }
         }
     }
+
+    return $null
+}
+
+function Get-FastResponseRule([string]$InputAscii) {
+    $fastResponses = Get-PropValue $script:Profile "fast_response_ascii"
+    if ($null -eq $fastResponses) { return $null }
+
+    foreach ($property in $fastResponses.PSObject.Properties) {
+        if ($InputAscii -eq [string]$property.Name) {
+            $responseAscii = [string]$property.Value
+            return [pscustomobject]@{
+                label = "fast-response"
+                phase = "fast-response"
+                response_ascii = $responseAscii
+                delay_ms = 0
+            }
+        }
+    }
+
     return $null
 }
 
 function Invoke-Transaction([System.Net.Sockets.NetworkStream]$Stream, [byte[]]$InputBytes) {
-    $rule = Find-MatchingRule $InputBytes
     $inputHex = Format-HexBytes $InputBytes
     $inputAscii = Format-AsciiBytes $InputBytes
+    $inputText = [System.Text.Encoding]::ASCII.GetString($InputBytes)
+
+    Write-EmulatorEvent @{
+        event = "transaction_start"
+        input_hex = $inputHex
+        input_ascii = $inputAscii
+    }
+
+    try {
+        $rule = Get-ControlResponseRule $InputBytes $inputText (Format-HexCompact $InputBytes) $inputAscii
+        if ($null -ne $rule) {
+            $matchedFromControl = $true
+        }
+
+        if ($null -eq $rule) {
+            $rule = Get-FastResponseRule $inputText
+            $matchedFromControl = $false
+        }
+        if ($null -ne $rule) {
+            $matchEvent = if ($matchedFromControl) { "control_response_match" } else { "fast_response_match" }
+            Write-EmulatorEvent @{
+                event = $matchEvent
+                rule = Get-PropValue $rule "label" "fast-response"
+                phase = Get-PropValue $rule "phase" "fast-response"
+                input_hex = $inputHex
+                input_ascii = $inputAscii
+                control_path = if ($matchedFromControl) { $ControlPath } else { $null }
+            }
+        } else {
+            $rule = Find-MatchingRule $InputBytes
+        }
+    } catch {
+        Write-EmulatorEvent @{
+            event = "transaction_error"
+            input_hex = $inputHex
+            input_ascii = $inputAscii
+            error = $_.Exception.Message
+        }
+        throw
+    }
 
     if ($null -eq $rule) {
         Write-EmulatorEvent @{
@@ -201,6 +393,7 @@ function Invoke-Transaction([System.Net.Sockets.NetworkStream]$Stream, [byte[]]$
         input_hex = $inputHex
         input_ascii = $inputAscii
     }
+    Advance-RuleSequence $rule
 
     if ($Mode -eq "silent-after-spark" -and $phase -eq "analysis-result") {
         Write-EmulatorEvent @{
@@ -243,6 +436,13 @@ function Invoke-Transaction([System.Net.Sockets.NetworkStream]$Stream, [byte[]]$
         $Stream.Flush()
         Write-ByteEvent "rx" $byte $rule
     }
+    Write-EmulatorEvent @{
+        event = "transaction_done"
+        rule = $label
+        phase = $phase
+        input_hex = $inputHex
+        input_ascii = $inputAscii
+    }
     return $false
 }
 
@@ -282,6 +482,18 @@ function Invoke-ClientSession([System.Net.Sockets.TcpClient]$Client) {
                 Write-ByteEvent "tx" $byte
                 $lastInputTick = [Environment]::TickCount64
                 $lastActivityTick = $lastInputTick
+                if ($buffer.Count -eq 1 -and ($byte -eq 0x7f -or $byte -eq 0x3f)) {
+                    $closeAfterTransaction = Invoke-Transaction $stream ([byte[]]$buffer.ToArray())
+                    $buffer.Clear()
+                    $lastActivityTick = [Environment]::TickCount64
+                    if ($closeAfterTransaction) { break }
+                }
+                if ($buffer.Count -gt 0 -and $byte -eq 0x0d) {
+                    $closeAfterTransaction = Invoke-Transaction $stream ([byte[]]$buffer.ToArray())
+                    $buffer.Clear()
+                    $lastActivityTick = [Environment]::TickCount64
+                    if ($closeAfterTransaction) { break }
+                }
                 continue
             }
 
@@ -314,6 +526,7 @@ if (-not (Test-Path -Path $ProfilePath -PathType Leaf)) {
 
 $script:Profile = Get-Content -Path $ProfilePath -Raw | ConvertFrom-Json
 $script:StartEpochMs = Get-NowMs
+$script:SequenceState = @{}
 
 if (-not [string]::IsNullOrWhiteSpace($LogPath)) {
     $logDir = Split-Path -Parent $LogPath

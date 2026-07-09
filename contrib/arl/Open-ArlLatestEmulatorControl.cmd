@@ -1,0 +1,2 @@
+@echo off
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$run = Get-ChildItem 'C:\ARL\diagnostics' -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'emulator-control.json') } | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if (-not $run) { Write-Host 'No emulator-control.json found'; pause; exit 1 }; Start-Process notepad.exe (Join-Path $run.FullName 'emulator-control.json')"

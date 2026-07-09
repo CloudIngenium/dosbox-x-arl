@@ -84,6 +84,8 @@ private:
 	uint32_t arltrace_last_io_tick = 0;
 	uint32_t arltrace_last_hang_tick = 0;
 	Bitu arltrace_hang_ms = 0;
+	unsigned long long arltrace_max_bytes = 0;
+	bool arltrace_limit_reached = false;
 	ArlTraceLevel arltrace_level = ARL_TRACE_BASIC;
 
 	int trace_baudrate = 0;
@@ -94,6 +96,11 @@ private:
 	bool trace_dtr = false;
 	bool trace_break = false;
 	int trace_modem_status = -1;
+	bool arl_force_cts = false;
+	bool arl_force_dsr = false;
+	bool arl_force_dcd = false;
+	bool arl_hold_rts = false;
+	bool arl_hold_dtr = false;
 	bool trace_have_tx = false;
 	bool trace_have_rx = false;
 	uint8_t trace_last_tx = 0;
@@ -107,6 +114,8 @@ private:
 	void traceOpen(const std::string &path);
 	bool traceOpenCurrentPath();
 	void traceCommonFields(const char *event);
+	void traceFlush();
+	void traceCheckLimit();
 	void traceJsonString(const char *value);
 	void traceMessage(const char *event, const char *message);
 	void traceByte(const char *event, uint8_t val, uint8_t error);

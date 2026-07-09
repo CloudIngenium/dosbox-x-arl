@@ -1,0 +1,128 @@
+{
+  "name": "impact-simple386-four-row-sequence",
+  "description": "Trace-derived IMPACT profile from C:\\ARL\\diagnostics\\sample-analysis-20260708-205041\\snapshot-20260708-205610: three accepted rows followed by one valid row that IMPACT rejected with '?'.",
+  "source_run": "sample-analysis-20260708-205041/snapshot-20260708-205610",
+  "source_settings": {
+    "core": "simple",
+    "cputype": "386",
+    "cycles": 6000,
+    "rxdelay": 3000,
+    "trace_level": "basic"
+  },
+  "transaction_idle_ms": 120,
+  "default_response_delay_ms": 25,
+  "delayed_result_ms": 10000,
+  "notes": [
+    "Rows are protocol/checksum valid according to Analyze-ArlTrace.ps1.",
+    "Rows 1-3 were accepted by IMPACT and followed by #em.",
+    "Row 4 was repeated after IMPACT sent '?' instead of #em."
+  ],
+  "responses": [
+    {
+      "label": "impact-result-row-1-accepted",
+      "phase": "analysis-result",
+      "match": "ascii_contains",
+      "pattern_ascii": "#rd",
+      "response_ascii": "#101.371,12.578,2.490,0.669,3.045,65.708,1.477,57.487,1.394,84.300,11.148,9.772,18.475,6.436,57.487 093\r\n",
+      "repeat_policy": "sequence",
+      "sequence_key": "impact-result-row",
+      "sequence_index": 0,
+      "sequence_next": 1,
+      "checksum": 93,
+      "accepted_by_impact": true
+    },
+    {
+      "label": "impact-result-row-2-accepted",
+      "phase": "analysis-result",
+      "match": "ascii_contains",
+      "pattern_ascii": "#rd",
+      "response_ascii": "#96.533,12.455,2.460,0.650,3.005,62.985,1.459,57.662,1.372,83.136,10.537,9.494,18.342,6.434,57.662 024\r\n",
+      "repeat_policy": "sequence",
+      "sequence_key": "impact-result-row",
+      "sequence_index": 1,
+      "sequence_next": 2,
+      "checksum": 24,
+      "accepted_by_impact": true
+    },
+    {
+      "label": "impact-result-row-3-accepted",
+      "phase": "analysis-result",
+      "match": "ascii_contains",
+      "pattern_ascii": "#rd",
+      "response_ascii": "#107.760,13.354,2.630,0.692,3.207,65.846,1.534,62.237,1.470,88.111,11.900,10.276,19.505,6.840,62.237 089\r\n",
+      "repeat_policy": "sequence",
+      "sequence_key": "impact-result-row",
+      "sequence_index": 2,
+      "sequence_next": 3,
+      "checksum": 89,
+      "accepted_by_impact": true
+    },
+    {
+      "label": "impact-result-row-4-rejected",
+      "phase": "analysis-result",
+      "match": "ascii_contains",
+      "pattern_ascii": "#rd",
+      "response_ascii": "#106.251,13.389,2.615,0.690,3.180,65.430,1.528,62.935,1.454,87.305,11.880,10.284,19.361,6.779,62.935 117\r\n",
+      "repeat_policy": "sequence",
+      "sequence_key": "impact-result-row",
+      "sequence_index": 3,
+      "sequence_next": 4,
+      "checksum": 117,
+      "accepted_by_impact": false,
+      "failure_mode": "impact-sent-question-mark"
+    },
+    {
+      "label": "impact-reject-loop-repeat-row-4",
+      "phase": "reject-loop",
+      "match": "ascii_contains",
+      "pattern_ascii": "?",
+      "response_ascii": "#106.251,13.389,2.615,0.690,3.180,65.430,1.528,62.935,1.454,87.305,11.880,10.284,19.361,6.779,62.935 117\r\n",
+      "checksum": 117,
+      "note": "When IMPACT sends '?', repeat the rejected valid row exactly as the real ARL did."
+    },
+    {
+      "label": "impact-accepted-end-marker",
+      "phase": "accepted",
+      "match": "ascii_contains",
+      "pattern_ascii": "#em",
+      "response_ascii": "#",
+      "note": "Observed good IMPACT transition after accepted rows. Updated to ACK #em with # because real traces show ARL acknowledgement after accepted/end-marker transitions."
+    },
+    {
+      "label": "impact-generic-setup-st-ack",
+      "phase": "init-status",
+      "match": "prefix_ascii",
+      "pattern_ascii": "st ",
+      "response_ascii": "#0 080\r",
+      "delay_ms": 25,
+      "note": "Fallback for trace-derived emulator profiles: IMPACT can resend unprefixed st setup rows after storing/canceling a sample. The real ARL acknowledges these rows with #0 080."
+    },
+    {
+      "label": "impact-generic-setup-hash-st-ack",
+      "phase": "init-status",
+      "match": "prefix_ascii",
+      "pattern_ascii": "#st ",
+      "response_ascii": "#0 080\r",
+      "delay_ms": 25,
+      "note": "Fallback for trace-derived emulator profiles: preserve exact replay when available, but acknowledge unseen #st setup rows instead of hanging."
+    },
+    {
+      "label": "impact-generic-new-sample-ns-ack",
+      "phase": "init-status",
+      "match": "prefix_ascii",
+      "pattern_ascii": "ns ",
+      "response_ascii": "#",
+      "delay_ms": 25,
+      "note": "Fallback for trace-derived emulator profiles: after Store Result/cancel, IMPACT can send unprefixed ns rows before another analysis. Real traces show ns/#ns transitions acknowledged with #."
+    },
+    {
+      "label": "impact-generic-new-sample-hash-ns-ack",
+      "phase": "init-status",
+      "match": "prefix_ascii",
+      "pattern_ascii": "#ns ",
+      "response_ascii": "#",
+      "delay_ms": 25,
+      "note": "Fallback for trace-derived emulator profiles: acknowledge unseen #ns new-sample rows instead of hanging."
+    }
+  ]
+}

@@ -73,7 +73,10 @@ jobs:
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Start-ArlEmulator.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Analyze-LatestArlTrace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactStabilityTrace.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactCycles6000Trace.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactCycles10000Trace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactSafeSerialTrace.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactUartDataTrace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Preserve-ArlTraceRun.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Print-ArlLptCapture.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Watch-ArlLptCapture.ps1)) | Out-Null
@@ -153,12 +156,21 @@ jobs:
           cp dosbox-x.reference.conf "$arl_root/dosbox-x.reference.conf"
           cp dosbox-x.reference.full.conf "$arl_root/dosbox-x.reference.full.conf"
           cp docs/ARL-TRACE.md "$arl_root/ARL-TRACE.md"
+          cp docs/ARL-LAB-HISTORY-2026-07.md "$arl_root/ARL-LAB-HISTORY-2026-07.md"
           cp -R contrib/arl/. "$arl_root/contrib/arl/"
           cp contrib/arl/dosbox-arl-trace.conf "$arl_root/dosbox-arl-trace.conf"
           cp contrib/arl/Launch-ArlImpactStabilityTrace.ps1 "$arl_root/Launch-ArlImpactStabilityTrace.ps1"
+          cp contrib/arl/Launch-ArlImpactCycles6000Trace.ps1 "$arl_root/Launch-ArlImpactCycles6000Trace.ps1"
+          cp contrib/arl/Launch-ArlImpactCycles6000Trace.cmd "$arl_root/Launch-ArlImpactCycles6000Trace.cmd"
+          cp contrib/arl/Launch-ArlImpactCycles10000Trace.ps1 "$arl_root/Launch-ArlImpactCycles10000Trace.ps1"
+          cp contrib/arl/Launch-ArlImpactCycles10000Trace.cmd "$arl_root/Launch-ArlImpactCycles10000Trace.cmd"
           cp contrib/arl/Launch-ArlImpactSafeSerialTrace.ps1 "$arl_root/Launch-ArlImpactSafeSerialTrace.ps1"
           cp contrib/arl/Launch-ArlImpactSafeSerialTrace.cmd "$arl_root/Launch-ArlImpactSafeSerialTrace.cmd"
+          cp contrib/arl/Launch-ArlImpactUartDataTrace.ps1 "$arl_root/Launch-ArlImpactUartDataTrace.ps1"
+          cp contrib/arl/Launch-ArlImpactUartDataTrace.cmd "$arl_root/Launch-ArlImpactUartDataTrace.cmd"
           cp contrib/arl/Launch-ArlImpactRx4000Trace.cmd "$arl_root/Launch-ArlImpactRx4000Trace.cmd"
+          cp contrib/arl/Analyze-ArlTrace.ps1 "$arl_root/Analyze-ArlTrace.ps1"
+          cp contrib/arl/Analyze-LatestArlTrace.ps1 "$arl_root/Analyze-LatestArlTrace.ps1"
           cp contrib/arl/Preserve-ArlTraceRun.ps1 "$arl_root/Preserve-ArlTraceRun.ps1"
           cp contrib/arl/Print-ArlLptCapture.ps1 "$arl_root/Print-ArlLptCapture.ps1"
           cp contrib/arl/Watch-ArlLptCapture.ps1 "$arl_root/Watch-ArlLptCapture.ps1"

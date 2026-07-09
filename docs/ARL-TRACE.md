@@ -11,13 +11,17 @@ must not be treated as a replacement for the real ARL until protocol bytes are
 confirmed from lab traces. Do not add manual ICS command senders, synchronize, or
 reset helpers.
 
+For the chronological lab handoff log, including tests, hypotheses, failed
+paths, trace evidence, and next steps, read
+[`ARL-LAB-HISTORY-2026-07.md`](./ARL-LAB-HISTORY-2026-07.md).
+
 ## Current Lab Build
 
 As of 2026-07-08, the HP bench PC (`LABORATORIO-ARL`) is using ARL trace build
 `96994b1`:
 
 - `C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe`
-- `C:\ARL\DOSBox-X-ARL\dosbox-x-arl-96994b1.exe`
+- `C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe`
 - SHA256:
   `499A1F9D992F28CD022429F6F2CCAAFA0F03D898F68B606B7659CA29819571DA`
 - previous backup:
@@ -25,7 +29,9 @@ As of 2026-07-08, the HP bench PC (`LABORATORIO-ARL`) is using ARL trace build
 
 The public desktop shortcut `ARL IMPACT+ UARTDATA TRACE` launches
 `Launch-ArlImpactUartDataTrace.ps1`, which uses `arltracelevel:uartdata`,
-`cycles=fixed 12000`, `rxdelay:1000`, and COM5.
+`cycles=fixed 8000`, `rxdelay:3000`, and COM5. Use it only for short,
+operator-attended diagnostic burns because it records guest UART `THR/RHR`
+activity in addition to host TX/RX bytes.
 
 After the 2026-07-08 successful-first-burn / stuck-second-burn evidence, keep
 that shortcut for deep UART-consumption proof only. The normal retry path should
@@ -55,6 +61,78 @@ The next tuning step is `ARL IMPACT+ RX4000 TRACE`, which keeps the same
 from 3000 to 4000. This tests whether a modest grace window helps without the
 long blocked-UART behavior observed at 10000.
 
+After the UARTDATA evidence showed that valid rows can be received and read but
+still rejected by IMPACT, the next lab matrix should hold `rxdelay:3000`
+constant and vary only CPU timing. Use one burn per DOSBox launch:
+
+- `Launch-ArlImpactStabilityTrace.ps1`: `cycles=fixed 8000`, `rxdelay:3000`
+- `Launch-ArlImpactCycles6000Trace.ps1`: `cycles=fixed 6000`, `rxdelay:3000`
+- `Launch-ArlImpactCycles10000Trace.ps1`: `cycles=fixed 10000`, `rxdelay:3000`
+
+After `3500` accepted only one burn and `4000` failed status reads, do not keep
+walking cycles downward. The next useful no-rebuild tests keep the best observed
+transport setting and change the emulated DOS machine profile:
+
+- `Launch-ArlImpactCycles6000SimpleTrace.ps1`: `core=simple`, `cputype=486`,
+  `cycles=fixed 6000`, `rxdelay:3000`
+- `Launch-ArlImpactCycles6000Cpu386Trace.ps1`: `core=normal`, `cputype=386`,
+  `cycles=fixed 6000`, `rxdelay:3000`
+- `Launch-ArlImpactCycles6000Simple386Trace.ps1`: `core=simple`,
+  `cputype=386`, `cycles=fixed 6000`, `rxdelay:3000`
+
+Memory-layout variants are also available because IMPACT may change parser or
+buffer paths when EMS/XMS/UMB are present:
+
+- `Launch-ArlImpactCycles6000NoEmsTrace.ps1`: `memsize=16`, `xms=true`,
+  `ems=false`, `umb=true`
+- `Launch-ArlImpactCycles6000NoUmbTrace.ps1`: `memsize=16`, `xms=true`,
+  `ems=true`, `umb=false`
+- `Launch-ArlImpactCycles6000NoMouseTrace.ps1`: `memsize=16`, `xms=true`,
+  `ems=true`, `umb=true`, does not load `DOS\MOUSE.COM`
+- `Launch-ArlImpactCycles6000LowMemTrace.ps1`: `memsize=4`, `xms=true`,
+  `ems=false`, `umb=true`
+- `Launch-ArlImpactCycles6000ConventionalTrace.ps1`: `memsize=4`,
+  `xms=false`, `ems=false`, `umb=false`
+
+Use `NOEMS`, `NOUMB`, then `NOMOUSE` before `LOWMEM` or `CONVENTIONAL`; they
+change less while testing the most suspicious old-DOS memory variables.
+
+`UARTDATA` launchers are diagnostic-only. A failed `CYCLES6000 UARTDATA TRACE`
+run does not prove that `NOEMS` failed, and it should not be used as a stability
+setting because the UART register trace volume can perturb timing.
+
+`CYCLES6000 SIMPLE TRACE` produced a successful first analysis and then two
+completed analyses were reported by the operator. Its run metadata confirmed
+`core=simple`, `cputype=486`, `cycles=fixed 6000`, and `rxdelay:3000`.
+
+The same run proved LPT capture worked: `LPTCAP.PRN` contained 5242 bytes. A
+watcher-launch bug was fixed after this run: `Start-ArlTraceRun.ps1` now writes
+named hashtable splatting for `Watch-ArlLptCapture.ps1` instead of positional
+array splatting. If a RAW print job reaches the `EPSON LX-350` queue but does
+not physically print, troubleshoot Windows/USB/printer state rather than IMPACT
+LPT capture.
+
+Before each burn, close DOSBox-X, confirm no `dosbox` process remains, and have
+the operator reinitialize ARL/ICS. A passing run is a result row followed by
+`#em`, `INTERFAC.DAT` update, and LPT capture/print job if IMPACT reaches print.
+
+Later 2026-07-08 runs with both `rxdelay:3000` and `rxdelay:4000` reproduced the
+same post-result loop: IMPACT sent `#rd 246`, the ARL returned repeated numeric
+result rows at 2400 baud, and IMPACT kept sending `?` without sending `#em`.
+The trailing result-row checksum bytes matched the modulo-256 checksum rule
+used by commands such as `#rd 246` and `#em 242`, so the repeated rows were not
+obviously corrupt at the ASCII protocol level. The next controlled diagnostic
+burn should therefore use `ARL IMPACT+ UARTDATA TRACE` to prove whether IMPACT
+is consuming the UART receive register cleanly or whether emulated UART/FIFO
+state diverges before IMPACT accepts the packet.
+
+If DOSBox-X is closed while this loop is active, the ARL/ICS side can remain in
+the result-read state. A subsequent IMPACT launch may then send status commands
+at 9600 baud while the instrument/interface is still effectively in the
+post-result 2400-baud conversation, producing RX framing/parity errors and a
+new hang at "Reading status channels". Clear/reinitialize the ARL/ICS state
+before treating that later status-read hang as a separate failure.
+
 Build `96994b1` moved THR/RHR `uartdata` tracing to `CSerial::Write_THR()` and
 `CSerial::Read_RHR()`. That matters because IMPACT can use BIOS/INT14 paths that
 do not necessarily pass through the I/O-port wrappers where earlier builds
@@ -63,6 +141,11 @@ logged UART data-register access.
 Do not use `10.30.1.6` for this lab PC; that address was observed to be a
 different Linux host. Use `LABORATORIO-ARL` / `10.5.18.101` for SSH access when
 reachable.
+
+Remote HP operations are documented in
+[`ARL-HP-REMOTE-OPS.md`](./ARL-HP-REMOTE-OPS.md). Use `svc-claude` with
+`~/.ssh/svc-claude`, place user-facing launchers in `C:\Users\Public\Desktop`,
+and prefer uploading `.ps1` files over inline PowerShell in SSH commands.
 
 ## Branches
 
@@ -100,6 +183,15 @@ serial1 = directserial realport:COM5 rxdelay:1000 arltracelevel:basic arltracese
   `status-only`, or `sample-analysis`.
 - `arltracehangms:<ms>` emits `hang_snapshot` when no relevant TX/RX occurs for
   the configured interval.
+- `arltracemaxmb:<mb>` closes the trace after the file reaches the configured
+  size limit. `Start-ArlTraceRun.ps1` uses `64` MB by default so a stuck polling
+  loop preserves evidence without filling the disk. Use `0` only for short,
+  supervised captures where an unlimited trace is intentional.
+- `arlforcects:1`, `arlforcedsr:1`, and `arlforcedcd:1` force the
+  guest-visible modem input lines high. Use only for compatibility tests after
+  installing a build that contains these options.
+- `arlholdrts:1` and `arlholddtr:1` keep the host RTS/DTR output lines high
+  toward the ARL/ICS while tracing the effective line state.
 
 Trace v2 includes:
 
@@ -114,6 +206,82 @@ Trace v2 includes:
   in `uart` and `full`
 - FIFO usage, IRQ state, `rx_state`, `rx_retry`, and error counters
 - Windows host DCB, timeouts, flow-control flags, and modem status in `full`
+
+## SIMPLE386 Reject Matrix
+
+The current best evidence run is
+`C:\ARL\diagnostics\sample-analysis-20260708-205041\snapshot-20260708-205610`.
+It used `core=simple`, `cputype=386`, `cycles=fixed 6000`, `rxdelay:3000`,
+accepted three result rows, then rejected a fourth complete checksum-valid row
+with `?` instead of `#em`.
+
+Use this no-rebuild order next, one variable per fresh DOSBox/IMPACT session:
+
+1. `01 NOAUTOPRINT - 6000 SIMPLE386`
+2. `02 NO MOUSE.COM - 6000 SIMPLE386`
+3. `03 NOUMB - 6000 SIMPLE386`
+4. `04 EMSBOARD - 6000 SIMPLE386`
+5. `05 EMM386 - 6000 SIMPLE386`
+
+Observed on 2026-07-08/09:
+
+- `01` accepted the first burn, then rejected the second checksum-valid row.
+- `02` through `05` each rejected the first checksum-valid result row.
+- `02` only disables `DOS\MOUSE.COM`; DOSBox-X still exposes its internal
+  `INT 33h`/PS2/AUX mouse path unless the generated config disables it.
+
+Next preferred isolation test:
+
+- `00 BASELINE - 6000 486`
+  - restores the best-known good profile from
+    `sample-analysis-20260708-173311`
+  - `core=normal`, `cputype=486`, `cycles=fixed 6000`, `rxdelay:3000`
+  - uses normal mouse/EMS/XMS/UMB, auto-print, and old default video scaling
+- `11 NOINT33 - 6000 SIMPLE386`
+  - `core=simple`, `cputype=386`, `cycles=fixed 6000`, `rxdelay:3000`
+  - disables `DOS\MOUSE.COM`, `int33`, `biosps2`, and keyboard `aux`
+  - disables auto-print to remove LPT watcher side effects for this test
+
+## Operator Window Size
+
+Generated ARL configs use a larger operator window by default:
+
+- `[sdl] windowresolution = 1280x960`
+- `[sdl] output = openglnb`
+- `[render] aspect = true`
+- `[render] scaler = none`
+
+This scales DOSBox-X output for readability while keeping the DOS video mode
+seen by IMPACT unchanged. If the HP/RDP display is too small, lower
+`WindowResolution` in the launcher call, for example `1024x768`.
+
+If those do not move the failure, use the deeper DOS compatibility launchers:
+
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 ZEROEMS TRACE`
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 ZEROXMS TRACE`
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 MCBCOMPAT TRACE`
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 NOSHARE TRACE`
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 UNMASKDISKIO TRACE`
+
+The following require a build with modem-line options. They are installed on the
+HP as of build `9663306`, but the first lab result did not make either one a
+better default:
+
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 FORCELINES TRACE`
+- `ARL IMPACT+ CYCLES6000 SIMPLE386 HOLDRTS-DTR TRACE`
+
+Observed 2026-07-08:
+
+- `FORCELINES` received a checksum-valid result row and then IMPACT sent `?`
+  repeatedly instead of `#em`.
+- `HOLDRTS-DTR` did not produce a useful analysis/result-read transaction.
+- Continue with `NOAUTOPRINT`, then the DOS memory-layout launchers, before
+  returning to modem-line forcing.
+
+Emulator profiles derived from the run:
+
+- `profiles\impact-simple386-four-row-sequence.json`
+- `profiles\impact-simple386-rejected-row-first.json`
 
 ## ARLTRACE.COM
 
@@ -150,6 +318,8 @@ C:\ARL\DOSBox-X-ARL\Start-ArlTraceRun.ps1 -Session impact
 C:\ARL\DOSBox-X-ARL\Start-ArlTraceRun.ps1 -Session tics
 C:\ARL\DOSBox-X-ARL\Start-ArlTraceRun.ps1 -Session sample-analysis
 C:\ARL\DOSBox-X-ARL\Launch-ArlImpactStabilityTrace.ps1
+C:\ARL\DOSBox-X-ARL\Launch-ArlImpactCycles6000Trace.ps1
+C:\ARL\DOSBox-X-ARL\Launch-ArlImpactCycles10000Trace.ps1
 ```
 
 Each run creates `C:\ARL\diagnostics\<session>-<timestamp>\` with:
@@ -209,8 +379,9 @@ Keep the current lab serial settings while diagnosing:
 
 - ARL cable on `COM5`
 - WCH FIFO disabled or minimized in Device Manager
-- `cycles = fixed 12000`
-- `rxdelay:1000` as the first trace run
+- `cycles = fixed 8000` as baseline, then 6000 and 10000 only as single-variable tests
+- `rxdelay:3000` for the current matrix
+- `arltracelevel:basic` for normal burns; `uartdata` only for short proof captures
 
 The pass/fail gate is post-spark completion: IMPACT must exit the busy state and
 rewrite `C:\ARL\IMPLUS\INTERFAC.DAT`.
@@ -313,6 +484,56 @@ Emulator modes:
 
 The default `profiles\arl3460-baseline.json` is synthetic. Replace its
 responses only with bytes confirmed by real `serial.ndjson` traces.
+
+Trace-derived profiles are now generated with:
+
+```powershell
+C:\ARL\DOSBox-X-ARL\New-ArlEmulatorProfileFromTrace.ps1 `
+  -RunPath C:\ARL\diagnostics\sample-analysis-20260708-173311 `
+  -OutPath C:\ARL\DOSBox-X-ARL\profiles\impact-6000-good7-then-reject.json `
+  -Name impact-6000-good7-then-reject `
+  -Mode sequence `
+  -LineEnding CR
+```
+
+Current HP profiles:
+
+- `profiles\impact-6000-good7-then-reject.json`: seven accepted result rows
+  followed by the checksum-valid row that IMPACT rejected with `?`.
+- `profiles\impact-6000-rejectfirst-current.json`: the current baseline
+  reject row as the first emulator result.
+- Both profiles include a trace-derived protocol prelude before the result
+  rules: `sc`, `sw`, `st`, `rs`, and the first `ns/pa/m1/cl/dc/m2/we`
+  preparation burst. This is required because IMPACT must pass ICS
+  configuration/status before it ever asks for `#rd`.
+- Profiles also include an initial `0x7F` sync rule that responds with `#`.
+  `Start-ArlEmulator.ps1` handles that standalone sync byte immediately, because
+  IMPACT otherwise repeats `0x7F` every 10 seconds and never sends `sc`. If an
+  old emulator is still listening on port `3460`, the launcher stops it before
+  starting the next emulated run.
+- The emulator also processes buffered input immediately on command terminator
+  `CR` (`0x0D`), because IMPACT can wait on the next response without leaving
+  enough idle time for a timer-only transaction splitter.
+
+Operator emulator shortcuts:
+
+- `90 EMU GOOD-THEN-REJECT`: starts the localhost emulator automatically and
+  runs IMPACT through DOSBox-X `nullmodem`.
+- `91 EMU REJECT-FIRST`: same transport, but returns the rejected row first.
+
+Both shortcuts are safe for hardware: they never open `COM5`; generated configs
+must show `serial1 = nullmodem server:127.0.0.1 port:3460 ...`.
+
+Use these tests to distinguish row content from accumulated IMPACT state:
+
+- If `91 EMU REJECT-FIRST` is rejected immediately, suspect row content,
+  format, checksum interpretation, range checks, or alloy/curve-specific
+  acceptance logic.
+- If `91 EMU REJECT-FIRST` is accepted but `90 EMU GOOD-THEN-REJECT` fails
+  later, suspect accumulated IMPACT session state, memory/layout, or result
+  counter state.
+- If both emulator profiles behave differently from the real ARL trace, suspect
+  unmodeled status/control-line/timing context before `#rd`.
 
 ## TICS Diagnosis
 
