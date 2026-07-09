@@ -308,6 +308,22 @@ Interpretation:
 - If all variants are rejected, IMPACT likely rejects one of the numeric values,
   field widths, signs/spaces, or accumulated state rather than checksum alone.
 
+First live result:
+
+- Run folder: `C:\ARL\diagnostics\impact-emulator-20260709-081355`.
+- The original checksum `100` control was rejected, as expected.
+- Several value-equivalent checksum `100` variants were accepted with `#em`,
+  including variants using explicit `+`, leading zeros, and extra precision.
+- IMPACT later showed `Impact+ Error: Ratioed Intensities` on
+  `format-equiv-101-to-000-leading-space-leading-zero-plus-precision`.
+- The offending row began with `# 0042.97,...` and also included a field with a
+  leading space before `+048.231`. This suggests that leading whitespace inside
+  a numeric result field is unsafe even when the numeric value and checksum are
+  valid.
+- New safer profile: `98 EMU FORMAT SAFE`, backed by
+  `impact-format-equivalence-safe-sweep.json`, keeps only format-equivalent rows
+  that do not begin any numeric field with whitespace.
+
 ### `97 EMU CHECKSUM GRAMMAR`
 
 Profile: `impact-checksum-grammar-sweep.json`.
