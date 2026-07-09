@@ -38,6 +38,24 @@
       "pattern_ascii": "#em",
       "response_ascii": "",
       "note": "No response is needed; only record whether IMPACT sends #em."
+    },
+    {
+      "label": "impact-generic-setup-st-ack",
+      "phase": "init-status",
+      "match": "prefix_ascii",
+      "pattern_ascii": "st ",
+      "response_ascii": "#0 080\r",
+      "delay_ms": 25,
+      "note": "Fallback for trace-derived emulator profiles: IMPACT can resend unprefixed st setup rows after storing/canceling a sample. The real ARL acknowledges these rows with #0 080."
+    },
+    {
+      "label": "impact-generic-setup-hash-st-ack",
+      "phase": "init-status",
+      "match": "prefix_ascii",
+      "pattern_ascii": "#st ",
+      "response_ascii": "#0 080\r",
+      "delay_ms": 25,
+      "note": "Fallback for trace-derived emulator profiles: preserve exact replay when available, but acknowledge unseen #st setup rows instead of hanging."
     }
   ]
 }

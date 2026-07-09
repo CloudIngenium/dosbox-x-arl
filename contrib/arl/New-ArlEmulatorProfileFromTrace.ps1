@@ -384,6 +384,26 @@ $responses.Add([pscustomobject][ordered]@{
     note = "Observed IMPACT transition after accepted rows."
 })
 
+$responses.Add([pscustomobject][ordered]@{
+    label = "impact-generic-setup-st-ack"
+    phase = "init-status"
+    match = "prefix_ascii"
+    pattern_ascii = "st "
+    response_ascii = "#0 080`r"
+    delay_ms = $DefaultResponseDelayMs
+    note = "Fallback for trace-derived emulator profiles: IMPACT can resend unprefixed st setup rows after storing/canceling a sample. The real ARL acknowledges these rows with #0 080."
+})
+
+$responses.Add([pscustomobject][ordered]@{
+    label = "impact-generic-setup-hash-st-ack"
+    phase = "init-status"
+    match = "prefix_ascii"
+    pattern_ascii = "#st "
+    response_ascii = "#0 080`r"
+    delay_ms = $DefaultResponseDelayMs
+    note = "Fallback for trace-derived emulator profiles: preserve exact replay when available, but acknowledge unseen #st setup rows instead of hanging."
+})
+
 $acceptedCount = @($rows | Where-Object { ([string]$_.outcome).StartsWith("accepted") }).Count
 $rejectedCount = @($rows | Where-Object { ([string]$_.outcome).StartsWith("rejected") }).Count
 $sourceCore = Get-PropValue $metadata "core"
