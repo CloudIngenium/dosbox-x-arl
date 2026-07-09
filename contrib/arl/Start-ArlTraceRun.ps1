@@ -324,8 +324,9 @@ if ($usesEmulator) {
 }
 
 $emulatorScriptPath = Join-ArlPath $PSScriptRoot "Start-ArlEmulator.ps1"
+$emulatorControlPath = Join-ArlPath $runDir "emulator-control.json"
 $powerShellExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
-$emulatorCommand = "$powerShellExe -NoProfile -ExecutionPolicy Bypass -File `"$emulatorScriptPath`" -Mode $EmulatorMode -ProfilePath `"$EmulatorProfilePath`" -ListenAddress $EmulatorHost -Port $EmulatorPort -Session $Session -LogPath `"$emulatorTracePath`" -MaxConnections 1"
+$emulatorCommand = "$powerShellExe -NoProfile -ExecutionPolicy Bypass -File `"$emulatorScriptPath`" -Mode $EmulatorMode -ProfilePath `"$EmulatorProfilePath`" -ListenAddress $EmulatorHost -Port $EmulatorPort -Session $Session -LogPath `"$emulatorTracePath`" -ControlPath `"$emulatorControlPath`" -MaxConnections 1"
 $mouseCommand = if ($LoadMouse) { "DOS\MOUSE.COM" } else { "rem DOS\\MOUSE.COM disabled for memory-layout test" }
 
 $conf = @"
@@ -401,6 +402,7 @@ $metadata = [pscustomobject]@{
     scaler = $Scaler
     trace = if ($usesEmulator) { $null } else { $tracePath }
     emulator_trace = if ($usesEmulator) { $emulatorTracePath } else { $null }
+    emulator_control = if ($usesEmulator) { $emulatorControlPath } else { $null }
     log = $logPath
     interfac_dat = $interfacPath
     com_port = $ComPort
@@ -454,6 +456,7 @@ Write-Host "Run directory: $runDir"
 Write-Host "Config: $confPath"
 if ($usesEmulator) {
     Write-Host "Emulator trace: $emulatorTracePath"
+    Write-Host "Emulator control: $emulatorControlPath"
     if ($StartEmulator) {
         Write-Host "Emulator will be started automatically."
     } else {
@@ -500,6 +503,21 @@ if ($usesEmulator -and $StartEmulator) {
         throw "ARL emulator profile not found: $EmulatorProfilePath"
     }
     Stop-StaleArlEmulatorProcesses -Port $EmulatorPort
+    $controlTemplate = [ordered]@{
+        enabled = $false
+        note = "Hot control file. Set enabled=true and add rules to override emulator responses without restarting IMPACT."
+        examples = @(
+            [ordered]@{
+                label = "override-next-result-read"
+                match = "exact_ascii"
+                pattern_ascii = "#rd 246`r"
+                response_ascii = "0.500,1.715,1.345,5.0958,5.64,0.239,0.995,0.382,0.2481,6.057,0.079,0.560,75.49,1.6636 000`r"
+                delay_ms = 0
+            }
+        )
+        rules = @()
+    }
+    $controlTemplate | ConvertTo-Json -Depth 8 | Set-Content -Path $emulatorControlPath -Encoding UTF8
     $emulatorArgs = @(
         "-NoProfile",
         "-ExecutionPolicy",
@@ -518,6 +536,8 @@ if ($usesEmulator -and $StartEmulator) {
         $Session,
         "-LogPath",
         $emulatorTracePath,
+        "-ControlPath",
+        $emulatorControlPath,
         "-MaxConnections",
         "1"
     )

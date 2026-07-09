@@ -1661,3 +1661,49 @@ Next emulator interpretation:
   - `LPTCAP.PRN` is the rich audit/print artifact with intermediate intensity
     stages and final concentration, but page parsing must infer boundaries from
     report headings/spacing rather than form-feed bytes.
+
+2026-07-09 live emulator progress and hot-control support:
+
+- Current emulator run observed after the safe-loop prep fix:
+  `C:\ARL\diagnostics\impact-emulator-20260709-094232`.
+- Live inspection used shared-read file access because Windows locks the active
+  `emulator.ndjson` while the emulator writes it.
+- State at inspection:
+  - `emulator.ndjson` had `7340` events and no `no_match` or
+    `transaction_error` events;
+  - `fast_response_match` count was `132`, proving the recurring ACK fast path
+    was active;
+  - latest result read completed and IMPACT answered `#em 242\r`;
+  - `0.RES` and `INTERFAC.DAT` were updated at `09:48`;
+  - `LPTCAP.PRN` grew to `56048` bytes with `8` `Final Concentration`
+    markers, `22` `100% normalization` markers, and `22`
+    `Absolute Intensities` markers.
+- Added `Inspect-ArlCurrentRun.ps1` to inspect live diagnostics without failing
+  on active file locks.
+- Added emulator hot-control support:
+  - `Start-ArlEmulator.ps1` accepts `-ControlPath`;
+  - `Start-ArlTraceRun.ps1` creates `emulator-control.json` in each emulator
+    run directory and passes it to the emulator;
+  - the emulator reloads the control file when it changes and can override a
+    matching transaction before the normal profile/fast path;
+  - matches are logged as `control_response_match`.
+- Initial control file shape:
+  ```json
+  {
+    "enabled": true,
+    "rules": [
+      {
+        "label": "override-next-result-read",
+        "match": "exact_ascii",
+        "pattern_ascii": "#rd 246\r",
+        "response_ascii": "0.500,1.715,1.345,5.0958,5.64,0.239,0.995,0.382,0.2481,6.057,0.079,0.560,75.49,1.6636 000\r",
+        "delay_ms": 0
+      }
+    ]
+  }
+  ```
+- Safety note:
+  - this is emulator-only and applies to nullmodem TCP sessions;
+  - it does not touch `COM5` or the real ARL;
+  - it is intended for checksum/format/timing probes while preserving a live
+    IMPACT state.

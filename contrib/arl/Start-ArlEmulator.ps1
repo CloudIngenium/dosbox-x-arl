@@ -7,6 +7,7 @@ param(
     [int]$Port = 3460,
     [string]$Session = "impact-emulator",
     [string]$LogPath = "",
+    [string]$ControlPath = "",
     [int]$MaxConnections = 0,
     [int]$ExitAfterIdleMs = 0,
     [switch]$SelfTest
@@ -111,6 +112,64 @@ function Write-ByteEvent([string]$Direction, [byte]$Byte, $Rule = $null) {
         $fields["phase"] = Get-PropValue $Rule "phase" "unknown"
     }
     Write-EmulatorEvent $fields
+}
+
+function Read-ControlProfile {
+    if ([string]::IsNullOrWhiteSpace($ControlPath)) { return $null }
+    if (-not (Test-Path -Path $ControlPath -PathType Leaf)) { return $null }
+
+    $item = Get-Item -Path $ControlPath
+    $lastWriteUtc = $item.LastWriteTimeUtc
+    if ($null -ne $script:ControlProfile -and $script:ControlLastWriteUtc -eq $lastWriteUtc) {
+        return $script:ControlProfile
+    }
+
+    try {
+        $control = Get-Content -Path $ControlPath -Raw | ConvertFrom-Json
+        $script:ControlProfile = $control
+        $script:ControlLastWriteUtc = $lastWriteUtc
+        Write-EmulatorEvent @{
+            event = "control_loaded"
+            control_path = $ControlPath
+            last_write_utc = $lastWriteUtc.ToString("o")
+            enabled = [bool](Get-PropValue $control "enabled" $false)
+            note = Get-PropValue $control "note" ""
+        }
+        return $control
+    } catch {
+        Write-EmulatorEvent @{
+            event = "control_load_error"
+            control_path = $ControlPath
+            error = $_.Exception.Message
+        }
+        return $null
+    }
+}
+
+function Get-ControlResponseRule([byte[]]$InputBytes, [string]$InputText, [string]$InputHex, [string]$InputAscii) {
+    $control = Read-ControlProfile
+    if ($null -eq $control) { return $null }
+    if (-not [bool](Get-PropValue $control "enabled" $false)) { return $null }
+
+    $rules = @(Get-PropValue $control "rules" @())
+    foreach ($rule in $rules) {
+        if ((Test-RuleMatch $rule $InputHex $InputText) -or (Test-RuleMatch $rule $InputHex $InputAscii)) {
+            $label = Get-PropValue $rule "label" "control-response"
+            $phase = Get-PropValue $rule "phase" "control"
+            $responseHex = Get-PropValue $rule "response_hex"
+            $responseAscii = Get-PropValue $rule "response_ascii"
+            $delayMs = [int](Get-PropValue $rule "delay_ms" 0)
+            return [pscustomobject]@{
+                label = "control:$label"
+                phase = $phase
+                response_hex = $responseHex
+                response_ascii = $responseAscii
+                delay_ms = $delayMs
+            }
+        }
+    }
+
+    return $null
 }
 
 function Get-ResponseBytes($Rule, [string]$CurrentMode) {
@@ -282,14 +341,24 @@ function Invoke-Transaction([System.Net.Sockets.NetworkStream]$Stream, [byte[]]$
     }
 
     try {
-        $rule = Get-FastResponseRule $inputText
+        $rule = Get-ControlResponseRule $InputBytes $inputText (Format-HexCompact $InputBytes) $inputAscii
         if ($null -ne $rule) {
+            $matchedFromControl = $true
+        }
+
+        if ($null -eq $rule) {
+            $rule = Get-FastResponseRule $inputText
+            $matchedFromControl = $false
+        }
+        if ($null -ne $rule) {
+            $matchEvent = if ($matchedFromControl) { "control_response_match" } else { "fast_response_match" }
             Write-EmulatorEvent @{
-                event = "fast_response_match"
+                event = $matchEvent
                 rule = Get-PropValue $rule "label" "fast-response"
                 phase = Get-PropValue $rule "phase" "fast-response"
                 input_hex = $inputHex
                 input_ascii = $inputAscii
+                control_path = if ($matchedFromControl) { $ControlPath } else { $null }
             }
         } else {
             $rule = Find-MatchingRule $InputBytes
