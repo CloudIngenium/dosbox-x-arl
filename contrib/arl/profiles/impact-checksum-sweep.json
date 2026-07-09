@@ -34,7 +34,7 @@
     "Use with serial1=nullmodem, never directserial.",
     "Clamped suspected fields from rejected row: 2=13.354, 8=62.237, 12=10.276, 15=62.237.",
     "Changed field 6 from 65.430 to 65.420 to move checksum from 100 to 099.",
-    "Checksum sweep profile: each #rd sends the next test case; ? receives a good checksum099 recovery row."
+    "After ?, recovery rows intentionally omit the leading # because real ARL reject-loop repeats the row body without #."
   ],
   "responses": [
     {
@@ -980,12 +980,12 @@
       "phase": "reject-recovery",
       "match": "exact_ascii",
       "pattern_ascii": "?",
-      "response_ascii": "#106.251,13.354,2.615,0.690,3.180,65.420,1.528,62.237,1.454,87.305,11.880,10.276,19.361,6.779,62.237 099\r",
+      "response_ascii": "106.251,13.354,2.615,0.690,3.180,65.420,1.528,62.237,1.454,87.305,11.880,10.276,19.361,6.779,62.237 099\r",
       "checksum": 99,
       "checksum_text": "099",
       "computed_checksum": 99,
       "checksum_valid": true,
-      "note": "If IMPACT rejects a sweep case with ?, send a known accepted row so it can #em and continue to the next case."
+      "note": "If IMPACT rejects a sweep case with ?, repeat a known accepted row without the leading #, matching the real ARL reject-loop behavior."
     }
   ],
   "checksum_sweep_cases": [
