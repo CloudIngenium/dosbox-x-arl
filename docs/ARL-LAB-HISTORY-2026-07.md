@@ -1288,14 +1288,21 @@ Current read:
 - Updated `New-ArlEmulatorProfileFromTrace.ps1 -IncludeProtocolPrelude` to
   replay trace-derived pre-`#rd` responses from `protocol-candidates.json`.
 - Regenerated profiles on HP:
-  - `impact-6000-good7-then-reject.json`: 14 rules, including 4
-    `init-status` rules, 8 result rows, 1 reject-loop rule, and 1 `#em` rule.
-  - `impact-6000-rejectfirst-current.json`: 7 rules, including 4
-    `init-status` rules, 1 rejected result row, 1 reject-loop rule, and 1
-    `#em` rule.
+  - `impact-6000-good7-then-reject.json`: 15 rules, including one initial
+    `0x7F` sync ignore rule, 4 `init-status` rules, 8 result rows, 1
+    reject-loop rule, and 1 `#em` rule.
+  - `impact-6000-rejectfirst-current.json`: 8 rules, including one initial
+    `0x7F` sync ignore rule, 4 `init-status` rules, 1 rejected result row, 1
+    reject-loop rule, and 1 `#em` rule.
 - The prelude currently replays `sc`, `sw/st/ms`, `rs`, and the first
   `ns/pa/m1/cl/dc/m2/we` preparation burst. This should let IMPACT pass the
   configuration/status screens before emulator result tests.
+- The first prelude attempt used generic `match:any` sequence rules and a stale
+  emulator process was still listening on port `3460`. That caused new launches
+  to create only `trace_open` entries without `listen/connect`. The launcher now
+  stops stale `Start-ArlEmulator.ps1` PowerShell processes before starting a new
+  emulator, and prelude rules now match concrete command patterns (`sc`, `#sw`,
+  `#rs`, `ns`) instead of arbitrary bytes.
 
 2026-07-09 AUTOEXEC/CONFIG audit:
 

@@ -54,6 +54,20 @@ function Normalize-ResultLine([string]$Line) {
     return $normalized
 }
 
+function Get-PreludePattern([string]$Text) {
+    if ([string]::IsNullOrWhiteSpace($Text)) { return "" }
+    $clean = $Text.Replace("\r", "`r").Replace("\n", "`n")
+    $plain = $Text -replace '\\r', "`r" -replace '\\n', "`n"
+    if ($plain -match "sc\s+") { return "sc " }
+    if ($plain -match "#sw\s+") { return "#sw " }
+    if ($plain -match "#st\s+") { return "#st " }
+    if ($plain -match "#rs\s+") { return "#rs " }
+    if ($plain -match "ns\s+") { return "ns " }
+    if ($plain -match "pa\s+") { return "pa " }
+    if ($plain -match "#ms\s+") { return "#ms " }
+    return $clean
+}
+
 function Convert-ToNullableInt($Value) {
     if ($null -eq $Value -or [string]::IsNullOrWhiteSpace([string]$Value)) { return $null }
     return [int]$Value
@@ -169,21 +183,31 @@ if ($IncludeProtocolPrelude) {
             }
     )
 
+    $responses.Add([pscustomobject][ordered]@{
+        label = "impact-sync-ignore-7f"
+        phase = "init-sync"
+        match = "exact_hex"
+        pattern_hex = "7F"
+        response_ascii = ""
+        note = "IMPACT may send an initial 0x7F sync byte before ICS commands; the real ARL did not answer it as a standalone transaction."
+    })
+
     for ($p = 0; $p -lt $preludeCandidates.Count; $p++) {
         $candidate = $preludeCandidates[$p]
         $txPreview = [string]$candidate.tx_ascii
         if ($txPreview.Length -gt 80) {
             $txPreview = $txPreview.Substring(0, 80) + "..."
         }
+        $pattern = Get-PreludePattern ([string]$candidate.tx_ascii)
+        if ([string]::IsNullOrWhiteSpace($pattern)) {
+            continue
+        }
         $responses.Add([pscustomobject][ordered]@{
             label = "impact-prelude-$($p + 1)-candidate-$($candidate.index)"
             phase = "init-status"
-            match = "any"
+            match = "ascii_contains"
+            pattern_ascii = $pattern
             response_ascii = [string]$candidate.rx_ascii
-            repeat_policy = "sequence"
-            sequence_key = "impact-prelude"
-            sequence_index = $p
-            sequence_next = $p + 1
             source_candidate_index = [int]$candidate.index
             source_tx_preview = $txPreview
             source_rx_count = [int]$candidate.rx_count

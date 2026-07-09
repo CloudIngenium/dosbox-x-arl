@@ -89,6 +89,35 @@ function ConvertTo-ArlDosOption([object]$Value, [string]$Name, [string[]]$Allowe
     return $text
 }
 
+function Stop-StaleArlEmulatorProcesses([int]$Port) {
+    $stalePids = New-Object System.Collections.Generic.HashSet[int]
+
+    try {
+        $connections = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+        foreach ($connection in $connections) {
+            if ($connection.OwningProcess -gt 0) {
+                [void]$stalePids.Add([int]$connection.OwningProcess)
+            }
+        }
+    } catch {
+        # Older Windows builds may not expose Get-NetTCPConnection in this context.
+    }
+
+    $processes = @(Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe' OR Name = 'pwsh.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { ([string]$_.CommandLine) -match "Start-ArlEmulator\.ps1" })
+
+    foreach ($process in $processes) {
+        if ($stalePids.Count -eq 0 -or $stalePids.Contains([int]$process.ProcessId)) {
+            Write-Host "Stopping stale ARL emulator PID $($process.ProcessId)"
+            try {
+                Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
+            } catch {
+                Write-Warning "Could not stop stale ARL emulator PID $($process.ProcessId): $($_.Exception.Message)"
+            }
+        }
+    }
+}
+
 $xmsText = ConvertTo-ArlDosOption $Xms "Xms" @("true", "false")
 $emsText = ConvertTo-ArlDosOption $Ems "Ems" @("true", "false", "emsboard", "emm386")
 $umbText = ConvertTo-ArlDosOption $Umb "Umb" @("true", "false")
@@ -330,6 +359,7 @@ if ($usesEmulator -and $StartEmulator) {
     if (-not (Test-Path -Path $EmulatorProfilePath -PathType Leaf)) {
         throw "ARL emulator profile not found: $EmulatorProfilePath"
     }
+    Stop-StaleArlEmulatorProcesses -Port $EmulatorPort
     $emulatorArgs = @(
         "-NoProfile",
         "-ExecutionPolicy",

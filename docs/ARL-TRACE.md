@@ -506,6 +506,9 @@ Current HP profiles:
   rules: `sc`, `sw`, `st`, `rs`, and the first `ns/pa/m1/cl/dc/m2/we`
   preparation burst. This is required because IMPACT must pass ICS
   configuration/status before it ever asks for `#rd`.
+- Profiles also include an initial `0x7F` sync ignore rule. If an old emulator
+  is still listening on port `3460`, the launcher stops it before starting the
+  next emulated run.
 
 Operator emulator shortcuts:
 
