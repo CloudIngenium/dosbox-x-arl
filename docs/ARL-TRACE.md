@@ -187,11 +187,21 @@ serial1 = directserial realport:COM5 rxdelay:1000 arltracelevel:basic arltracese
   size limit. `Start-ArlTraceRun.ps1` uses `64` MB by default so a stuck polling
   loop preserves evidence without filling the disk. Use `0` only for short,
   supervised captures where an unlimited trace is intentional.
+- `arlresultobserve:1` arms only after IMPACT transmits `#rd`, reconstructs the
+  returned row through `CR`, validates its 8-bit additive checksum, classifies
+  it as `low_000_099` or `high_100_255`, and records IMPACT's later `#em` or
+  `?`. It is observe-only and never changes RX bytes.
 - `arlforcects:1`, `arlforcedsr:1`, and `arlforcedcd:1` force the
   guest-visible modem input lines high. Use only for compatibility tests after
   installing a build that contains these options.
 - `arlholdrts:1` and `arlholddtr:1` keep the host RTS/DTR output lines high
   toward the ARL/ICS while tracing the effective line state.
+
+The physical five-burn reference captured on 2026-07-10 is stored in
+`contrib/arl/fixtures/accepted-five-burns-20260710.json`. IMPACT accepted
+checksums `099`, `045`, `045`, `054`, and `024` with zero UART errors. This
+supports low-checksum acceptance but does not by itself prove that every
+checksum above `099` is rejected.
 
 Trace v2 includes:
 
