@@ -32,6 +32,13 @@ $artifacts = New-Object System.Collections.Generic.List[object]
 if (Copy-RunArtifact (Join-Path $ImplusPath "INTERFAC.DAT") "INTERFAC.final.DAT") {
     $artifacts.Add([ordered]@{ path = "INTERFAC.final.DAT"; name = "INTERFAC.final.DAT"; role = "interfac" })
 }
+
+$tracePath = Join-Path $RunDirectory $TraceFile
+$correctionCount = if (Test-Path -LiteralPath $tracePath -PathType Leaf) {
+    @(Select-String -LiteralPath $tracePath -SimpleMatch '"event":"result_correction"' -ErrorAction Stop).Count
+} else {
+    0
+}
 if (Copy-RunArtifact (Join-Path $ImplusPath "0.RES") "0.final.RES") {
     $artifacts.Add([ordered]@{ path = "0.final.RES"; name = "0.final.RES"; role = "legacy_result" })
 }
@@ -54,7 +61,8 @@ $marker = [ordered]@{
     artifacts = @($artifacts.ToArray())
     metadata = [ordered]@{
         transport = "directserial"
-        mutation = "false"
+        mutation = if ($correctionCount -gt 0) { "true" } else { "false" }
+        correction_count = $correctionCount.ToString([Globalization.CultureInfo]::InvariantCulture)
         finalizer = "Finalize-ArlDirectSerialRun.ps1"
     }
 }
