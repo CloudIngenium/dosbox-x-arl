@@ -191,6 +191,12 @@ serial1 = directserial realport:COM5 rxdelay:1000 arltracelevel:basic arltracese
   returned row through `CR`, validates its 8-bit additive checksum, classifies
   it as `low_000_099` or `high_100_255`, and records IMPACT's later `#em` or
   `?`. It is observe-only and never changes RX bytes.
+- `arlresultretrylow:1` implies observation and enables a reactive physical
+  retry. The first result is always delivered unchanged. Only after IMPACT
+  transmits `?` is the repeated row buffered and respelled with decimal-safe
+  ASCII formatting targeting confirmed checksums `099`, `089`, `055`, `023`,
+  then `000`. Every original/presented pair is traced with
+  `decimal_equal:true`; initialization, status and command frames are untouched.
 - `arlforcects:1`, `arlforcedsr:1`, and `arlforcedcd:1` force the
   guest-visible modem input lines high. Use only for compatibility tests after
   installing a build that contains these options.
@@ -717,12 +723,14 @@ row.
 
 ### Physical return launchers
 
-The operator desktop is intentionally reduced to two physical paths with the
+The operator desktop exposes three physical paths with the
 same timing and display settings:
 
 - `00 DIRECTSERIAL BYPASS`: known recovery path with no result observer.
 - `01 OBSERVE ONLY`: adds `arlresultobserve:1`; every observer event records
   `mutated:false` and the serial bytes are unchanged.
+- `02 REACTIVE SAFE`: adds `arlresultretrylow:1`; it passes the first row
+  unchanged and intervenes only after IMPACT rejects it with `?`.
 
 Both use `cycles=fixed 12000`, `rxdelay:3000`, basic bounded trace, and LPT
 capture. Do not install or run `01` until the ARL is explicitly returned from
