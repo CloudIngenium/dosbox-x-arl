@@ -47,6 +47,7 @@ param(
     [switch]$ArlForceDcd,
     [switch]$ArlHoldRts,
     [switch]$ArlHoldDtr,
+    [switch]$ArlResultObserve,
     [ValidateSet("basic", "uartdata", "uart", "full")]
     [string]$TraceLevel = "basic",
     [int]$HangMs = 15000,
@@ -324,6 +325,7 @@ if ($usesEmulator) {
     if ($ArlForceDcd) { $lineOptions.Add("arlforcedcd:1") }
     if ($ArlHoldRts) { $lineOptions.Add("arlholdrts:1") }
     if ($ArlHoldDtr) { $lineOptions.Add("arlholddtr:1") }
+    if ($ArlResultObserve) { $lineOptions.Add("arlresultobserve:1") }
     $lineOptionsText = if ($lineOptions.Count -gt 0) { " " + ($lineOptions -join " ") } else { "" }
     $serialLine = "serial1 = directserial realport:$ComPort rxdelay:$RxDelay arltracelevel:$TraceLevel arltracesession:$Session arltracehangms:$HangMs$traceLimitOption$lineOptionsText arltrace:$tracePath"
     $serialComment = "# Direct ARL session: opens the real Windows serial port."
@@ -447,6 +449,7 @@ $metadata = [pscustomobject]@{
     arl_force_dcd = [bool]$ArlForceDcd
     arl_hold_rts = [bool]$ArlHoldRts
     arl_hold_dtr = [bool]$ArlHoldDtr
+    arl_result_observe = [bool]$ArlResultObserve
     trace_level = if ($usesEmulator) { $null } else { $TraceLevel }
     hang_ms = $HangMs
     trace_max_mb = if ($usesEmulator) { $null } else { $TraceMaxMb }

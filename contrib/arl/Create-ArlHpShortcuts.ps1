@@ -11,83 +11,13 @@ $ErrorActionPreference = "Stop"
 
 $shortcuts = @(
     @{
-        Name = "00 BASELINE - 6000 486"
-        Target = "Launch-ArlImpactCycles6000Trace.cmd"
+        Name = "00 DIRECTSERIAL BYPASS"
+        Target = "Launch-ArlImpactDirectSerialBypass.cmd"
         BuildRequired = $false
     },
     @{
-        Name = "01 NOAUTOPRINT - 6000 SIMPLE386"
-        Target = "Launch-ArlImpactCycles6000Simple386NoAutoPrintTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "02 NO MOUSE.COM - 6000 SIMPLE386"
-        Target = "Launch-ArlImpactCycles6000Simple386NoMouseTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "03 NOUMB - 6000 SIMPLE386"
-        Target = "Launch-ArlImpactCycles6000Simple386NoUmbTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "04 EMSBOARD - 6000 SIMPLE386"
-        Target = "Launch-ArlImpactCycles6000Simple386EmsBoardTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "05 EMM386 - 6000 SIMPLE386"
-        Target = "Launch-ArlImpactCycles6000Simple386Emm386Trace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "06 ZEROEMS - 6000 SIMPLE386"
-        Target = "Launch-ArlImpactCycles6000Simple386ZeroEmsTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "07 ZEROXMS - 6000 SIMPLE386"
-        Target = "Launch-ArlImpactCycles6000Simple386ZeroXmsTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "08 MCBCOMPAT - 6000 SIMPLE386"
-        Target = "Launch-ArlImpactCycles6000Simple386McbCompatTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "09 NOSHARE - 6000 SIMPLE386"
-        Target = "Launch-ArlImpactCycles6000Simple386NoShareTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "10 UNMASKDISKIO - 6000 SIMPLE386"
-        Target = "Launch-ArlImpactCycles6000Simple386UnmaskTimerDiskIoTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "11 NOINT33 - 6000 SIMPLE386"
-        Target = "Launch-ArlImpactCycles6000Simple386NoInt33Trace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "20 INI ICSDELAY200 - 6000"
-        Target = "Launch-ArlImpactIniIcsDelay200Trace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "21 INI ICSDELAY300 - 6000"
-        Target = "Launch-ArlImpactIniIcsDelay300Trace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "22 INI BOOTSTATUS OFF - 6000"
-        Target = "Launch-ArlImpactIniBootStatusOffTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "23 INI TRACE OFF - 6000"
-        Target = "Launch-ArlImpactIniTraceOffTrace.cmd"
+        Name = "01 OBSERVE ONLY"
+        Target = "Launch-ArlImpactObserveOnlyTrace.cmd"
         BuildRequired = $false
     },
     @{
@@ -124,16 +54,6 @@ $shortcuts = @(
         Name = "89 PRINT HP TEXT SEND"
         Target = "Print-LatestArlLpt-HPSmartTank-Text-Send.cmd"
         BuildRequired = $false
-    },
-    @{
-        Name = "99 FORCELINES - 6000 SIMPLE386"
-        Target = "Launch-ArlImpactCycles6000Simple386ForceLinesTrace.cmd"
-        BuildRequired = $true
-    },
-    @{
-        Name = "99 HOLDRTS-DTR - 6000 SIMPLE386"
-        Target = "Launch-ArlImpactCycles6000Simple386HoldRtsDtrTrace.cmd"
-        BuildRequired = $true
     }
 )
 
