@@ -579,6 +579,29 @@ if ($usesEmulator -and $StartEmulator) {
 $process = Start-Process -FilePath $DosboxExe -ArgumentList @("-conf", $confPath) -PassThru
 Write-Host "Started DOSBox-X ARL PID $($process.Id)"
 
+$directSerialFinalizerProcess = $null
+if (-not $usesEmulator) {
+    $finalizerScriptPath = Join-ArlPath $PSScriptRoot "Finalize-ArlDirectSerialRun.ps1"
+    $finalizerLogPath = Join-ArlPath $runDir "directserial-finalizer.log"
+    $finalizerErrorPath = Join-ArlPath $runDir "directserial-finalizer.err.log"
+    if (-not (Test-Path -LiteralPath $finalizerScriptPath -PathType Leaf)) {
+        throw "Directserial finalizer script not found: $finalizerScriptPath"
+    }
+    $directSerialFinalizerProcess = Start-Process -FilePath $powerShellExe `
+        -ArgumentList @(
+            "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $finalizerScriptPath,
+            "-ParentPid", [string]$process.Id,
+            "-ParentStartTime", $process.StartTime.ToString("o"),
+            "-RunDirectory", $runDir,
+            "-ImplusPath", $ImplusPath
+        ) `
+        -RedirectStandardOutput $finalizerLogPath `
+        -RedirectStandardError $finalizerErrorPath `
+        -WindowStyle Hidden `
+        -PassThru
+    Write-Host "Started directserial bundle finalizer PID $($directSerialFinalizerProcess.Id)"
+}
+
 $iniRestoreProcess = $null
 if ($null -ne $impactIniOverride) {
     $restoreScriptPath = Join-ArlPath $runDir "restore-impact-ini-after-dosbox.ps1"
@@ -685,6 +708,9 @@ if ($Wait) {
     }
     if ($null -ne $iniRestoreProcess) {
         $iniRestoreProcess.WaitForExit(10000) | Out-Null
+    }
+    if ($null -ne $directSerialFinalizerProcess) {
+        $directSerialFinalizerProcess.WaitForExit(10000) | Out-Null
     }
     if (Test-Path -Path $interfacPath -PathType Leaf) {
         Copy-Item -Path $interfacPath -Destination (Join-ArlPath $runDir "INTERFAC.DAT.after") -Force

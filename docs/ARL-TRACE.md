@@ -690,6 +690,15 @@ git tag -a arltrace-vYYYY.MM.DD-N -m "ARL trace build YYYY.MM.DD-N"
 
 ## CI Artifact
 
+### Finalized directserial evidence
+
+Directserial launchers start `Finalize-ArlDirectSerialRun.ps1` in the
+background. It waits for the exact DOSBox process instance to exit, snapshots
+final legacy artifacts, and atomically writes `directserial-finalized.json`.
+Chispa Agent ignores a run until this marker exists, so an open trace is never
+ingested. The finalizer does not open the serial port and does not alter trace
+or result bytes.
+
 `.github/workflows/arl-trace-win64.yml` builds a Windows x64 SDL2 artifact. The
 artifact contains:
 
