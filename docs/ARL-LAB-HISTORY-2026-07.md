@@ -1835,3 +1835,21 @@ Simplified next emulator test:
    respondio #em`, the low-checksum override is accepted.
 6. Close DOSBox and repeat only with `80 EMU NORMAL LOOP` if a normal control
    comparison is needed.
+
+2026-07-11 USB printing and formatted proof mode:
+
+- The Epson LX-350 must be connected to the HP through USB only (`USB001`).
+  Simultaneous USB and LPT connections caused queued Windows jobs not to print;
+  disconnecting LPT allowed the Windows test page to print.
+- The Epson Windows V4 driver accepts RAW spool jobs without reliably emitting
+  paper. The verified operational path is `PrintMode Text`; the original
+  `LPTCAP.PRN` remains the immutable protocol artifact.
+- Added an opt-in `PrintMode Formatted` proof mode. It selects the latest
+  finalized print job, restructures `Final Concentration` into a five-column
+  element/value grid, and renders it with GDI, landscape orientation,
+  0.25-inch margins, Courier New, and an automatically selected 8-18 point font.
+  Unknown report layouts fall back to the original cleaned text.
+- Formatted mode is not the automatic production default until a physical page
+  is compared with the verified Text output. Operator helpers:
+  - `Print-LatestArlLpt-Epson-Formatted-DryRun.cmd` previews metadata only;
+  - `Print-LatestArlLpt-Epson-Formatted-Send.cmd` sends the latest capture.
