@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("impact", "tics", "status-only", "sample-analysis", "impact-emulator", "tics-emulator")]
+    [ValidateSet("impact", "tics", "status-only", "sample-analysis", "standardization", "normalization", "impact-emulator", "tics-emulator")]
     [string]$Session = "impact",
 
     [string]$DosboxExe = "C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe",
@@ -62,6 +62,9 @@ param(
     [int]$LptIdleMs = 2500,
     [int]$LptPollMs = 500,
     [switch]$NoLptFormFeed,
+    [string]$WorkflowKind = "",
+    [string]$WorkflowSnapshotBeforePath = "",
+    [string]$WorkflowSnapshotScriptPath = "",
     [bool]$CleanImpactTemp = $true,
     [string[]]$ImpactIniSet = @(),
     [switch]$Wait,
@@ -593,14 +596,22 @@ if (-not $usesEmulator) {
     if (-not (Test-Path -LiteralPath $finalizerScriptPath -PathType Leaf)) {
         throw "Directserial finalizer script not found: $finalizerScriptPath"
     }
+    $finalizerArgs = @(
+        "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $finalizerScriptPath,
+        "-ParentPid", [string]$process.Id,
+        "-ParentStartTime", $process.StartTime.ToString("o"),
+        "-RunDirectory", $runDir,
+        "-ImplusPath", $ImplusPath
+    )
+    if (-not [string]::IsNullOrWhiteSpace($WorkflowKind)) {
+        $finalizerArgs += @(
+            "-WorkflowKind", $WorkflowKind,
+            "-WorkflowSnapshotBeforePath", $WorkflowSnapshotBeforePath,
+            "-WorkflowSnapshotScriptPath", $WorkflowSnapshotScriptPath
+        )
+    }
     $directSerialFinalizerProcess = Start-Process -FilePath $powerShellExe `
-        -ArgumentList @(
-            "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $finalizerScriptPath,
-            "-ParentPid", [string]$process.Id,
-            "-ParentStartTime", $process.StartTime.ToString("o"),
-            "-RunDirectory", $runDir,
-            "-ImplusPath", $ImplusPath
-        ) `
+        -ArgumentList $finalizerArgs `
         -RedirectStandardOutput $finalizerLogPath `
         -RedirectStandardError $finalizerErrorPath `
         -WindowStyle Hidden `

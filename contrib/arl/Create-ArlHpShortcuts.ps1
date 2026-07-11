@@ -26,6 +26,16 @@ $shortcuts = @(
         BuildRequired = $false
     },
     @{
+        Name = "03 STANDARDIZATION PASSIVE"
+        Target = "Launch-ArlStandardizationPassiveTrace.cmd"
+        BuildRequired = $false
+    },
+    @{
+        Name = "04 NORMALIZATION PASSIVE"
+        Target = "Launch-ArlNormalizationPassiveTrace.cmd"
+        BuildRequired = $false
+    },
+    @{
         Name = "80 EMU NORMAL LOOP"
         Target = "Launch-ArlImpactEmulatorFormatSafeLoopTrace.cmd"
         BuildRequired = $false

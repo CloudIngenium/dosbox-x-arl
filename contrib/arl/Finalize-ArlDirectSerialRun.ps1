@@ -5,6 +5,9 @@ param(
     [Parameter(Mandatory = $true)][string]$ImplusPath,
     [string]$TraceFile = "serial.ndjson",
     [string]$DosBoxVersion = "dosbox-x-arl",
+    [string]$WorkflowKind = "",
+    [string]$WorkflowSnapshotBeforePath = "",
+    [string]$WorkflowSnapshotScriptPath = "",
     [int]$WaitTimeoutSeconds = 86400
 )
 
@@ -29,6 +32,45 @@ if (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue) {
 }
 
 $artifacts = New-Object System.Collections.Generic.List[object]
+$workflowChanges = @()
+if (-not [string]::IsNullOrWhiteSpace($WorkflowKind)) {
+    if (-not (Test-Path -LiteralPath $WorkflowSnapshotBeforePath -PathType Container)) {
+        throw "Workflow before-snapshot not found: $WorkflowSnapshotBeforePath"
+    }
+    if (-not (Test-Path -LiteralPath $WorkflowSnapshotScriptPath -PathType Leaf)) {
+        throw "Workflow snapshot script not found: $WorkflowSnapshotScriptPath"
+    }
+
+    $afterTemp = Join-Path $RunDirectory "workflow-after-staging"
+    & $WorkflowSnapshotScriptPath -ImplusPath $ImplusPath -Destination $afterTemp -Phase after | Out-Null
+    $beforeManifest = Get-Content -Raw -LiteralPath (Join-Path $WorkflowSnapshotBeforePath "snapshot-manifest.json") | ConvertFrom-Json
+    $afterManifest = Get-Content -Raw -LiteralPath (Join-Path $afterTemp "snapshot-manifest.json") | ConvertFrom-Json
+    $beforeByName = @{}; foreach ($item in @($beforeManifest)) { $beforeByName[$item.name] = $item }
+    $afterByName = @{}; foreach ($item in @($afterManifest)) { $afterByName[$item.name] = $item }
+    $names = @($beforeByName.Keys + $afterByName.Keys | Sort-Object -Unique)
+    $workflowChanges = @($names | ForEach-Object {
+        $name = $_; $old = $beforeByName[$name]; $new = $afterByName[$name]
+        $kind = if ($null -eq $old) { "created" } elseif ($null -eq $new) { "deleted" } elseif ($old.sha256 -ne $new.sha256) { "modified" } else { "unchanged" }
+        [ordered]@{ name = $name; change = $kind; before_sha256 = $old.sha256; after_sha256 = $new.sha256 }
+    })
+
+    foreach ($snapshot in @(
+        @{ Prefix = "workflow-before"; Path = $WorkflowSnapshotBeforePath },
+        @{ Prefix = "workflow-after"; Path = $afterTemp }
+    )) {
+        foreach ($file in Get-ChildItem -LiteralPath $snapshot.Path -File | Where-Object Name -ne "snapshot-manifest.json") {
+            $name = "$($snapshot.Prefix)-$($file.Name)"
+            Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $RunDirectory $name) -Force
+            $role = if ($file.Extension -in @(".CAL", ".REG")) { "calibration" } else { "other" }
+            $artifacts.Add([ordered]@{ path = $name; name = $name; role = $role })
+        }
+    }
+    $diffName = "workflow-file-diff.json"
+    [IO.File]::WriteAllText((Join-Path $RunDirectory $diffName), ($workflowChanges | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
+    $artifacts.Add([ordered]@{ path = $diffName; name = $diffName; role = "other" })
+    Remove-Item -LiteralPath $afterTemp -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Split-Path -Parent $WorkflowSnapshotBeforePath) -Recurse -Force -ErrorAction SilentlyContinue
+}
 if (Copy-RunArtifact (Join-Path $ImplusPath "INTERFAC.DAT") "INTERFAC.final.DAT") {
     $artifacts.Add([ordered]@{ path = "INTERFAC.final.DAT"; name = "INTERFAC.final.DAT"; role = "interfac" })
 }
@@ -52,6 +94,17 @@ foreach ($entry in @(
     }
 }
 
+$markerMetadata = [ordered]@{
+    transport = "directserial"
+    mutation = if ($correctionCount -gt 0) { "true" } else { "false" }
+    correction_count = $correctionCount.ToString([Globalization.CultureInfo]::InvariantCulture)
+    finalizer = "Finalize-ArlDirectSerialRun.ps1"
+}
+if (-not [string]::IsNullOrWhiteSpace($WorkflowKind)) {
+    $markerMetadata.workflow = $WorkflowKind
+    $markerMetadata.workflow_changed_file_count = @($workflowChanges | Where-Object change -ne "unchanged").Count.ToString([Globalization.CultureInfo]::InvariantCulture)
+}
+
 $marker = [ordered]@{
     runId = Split-Path -Leaf $RunDirectory
     traceFile = $TraceFile
@@ -59,12 +112,7 @@ $marker = [ordered]@{
     finalizedAt = [datetimeoffset]::UtcNow.ToString("o")
     dosBoxVersion = $DosBoxVersion
     artifacts = @($artifacts.ToArray())
-    metadata = [ordered]@{
-        transport = "directserial"
-        mutation = if ($correctionCount -gt 0) { "true" } else { "false" }
-        correction_count = $correctionCount.ToString([Globalization.CultureInfo]::InvariantCulture)
-        finalizer = "Finalize-ArlDirectSerialRun.ps1"
-    }
+    metadata = $markerMetadata
 }
 
 $markerPath = Join-Path $RunDirectory "directserial-finalized.json"
