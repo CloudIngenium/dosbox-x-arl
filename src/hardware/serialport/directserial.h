@@ -101,6 +101,12 @@ private:
 	bool arl_force_dcd = false;
 	bool arl_hold_rts = false;
 	bool arl_hold_dtr = false;
+	bool arl_result_observe = false;
+	bool arl_awaiting_result = false;
+	std::string arl_tx_frame;
+	std::string arl_rx_frame;
+	int arl_last_claimed_checksum = -1;
+	int arl_last_computed_checksum = -1;
 	bool trace_have_tx = false;
 	bool trace_have_rx = false;
 	uint8_t trace_last_tx = 0;
@@ -126,6 +132,10 @@ private:
 	void traceSnapshot(const char *event, const SerialTraceSnapshot &snapshot);
 	void traceHostState(const char *event);
 	void traceHangSnapshot();
+	void observeTxByte(uint8_t val);
+	void observeRxByte(uint8_t val);
+	void traceObservedResult(const std::string &frame);
+	void traceObservedDecision(const char *decision);
 	std::string traceRotatePath() const;
 	const char *traceLevelName() const;
 	const char *traceAscii(uint8_t val, char *buffer, size_t buffer_size);

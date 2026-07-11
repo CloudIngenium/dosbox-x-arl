@@ -569,6 +569,9 @@ CDirectSerial::CDirectSerial (Bitu id, CommandLine* cmd)
 	line_option = 0;
 	if (getBituSubstring("arlholddtr:", &line_option, cmd))
 		arl_hold_dtr = line_option != 0;
+	line_option = 0;
+	if (getBituSubstring("arlresultobserve:", &line_option, cmd))
+		arl_result_observe = line_option != 0;
 	getBituSubstring("arltracehangms:", &arltrace_hang_ms, cmd);
 	if (arltrace_hang_ms > 3600000) arltrace_hang_ms = 3600000;
 	Bitu arltrace_max_mb = 0;
@@ -817,6 +820,7 @@ bool CDirectSerial::doReceive() {
 		const uint8_t data = (uint8_t)(value&0xff);
 		const uint8_t error = (uint8_t)((value&0xff00)>>8);
 		traceByte("rx", data, error);
+		observeRxByte(data);
 		receiveByteEx(data,error);
 		return true;
 	}
@@ -874,6 +878,7 @@ void CDirectSerial::updateMSR () {
 
 void CDirectSerial::transmitByte (uint8_t val, bool first) {
 	traceByte("tx", val, 0);
+	observeTxByte(val);
 	if(!SERIAL_sendchar(comport, (char)val)) {
 		trace_tx_errors++;
 		trace_last_error = "tx_error";
@@ -882,6 +887,86 @@ void CDirectSerial::transmitByte (uint8_t val, bool first) {
 	}
 	if(first) setEvent(SERIAL_THR_EVENT, bytetime/8);
 	else setEvent(SERIAL_TX_EVENT, bytetime);
+}
+
+void CDirectSerial::observeTxByte(uint8_t val) {
+	if (!arl_result_observe) return;
+	if (arl_tx_frame.size() >= 1024) arl_tx_frame.clear();
+	arl_tx_frame.push_back((char)val);
+	if (val != '\r') return;
+
+	if (arl_tx_frame.compare(0, 4, "#rd ") == 0) {
+		arl_awaiting_result = true;
+		arl_rx_frame.clear();
+		arl_last_claimed_checksum = -1;
+		arl_last_computed_checksum = -1;
+		traceMessage("result_observe_armed", "IMPACT requested an analysis result");
+	} else if (arl_tx_frame.compare(0, 4, "#em ") == 0) {
+		traceObservedDecision("accepted");
+		arl_awaiting_result = false;
+	} else if (arl_tx_frame == "?\r") {
+		traceObservedDecision("rejected");
+		arl_awaiting_result = false;
+	}
+	arl_tx_frame.clear();
+}
+
+void CDirectSerial::observeRxByte(uint8_t val) {
+	if (!arl_result_observe || !arl_awaiting_result) return;
+	if (arl_rx_frame.size() >= 2048) {
+		traceMessage("result_observe_overflow", "result frame exceeded 2048 bytes");
+		arl_rx_frame.clear();
+		arl_awaiting_result = false;
+		return;
+	}
+	arl_rx_frame.push_back((char)val);
+	if (val != '\r') return;
+	traceObservedResult(arl_rx_frame);
+	arl_rx_frame.clear();
+}
+
+void CDirectSerial::traceObservedResult(const std::string &frame) {
+	if (!arltrace_fp) return;
+	const size_t end = frame.empty() ? 0 : frame.size() - 1;
+	const size_t separator = frame.rfind(' ', end);
+	int claimed = -1;
+	int computed = -1;
+	bool valid = false;
+	if (frame.size() >= 4 && frame[0] == '#' && separator != std::string::npos && separator + 1 < end) {
+		claimed = 0;
+		bool digits = true;
+		for (size_t i = separator + 1; i < end; ++i) {
+			if (frame[i] < '0' || frame[i] > '9') { digits = false; break; }
+			claimed = claimed * 10 + (frame[i] - '0');
+		}
+		if (digits) {
+			computed = 0;
+			for (size_t i = 1; i <= separator; ++i)
+				computed = (computed + (unsigned char)frame[i]) & 0xff;
+			valid = claimed == computed;
+		} else claimed = -1;
+	}
+	arl_last_claimed_checksum = claimed;
+	arl_last_computed_checksum = computed;
+	traceCommonFields("result_observed");
+	fputs(",\"frame\":", arltrace_fp);
+	traceJsonString(frame.c_str());
+	fprintf(arltrace_fp,
+	        ",\"claimed_checksum\":%d,\"computed_checksum\":%d,\"checksum_valid\":%s,\"checksum_class\":\"%s\",\"mutated\":false}\n",
+	        claimed, computed, valid ? "true" : "false",
+	        claimed >= 0 && claimed <= 99 ? "low_000_099" : "high_100_255");
+	traceFlush();
+}
+
+void CDirectSerial::traceObservedDecision(const char *decision) {
+	if (!arltrace_fp) return;
+	traceCommonFields("result_decision");
+	fputs(",\"decision\":", arltrace_fp);
+	traceJsonString(decision);
+	fprintf(arltrace_fp,
+	        ",\"claimed_checksum\":%d,\"computed_checksum\":%d}\n",
+	        arl_last_claimed_checksum, arl_last_computed_checksum);
+	traceFlush();
 }
 
 
