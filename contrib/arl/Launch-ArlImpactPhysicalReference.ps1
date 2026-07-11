@@ -44,6 +44,9 @@ if ($ReactiveRetryLow) { $arguments.ArlResultRetryLow = $true }
 if (-not $NoAutoPrintLpt) {
     $arguments.AutoPrintLpt = $true
     $arguments.PrinterName = "EPSON LX-350"
+    # The Epson V4 USB driver prints through the normal Windows text path.
+    # Raw jobs remain archived for evidence and manual replay.
+    $arguments.PrintMode = "Text"
 }
 if ($NoLaunch) { $arguments.NoLaunch = $true }
 

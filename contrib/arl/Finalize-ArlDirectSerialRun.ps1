@@ -69,6 +69,7 @@ $marker = [ordered]@{
 
 $markerPath = Join-Path $RunDirectory "directserial-finalized.json"
 $temporaryPath = "$markerPath.tmp-$([guid]::NewGuid().ToString('N'))"
-$marker | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $temporaryPath -Encoding UTF8
+$markerJson = $marker | ConvertTo-Json -Depth 8
+[IO.File]::WriteAllText($temporaryPath, $markerJson, [Text.UTF8Encoding]::new($false))
 Move-Item -LiteralPath $temporaryPath -Destination $markerPath -Force
 Write-Host "Finalized directserial evidence: $markerPath"
