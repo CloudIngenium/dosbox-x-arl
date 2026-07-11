@@ -122,6 +122,8 @@ jobs:
           pwsh -NoProfile -File contrib\arl\Start-ArlEmulator.ps1 `
             -ProfilePath contrib\arl\profiles\arl3460-baseline.json `
             -SelfTest
+          node contrib\arl\Validate-ArlChecksumCorpus.mjs
+          node contrib\arl\Run-ArlEmulatorOfflineMatrix.mjs 50
           pwsh -NoProfile -File contrib\arl\Start-ArlTraceRun.ps1 `
             -Session impact `
             -RunRoot "$PWD\arl-toolkit-run" `

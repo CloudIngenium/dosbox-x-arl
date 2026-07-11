@@ -699,6 +699,22 @@ Chispa Agent ignores a run until this marker exists, so an open trace is never
 ingested. The finalizer does not open the serial port and does not alter trace
 or result bytes.
 
+### Checksum decision corpus
+
+`contrib/arl/fixtures/checksum-decision-corpus.json` is the byte-exact decision
+corpus. Every replayable row has a real-trace provenance, 15 numeric fields, a
+recomputed additive checksum, and the observed IMPACT reply. Checksums mentioned
+in lab notes without a recovered row remain under `reported_only` and are
+explicitly forbidden from replay.
+
+`Validate-ArlChecksumCorpus.mjs` enforces those invariants. The Windows artifact
+workflow also runs `Run-ArlEmulatorOfflineMatrix.mjs 50`, which sends 50 result
+requests over localhost TCP, compares every returned byte, replays the recorded
+`#em`/`?` decisions, and verifies that the profile contains no `COM`,
+`directserial`, or `realport` reference. This is a transport/emulator integrity
+gate; a synthetic client does not prove how IMPACT itself will classify a new
+row.
+
 `.github/workflows/arl-trace-win64.yml` builds a Windows x64 SDL2 artifact. The
 artifact contains:
 
