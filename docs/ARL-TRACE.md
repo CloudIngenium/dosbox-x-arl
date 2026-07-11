@@ -715,6 +715,19 @@ requests over localhost TCP, compares every returned byte, replays the recorded
 gate; a synthetic client does not prove how IMPACT itself will classify a new
 row.
 
+### Physical return launchers
+
+The operator desktop is intentionally reduced to two physical paths with the
+same timing and display settings:
+
+- `00 DIRECTSERIAL BYPASS`: known recovery path with no result observer.
+- `01 OBSERVE ONLY`: adds `arlresultobserve:1`; every observer event records
+  `mutated:false` and the serial bytes are unchanged.
+
+Both use `cycles=fixed 12000`, `rxdelay:3000`, basic bounded trace, and LPT
+capture. Do not install or run `01` until the ARL is explicitly returned from
+the Dell to the HP and the physical preflight passes.
+
 `.github/workflows/arl-trace-win64.yml` builds a Windows x64 SDL2 artifact. The
 artifact contains:
 
