@@ -146,6 +146,7 @@ private:
 	void traceHangSnapshot();
 	void observeTxByte(uint8_t val);
 	void observeRxByte(uint8_t val);
+	void handleRejectedResult();
 	void traceObservedResult(const std::string &frame);
 	void traceObservedDecision(const char *decision);
 	bool buildEquivalentResult(const std::string &frame, std::string &presented,

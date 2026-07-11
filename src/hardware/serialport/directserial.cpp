@@ -945,6 +945,15 @@ void CDirectSerial::transmitByte (uint8_t val, bool first) {
 
 void CDirectSerial::observeTxByte(uint8_t val) {
 	if (!arl_result_observe) return;
+	// IMPACT 2.4-B1 sends a rejection as a lone '?' byte. Some protocol
+	// fixtures include a trailing CR, so accept both forms while a result is
+	// pending and clear the TX accumulator before the next command.
+	if (val == '?' && arl_awaiting_result && arl_tx_frame.empty()) {
+		traceObservedDecision("rejected");
+		handleRejectedResult();
+		arl_tx_frame.clear();
+		return;
+	}
 	if (arl_tx_frame.size() >= 1024) arl_tx_frame.clear();
 	arl_tx_frame.push_back((char)val);
 	if (val != '\r') return;
@@ -968,23 +977,28 @@ void CDirectSerial::observeTxByte(uint8_t val) {
 		arl_awaiting_result = false;
 	} else if (arl_tx_frame == "?\r") {
 		traceObservedDecision("rejected");
-		if (arl_result_retry_low && !arl_result_corrector.exhausted()) {
-			arl_awaiting_result = true;
-			arl_retry_correction_pending = true;
-			arl_retry_host_frame.clear();
-			arl_rx_frame.clear();
-			arl_current_result_mutated = false;
-			traceMessage("result_correction_armed", "IMPACT rejected result; waiting for repeated row");
-		} else {
-			arl_awaiting_result = false;
-			if (arl_result_retry_low && arl_result_corrector.exhausted()) {
-				arl_retry_blocked = true;
-				traceMessage("result_correction_exhausted",
-				             "all safe checksum targets were rejected; inbound retries are blocked");
-			}
-		}
+		handleRejectedResult();
 	}
 	arl_tx_frame.clear();
+}
+
+void CDirectSerial::handleRejectedResult() {
+	if (arl_result_retry_low && !arl_result_corrector.exhausted()) {
+		arl_awaiting_result = true;
+		arl_retry_correction_pending = true;
+		arl_retry_host_frame.clear();
+		arl_rx_frame.clear();
+		arl_current_result_mutated = false;
+		traceMessage("result_correction_armed", "IMPACT rejected result; waiting for repeated row");
+		return;
+	}
+
+	arl_awaiting_result = false;
+	if (arl_result_retry_low && arl_result_corrector.exhausted()) {
+		arl_retry_blocked = true;
+		traceMessage("result_correction_exhausted",
+		             "all safe checksum targets were rejected; inbound retries are blocked");
+	}
 }
 
 void CDirectSerial::observeRxByte(uint8_t val) {

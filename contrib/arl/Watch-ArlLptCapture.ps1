@@ -191,14 +191,14 @@ while ($true) {
             if ($Send) {
                 Write-Log "Sending $jobPath to $PrinterName"
                 try {
-                    $printArgs = @(
-                        "-CapturePath", $jobPath,
-                        "-PrinterName", $PrinterName,
-                        "-PrintMode", $PrintMode,
-                        "-Send"
-                    )
+                    $printArgs = @{
+                        CapturePath = $jobPath
+                        PrinterName = $PrinterName
+                        PrintMode = $PrintMode
+                        Send = $true
+                    }
                     if ($AppendFormFeed) {
-                        $printArgs += "-AppendFormFeed"
+                        $printArgs.AppendFormFeed = $true
                     }
                     & $PrintScriptPath @printArgs *>&1 |
                         Set-Content -Path $printLogPath -Encoding UTF8
