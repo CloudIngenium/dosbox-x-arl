@@ -26,10 +26,13 @@
 #if C_DIRECTSERIAL
 
 #include <cstdio>
+#include <deque>
 #include <string>
+#include <vector>
 
 #define DIRECTSERIAL_AVAILIBLE
 #include "serialport.h"
+#include "arl_result_corrector.h"
 
 #include "libserial.h"
 
@@ -102,11 +105,20 @@ private:
 	bool arl_hold_rts = false;
 	bool arl_hold_dtr = false;
 	bool arl_result_observe = false;
+	bool arl_result_retry_low = false;
 	bool arl_awaiting_result = false;
+	bool arl_retry_correction_pending = false;
+	bool arl_retry_blocked = false;
+	bool arl_current_result_mutated = false;
+	bool arl_last_result_mutated = false;
+	ArlResultCorrector arl_result_corrector;
 	std::string arl_tx_frame;
 	std::string arl_rx_frame;
+	std::string arl_retry_host_frame;
+	std::deque<uint8_t> arl_retry_guest_bytes;
 	int arl_last_claimed_checksum = -1;
 	int arl_last_computed_checksum = -1;
+	int arl_physical_result_checksum = -1;
 	bool trace_have_tx = false;
 	bool trace_have_rx = false;
 	uint8_t trace_last_tx = 0;
@@ -136,6 +148,13 @@ private:
 	void observeRxByte(uint8_t val);
 	void traceObservedResult(const std::string &frame);
 	void traceObservedDecision(const char *decision);
+	bool buildEquivalentResult(const std::string &frame, std::string &presented,
+	                           int &target_checksum);
+	void traceResultCorrection(const std::string &original,
+	                           const std::string &presented,
+	                           int original_checksum,
+	                           int presented_checksum,
+	                           const char *reason);
 	std::string traceRotatePath() const;
 	const char *traceLevelName() const;
 	const char *traceAscii(uint8_t val, char *buffer, size_t buffer_size);

@@ -572,6 +572,11 @@ CDirectSerial::CDirectSerial (Bitu id, CommandLine* cmd)
 	line_option = 0;
 	if (getBituSubstring("arlresultobserve:", &line_option, cmd))
 		arl_result_observe = line_option != 0;
+	line_option = 0;
+	if (getBituSubstring("arlresultretrylow:", &line_option, cmd)) {
+		arl_result_retry_low = line_option != 0;
+		if (arl_result_retry_low) arl_result_observe = true;
+	}
 	getBituSubstring("arltracehangms:", &arltrace_hang_ms, cmd);
 	if (arltrace_hang_ms > 3600000) arltrace_hang_ms = 3600000;
 	Bitu arltrace_max_mb = 0;
@@ -815,11 +820,60 @@ void CDirectSerial::handleUpperEvent(uint16_t type) {
 }
 
 bool CDirectSerial::doReceive() {
+	if (!arl_retry_guest_bytes.empty()) {
+		const uint8_t data = arl_retry_guest_bytes.front();
+		arl_retry_guest_bytes.pop_front();
+		traceByte("rx_presented", data, 0);
+		observeRxByte(data);
+		receiveByteEx(data, 0);
+		return true;
+	}
+
 	int value = SERIAL_getextchar(comport);
 	if(value) {
 		const uint8_t data = (uint8_t)(value&0xff);
 		const uint8_t error = (uint8_t)((value&0xff00)>>8);
 		traceByte("rx", data, error);
+		if (arl_result_retry_low && arl_retry_blocked)
+			return false;
+		if (arl_result_retry_low && arl_retry_correction_pending) {
+			if (arl_retry_host_frame.size() >= 2048) {
+				traceMessage("result_correction_overflow", "retry frame exceeded 2048 bytes");
+				arl_retry_host_frame.clear();
+				arl_retry_correction_pending = false;
+				receiveByteEx(data, error);
+				return true;
+			}
+			arl_retry_host_frame.push_back((char)data);
+			if (data != '\r') return false;
+
+			std::string presented;
+			int target_checksum = -1;
+			const int original_checksum = arl_physical_result_checksum;
+			if (!buildEquivalentResult(arl_retry_host_frame, presented, target_checksum)) {
+				presented = arl_retry_host_frame;
+				traceResultCorrection(arl_retry_host_frame, presented,
+				                      original_checksum, original_checksum,
+				                      "no_safe_equivalent");
+			} else {
+				arl_current_result_mutated = true;
+				arl_last_result_mutated = true;
+				traceResultCorrection(arl_retry_host_frame, presented,
+				                      original_checksum, target_checksum,
+				                      "reactive_retry_after_question");
+			}
+			for (const unsigned char ch : presented)
+				arl_retry_guest_bytes.push_back(ch);
+			arl_retry_host_frame.clear();
+			arl_retry_correction_pending = false;
+			if (arl_retry_guest_bytes.empty()) return false;
+			const uint8_t first = arl_retry_guest_bytes.front();
+			arl_retry_guest_bytes.pop_front();
+			traceByte("rx_presented", first, 0);
+			observeRxByte(first);
+			receiveByteEx(first, 0);
+			return true;
+		}
 		observeRxByte(data);
 		receiveByteEx(data,error);
 		return true;
@@ -898,15 +952,37 @@ void CDirectSerial::observeTxByte(uint8_t val) {
 	if (arl_tx_frame.compare(0, 4, "#rd ") == 0) {
 		arl_awaiting_result = true;
 		arl_rx_frame.clear();
+		arl_retry_host_frame.clear();
+		arl_retry_guest_bytes.clear();
+		arl_retry_correction_pending = false;
+		arl_retry_blocked = false;
+		arl_current_result_mutated = false;
+		arl_last_result_mutated = false;
+		arl_result_corrector.reset();
 		arl_last_claimed_checksum = -1;
 		arl_last_computed_checksum = -1;
+		arl_physical_result_checksum = -1;
 		traceMessage("result_observe_armed", "IMPACT requested an analysis result");
 	} else if (arl_tx_frame.compare(0, 4, "#em ") == 0) {
 		traceObservedDecision("accepted");
 		arl_awaiting_result = false;
 	} else if (arl_tx_frame == "?\r") {
 		traceObservedDecision("rejected");
-		arl_awaiting_result = false;
+		if (arl_result_retry_low && !arl_result_corrector.exhausted()) {
+			arl_awaiting_result = true;
+			arl_retry_correction_pending = true;
+			arl_retry_host_frame.clear();
+			arl_rx_frame.clear();
+			arl_current_result_mutated = false;
+			traceMessage("result_correction_armed", "IMPACT rejected result; waiting for repeated row");
+		} else {
+			arl_awaiting_result = false;
+			if (arl_result_retry_low && arl_result_corrector.exhausted()) {
+				arl_retry_blocked = true;
+				traceMessage("result_correction_exhausted",
+				             "all safe checksum targets were rejected; inbound retries are blocked");
+			}
+		}
 	}
 	arl_tx_frame.clear();
 }
@@ -932,7 +1008,7 @@ void CDirectSerial::traceObservedResult(const std::string &frame) {
 	int claimed = -1;
 	int computed = -1;
 	bool valid = false;
-	if (frame.size() >= 4 && frame[0] == '#' && separator != std::string::npos && separator + 1 < end) {
+	if (frame.size() >= 4 && separator != std::string::npos && separator + 1 < end) {
 		claimed = 0;
 		bool digits = true;
 		for (size_t i = separator + 1; i < end; ++i) {
@@ -941,20 +1017,57 @@ void CDirectSerial::traceObservedResult(const std::string &frame) {
 		}
 		if (digits) {
 			computed = 0;
-			for (size_t i = 1; i <= separator; ++i)
+			const size_t content_start = frame[0] == '#' ? 1 : 0;
+			for (size_t i = content_start; i <= separator; ++i)
 				computed = (computed + (unsigned char)frame[i]) & 0xff;
 			valid = claimed == computed;
 		} else claimed = -1;
 	}
 	arl_last_claimed_checksum = claimed;
 	arl_last_computed_checksum = computed;
+	if (!arl_current_result_mutated && valid)
+		arl_physical_result_checksum = claimed;
 	traceCommonFields("result_observed");
 	fputs(",\"frame\":", arltrace_fp);
 	traceJsonString(frame.c_str());
 	fprintf(arltrace_fp,
-	        ",\"claimed_checksum\":%d,\"computed_checksum\":%d,\"checksum_valid\":%s,\"checksum_class\":\"%s\",\"mutated\":false}\n",
+	        ",\"claimed_checksum\":%d,\"computed_checksum\":%d,\"checksum_valid\":%s,\"checksum_class\":\"%s\",\"mutated\":%s}\n",
 	        claimed, computed, valid ? "true" : "false",
-	        claimed >= 0 && claimed <= 99 ? "low_000_099" : "high_100_255");
+	        claimed >= 0 && claimed <= 99 ? "low_000_099" : "high_100_255",
+	        arl_current_result_mutated ? "true" : "false");
+	arl_current_result_mutated = false;
+	traceFlush();
+}
+
+bool CDirectSerial::buildEquivalentResult(const std::string &frame,
+	                                      std::string &presented,
+	                                      int &target_checksum)
+{
+	const ArlCorrectionResult result = arl_result_corrector.next(frame);
+	if (!result.success) return false;
+	presented = result.presented;
+	target_checksum = result.presented_checksum;
+	return result.original_checksum == arl_physical_result_checksum;
+}
+
+void CDirectSerial::traceResultCorrection(const std::string &original,
+	                                      const std::string &presented,
+	                                      int original_checksum,
+	                                      int presented_checksum,
+	                                      const char *reason)
+{
+	if (!arltrace_fp) return;
+	traceCommonFields("result_correction");
+	fputs(",\"original\":", arltrace_fp);
+	traceJsonString(original.c_str());
+	fputs(",\"presented\":", arltrace_fp);
+	traceJsonString(presented.c_str());
+	fprintf(arltrace_fp,
+	        ",\"original_checksum\":%d,\"presented_checksum\":%d,"
+	        "\"decimal_equal\":true,\"reason\":",
+	        original_checksum, presented_checksum);
+	traceJsonString(reason);
+	fputs("}\n", arltrace_fp);
 	traceFlush();
 }
 

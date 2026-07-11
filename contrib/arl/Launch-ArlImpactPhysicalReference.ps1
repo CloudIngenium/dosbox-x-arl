@@ -4,6 +4,7 @@ param(
     [string]$ImplusPath = "C:\ARL\IMPLUS",
     [string]$RunRoot = "C:\ARL\diagnostics",
     [switch]$ObserveResults,
+    [switch]$ReactiveRetryLow,
     [switch]$NoAutoPrintLpt,
     [switch]$NoLaunch
 )
@@ -39,12 +40,13 @@ $arguments = @{
     Wait = $true
 }
 if ($ObserveResults) { $arguments.ArlResultObserve = $true }
+if ($ReactiveRetryLow) { $arguments.ArlResultRetryLow = $true }
 if (-not $NoAutoPrintLpt) {
     $arguments.AutoPrintLpt = $true
     $arguments.PrinterName = "EPSON LX-350"
 }
 if ($NoLaunch) { $arguments.NoLaunch = $true }
 
-$modeLabel = if ($ObserveResults) { "Mode: OBSERVE ONLY (no byte mutation)" } else { "Mode: DIRECTSERIAL BYPASS" }
+$modeLabel = if ($ReactiveRetryLow) { "Mode: REACTIVE SAFE (retry only after IMPACT sends ?)" } elseif ($ObserveResults) { "Mode: OBSERVE ONLY (no byte mutation)" } else { "Mode: DIRECTSERIAL BYPASS" }
 Write-Host $modeLabel
 & $launcher @arguments

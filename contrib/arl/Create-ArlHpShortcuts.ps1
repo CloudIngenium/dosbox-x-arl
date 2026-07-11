@@ -21,6 +21,11 @@ $shortcuts = @(
         BuildRequired = $false
     },
     @{
+        Name = "02 REACTIVE SAFE"
+        Target = "Launch-ArlImpactReactiveSafeTrace.cmd"
+        BuildRequired = $false
+    },
+    @{
         Name = "80 EMU NORMAL LOOP"
         Target = "Launch-ArlImpactEmulatorFormatSafeLoopTrace.cmd"
         BuildRequired = $false
