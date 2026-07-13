@@ -344,9 +344,18 @@ Each run creates `C:\ARL\diagnostics\<session>-<timestamp>\` with:
 - `serial.ndjson`
 - `dosbox.log`
 - `run-metadata.json`
+- `calibration-access.ndjson`, containing successful guest opens of `.CAL` and
+  `.REG` files with timestamps, DOS paths, and access modes
 - `LPTCAP.PRN` if IMPACT prints to LPT1
 - `print-jobs\*.prn` plus manifests/logs when LPT auto-print is enabled
 - copied `INTERFAC.DAT.after` when `-Wait` is used and the file exists
+
+`calibration-access.ndjson` is evidence for resolving the actual IMPACT curve.
+Do not infer a curve from the alloy label alone. Downstream importers may assign
+the curve only when the file-access timeline identifies one unambiguous `.CAL`
+file for the analysis group; ambiguous runs must retain a null curve. The trace
+records names and access events only and never reads or changes calibration
+contents.
 
 Preserve important runs before cleanup or repeated retries:
 

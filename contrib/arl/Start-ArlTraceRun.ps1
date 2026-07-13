@@ -287,6 +287,7 @@ $lptSpoolDir = Join-ArlPath $runDir "print-jobs"
 $lptWatchLogPath = Join-ArlPath $runDir "lpt-watch.log"
 $lptWatchErrPath = Join-ArlPath $runDir "lpt-watch.err.log"
 $lptWatchLaunchPath = Join-ArlPath $runDir "lpt-watch-launch.ps1"
+$calibrationAccessPath = Join-ArlPath $runDir "calibration-access.ndjson"
 $interfacPath = Join-ArlPath $ImplusPath "INTERFAC.DAT"
 $usesEmulator = $Session -eq "impact-emulator" -or $Session -eq "tics-emulator"
 $usesTics = $Session -eq "tics" -or $Session -eq "tics-emulator"
@@ -414,6 +415,7 @@ $metadata = [pscustomobject]@{
     aspect = $Aspect
     scaler = $Scaler
     trace = if ($usesEmulator) { $null } else { $tracePath }
+    calibration_access_trace = $calibrationAccessPath
     emulator_trace = if ($usesEmulator) { $emulatorTracePath } else { $null }
     emulator_control = if ($usesEmulator) { $emulatorControlPath } else { $null }
     log = $logPath
@@ -585,7 +587,13 @@ if ($usesEmulator -and $StartEmulator) {
     Start-Sleep -Milliseconds 750
 }
 
-$process = Start-Process -FilePath $DosboxExe -ArgumentList @("-conf", $confPath) -PassThru
+$previousCalibrationTrace = [Environment]::GetEnvironmentVariable("DOSBOX_ARL_CALTRACE", "Process")
+[Environment]::SetEnvironmentVariable("DOSBOX_ARL_CALTRACE", $calibrationAccessPath, "Process")
+try {
+    $process = Start-Process -FilePath $DosboxExe -ArgumentList @("-conf", $confPath) -PassThru
+} finally {
+    [Environment]::SetEnvironmentVariable("DOSBOX_ARL_CALTRACE", $previousCalibrationTrace, "Process")
+}
 Write-Host "Started DOSBox-X ARL PID $($process.Id)"
 
 $directSerialFinalizerProcess = $null
