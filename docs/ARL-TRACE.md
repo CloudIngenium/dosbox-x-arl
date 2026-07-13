@@ -391,6 +391,13 @@ writes JSON/SHA256 metadata for later processing, and sends that job to
 the bytes sent to the Epson so matrix-printer pages eject immediately; the
 captured `LPTCAP.PRN` and saved `print-jobs\*.prn` remain unchanged.
 
+This per-append printing is diagnostic-only because IMPACT can emit a detailed
+stage block after each individual burn. The physical operator launcher keeps it
+disabled by default and still captures the complete `LPTCAP.PRN`. Use
+`Launch-ArlImpactPhysicalReference.ps1 -LegacyDebugPrintLpt` only for a
+supervised debugging session. Production printing belongs to Chispa.Agent,
+which creates one saved-group report after the 2-5 burn workflow is complete.
+
 Keep the current lab serial settings while diagnosing:
 
 - ARL cable on `COM5`

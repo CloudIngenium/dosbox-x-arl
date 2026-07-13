@@ -5,6 +5,7 @@ param(
     [string]$RunRoot = "C:\ARL\diagnostics",
     [switch]$ObserveResults,
     [switch]$ReactiveRetryLow,
+    [switch]$LegacyDebugPrintLpt,
     [switch]$NoAutoPrintLpt,
     [switch]$NoLaunch
 )
@@ -41,15 +42,24 @@ $arguments = @{
 }
 if ($ObserveResults) { $arguments.ArlResultObserve = $true }
 if ($ReactiveRetryLow) { $arguments.ArlResultRetryLow = $true }
-if (-not $NoAutoPrintLpt) {
+if ($LegacyDebugPrintLpt -and $NoAutoPrintLpt) {
+    throw "LegacyDebugPrintLpt and NoAutoPrintLpt cannot be combined."
+}
+if ($LegacyDebugPrintLpt) {
     $arguments.AutoPrintLpt = $true
     $arguments.PrinterName = "EPSON LX-350"
-    # The Epson V4 USB driver prints through the normal Windows text path.
-    # Raw jobs remain archived for evidence and manual replay.
+    # Diagnostic-only legacy output: IMPACT emits detailed stage blocks after
+    # individual burns. Production reports are generated once per saved group
+    # by Chispa.Agent and require manual approval during the gate.
     $arguments.PrintMode = "Text"
 }
 if ($NoLaunch) { $arguments.NoLaunch = $true }
 
 $modeLabel = if ($ReactiveRetryLow) { "Mode: REACTIVE SAFE (retry only after IMPACT sends ?)" } elseif ($ObserveResults) { "Mode: OBSERVE ONLY (no byte mutation)" } else { "Mode: DIRECTSERIAL BYPASS" }
 Write-Host $modeLabel
+if ($LegacyDebugPrintLpt) {
+    Write-Warning "Legacy detailed LPT printing is enabled for this diagnostic session."
+} else {
+    Write-Host "Printing: final saved-group report only (Chispa.Agent); LPT remains captured as evidence."
+}
 & $launcher @arguments
