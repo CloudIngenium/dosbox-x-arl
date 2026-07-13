@@ -155,19 +155,35 @@ jobs:
             -ArlRoot "$PWD\arl-physical-launcher-test" `
             -ImplusPath "$PWD\arl-physical-launcher-test\IMPLUS" `
             -RunRoot "$PWD\arl-physical-launcher-test\bypass" `
-            -NoAutoPrintLpt -NoLaunch
+            -NoLaunch
           pwsh -NoProfile -File contrib\arl\Launch-ArlImpactPhysicalReference.ps1 `
             -DosboxExe "$PWD\missing-dosbox.exe" `
             -ArlRoot "$PWD\arl-physical-launcher-test" `
             -ImplusPath "$PWD\arl-physical-launcher-test\IMPLUS" `
             -RunRoot "$PWD\arl-physical-launcher-test\observe" `
-            -ObserveResults -NoAutoPrintLpt -NoLaunch
+            -ObserveResults -NoLaunch
           pwsh -NoProfile -File contrib\arl\Launch-ArlImpactPhysicalReference.ps1 `
             -DosboxExe "$PWD\missing-dosbox.exe" `
             -ArlRoot "$PWD\arl-physical-launcher-test" `
             -ImplusPath "$PWD\arl-physical-launcher-test\IMPLUS" `
             -RunRoot "$PWD\arl-physical-launcher-test\reactive" `
-            -ObserveResults -ReactiveRetryLow -NoAutoPrintLpt -NoLaunch
+            -ObserveResults -ReactiveRetryLow -NoLaunch
+          $physicalMetadata = Get-ChildItem arl-physical-launcher-test -Filter run-metadata.json -Recurse |
+            ForEach-Object { Get-Content $_.FullName -Raw | ConvertFrom-Json }
+          if ($physicalMetadata.Count -ne 3 -or @($physicalMetadata | Where-Object auto_print_lpt).Count -ne 0) {
+            throw 'Physical operator launchers must not auto-print per-burn LPT blocks by default'
+          }
+          pwsh -NoProfile -File contrib\arl\Launch-ArlImpactPhysicalReference.ps1 `
+            -DosboxExe "$PWD\missing-dosbox.exe" `
+            -ArlRoot "$PWD\arl-physical-launcher-test" `
+            -ImplusPath "$PWD\arl-physical-launcher-test\IMPLUS" `
+            -RunRoot "$PWD\arl-physical-launcher-test\legacy-debug-print" `
+            -LegacyDebugPrintLpt -NoLaunch
+          $debugMetadata = Get-ChildItem arl-physical-launcher-test\legacy-debug-print -Filter run-metadata.json -Recurse |
+            Select-Object -First 1 | Get-Content -Raw | ConvertFrom-Json
+          if (-not $debugMetadata.auto_print_lpt) {
+            throw 'LegacyDebugPrintLpt must remain an explicit diagnostic opt-in'
+          }
           $bypassConfig = Get-ChildItem arl-physical-launcher-test\bypass -Recurse -Filter *.conf | Select-Object -First 1 | Get-Content -Raw
           $observeConfig = Get-ChildItem arl-physical-launcher-test\observe -Recurse -Filter *.conf | Select-Object -First 1 | Get-Content -Raw
           if ($bypassConfig -match 'arlresultobserve') { throw 'bypass config unexpectedly enables result observer' }
