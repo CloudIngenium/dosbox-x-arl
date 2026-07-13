@@ -74,10 +74,15 @@ if (-not [string]::IsNullOrWhiteSpace($ResultFilesBeforePath) -and (Test-Path -L
     }
     $changedResultFiles = @(Get-ChildItem -LiteralPath $ImplusPath -File -Filter "*.RES" -ErrorAction SilentlyContinue | Where-Object {
         $before = $beforeByName[$_.Name]
-        $null -eq $before -or [long]$before.length -ne $_.Length -or [datetime]$before.last_write_utc -ne $_.LastWriteTimeUtc
+        $beforeTicks = if ($null -ne $before -and $null -ne $before.last_write_utc_ticks) { [long]$before.last_write_utc_ticks } elseif ($null -ne $before) { ([datetime]$before.last_write_utc).ToUniversalTime().Ticks } else { 0 }
+        $null -eq $before -or [long]$before.length -ne $_.Length -or $beforeTicks -ne $_.LastWriteTimeUtc.Ticks
     } | ForEach-Object Name | Sort-Object -Unique)
 }
-$resultFiles = @($accessedResultFiles + $changedResultFiles | Sort-Object -Unique)
+$resultFiles = if ($accessedResultFiles.Count -gt 0) {
+    @($accessedResultFiles)
+} else {
+    @($changedResultFiles)
+}
 $workflowChanges = @()
 if (-not [string]::IsNullOrWhiteSpace($WorkflowKind)) {
     if (-not (Test-Path -LiteralPath $WorkflowSnapshotBeforePath -PathType Container)) {
@@ -153,7 +158,7 @@ $markerMetadata = [ordered]@{
     calibration_candidates = ($accessedCalibrationFiles -join ",")
     curve_file = if (@($accessedCalibrationFiles).Count -eq 1) { $accessedCalibrationFiles[0] } else { "" }
     result_file_candidates = ($resultFiles -join ",")
-    result_file = if (@($resultFiles).Count -eq 1) { $resultFiles[0] } else { "" }
+    result_file = if (@($resultFiles).Count -eq 1) { @($resultFiles)[0] } else { "" }
 }
 if (-not [string]::IsNullOrWhiteSpace($WorkflowKind)) {
     $markerMetadata.workflow = $WorkflowKind
