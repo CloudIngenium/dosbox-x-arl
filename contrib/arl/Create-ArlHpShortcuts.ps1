@@ -12,62 +12,37 @@ $ErrorActionPreference = "Stop"
 $shortcuts = @(
     @{
         Name = "00 DIRECTSERIAL BYPASS"
-        Target = "Launch-ArlImpactDirectSerialBypass.cmd"
+        Target = "contrib\arl\Launch-ArlImpactDirectSerialBypass.cmd"
         BuildRequired = $false
     },
     @{
-        Name = "01 OBSERVE ONLY"
-        Target = "Launch-ArlImpactObserveOnlyTrace.cmd"
+        Name = "01 PRECHECK"
+        Target = "contrib\arl\Run-ArlOperatorPreflight.cmd"
         BuildRequired = $false
     },
     @{
         Name = "02 REACTIVE SAFE"
-        Target = "Launch-ArlImpactReactiveSafeTrace.cmd"
+        Target = "contrib\arl\Launch-ArlImpactReactiveSafeTrace.cmd"
         BuildRequired = $false
     },
     @{
-        Name = "03 STANDARDIZATION PASSIVE"
-        Target = "Launch-ArlStandardizationPassiveTrace.cmd"
+        Name = "03 APPROVE LAST REPORT"
+        Target = "contrib\arl\Approve-LatestArlReport.cmd"
         BuildRequired = $false
     },
     @{
-        Name = "04 NORMALIZATION PASSIVE"
-        Target = "Launch-ArlNormalizationPassiveTrace.cmd"
+        Name = "04 STANDARDIZATION PASSIVE"
+        Target = "contrib\arl\Launch-ArlStandardizationPassiveTrace.cmd"
         BuildRequired = $false
     },
     @{
-        Name = "80 EMU NORMAL LOOP"
-        Target = "Launch-ArlImpactEmulatorFormatSafeLoopTrace.cmd"
+        Name = "05 NORMALIZATION PASSIVE"
+        Target = "contrib\arl\Launch-ArlNormalizationPassiveTrace.cmd"
         BuildRequired = $false
     },
     @{
-        Name = "81 EMU LOWCHECK START"
-        Target = "Launch-ArlImpactEmulatorLowChecksumStartTrace.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "84 INSPECT CURRENT RUN"
-        Target = "Inspect-ArlCurrentRun.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "86 PRINT EPSON RAW DRYRUN"
-        Target = "Print-LatestArlLpt-Epson-Raw-DryRun.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "87 PRINT HP TEXT DRYRUN"
-        Target = "Print-LatestArlLpt-HPSmartTank-Text-DryRun.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "88 PRINT EPSON RAW SEND"
-        Target = "Print-LatestArlLpt-Epson-Raw-Send.cmd"
-        BuildRequired = $false
-    },
-    @{
-        Name = "89 PRINT HP TEXT SEND"
-        Target = "Print-LatestArlLpt-HPSmartTank-Text-Send.cmd"
+        Name = "90 EMULATOR"
+        Target = "contrib\arl\Launch-ArlImpactEmulatorTrace.cmd"
         BuildRequired = $false
     }
 )
@@ -86,7 +61,7 @@ if (-not $NoCleanup) {
     Get-ChildItem -Path $DesktopPath -Filter "*.lnk" -File |
         Where-Object {
             $name = $_.Name.ToLowerInvariant()
-            ($_.BaseName -match "ARL|IMPACT|CYCLES|SIMPLE|TRACE|TICS|UARTDATA|FORCELINES|HOLDRTS|RX4000|SAFE SERIAL|STABILITY|NOINT33|NO MOUSE|EMU|PRINT|INSPECT") -and
+            ($_.BaseName -match "ARL|IMPACT|CYCLES|SIMPLE|TRACE|TICS|UARTDATA|FORCELINES|HOLDRTS|RX4000|SAFE SERIAL|STABILITY|NOINT33|NO MOUSE|EMU|PRINT|INSPECT|PRECHECK|APPROVE|STANDARDIZATION|NORMALIZATION") -and
             -not $desiredNames.ContainsKey($name)
         } |
         Remove-Item -Force
@@ -94,7 +69,7 @@ if (-not $NoCleanup) {
     Get-ChildItem -Path $DesktopPath -File |
         Where-Object {
             $_.Extension -ne ".lnk" -and
-            $_.BaseName -match "ARL|IMPACT|CYCLES|SIMPLE|TRACE|TICS|UARTDATA|FORCELINES|HOLDRTS|RX4000|SAFE SERIAL|STABILITY|EMU|PRINT|INSPECT"
+            $_.BaseName -match "ARL|IMPACT|CYCLES|SIMPLE|TRACE|TICS|UARTDATA|FORCELINES|HOLDRTS|RX4000|SAFE SERIAL|STABILITY|EMU|PRINT|INSPECT|PRECHECK|APPROVE|STANDARDIZATION|NORMALIZATION"
         } |
         Remove-Item -Force
 }

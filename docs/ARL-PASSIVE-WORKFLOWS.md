@@ -1,6 +1,6 @@
 # Passive standardization and normalization capture
 
-The `03 STANDARDIZATION PASSIVE` and `04 NORMALIZATION PASSIVE` launchers are
+The `04 STANDARDIZATION PASSIVE` and `05 NORMALIZATION PASSIVE` launchers are
 observe-only evidence tools. They start normal IMPACT, capture serial/LPT, and
 never send a Chispa command or alter an ARL response.
 
@@ -21,3 +21,8 @@ then publishes `directserial-finalized.json` for Agent ingestion.
 
 The two workflows must use separate sessions so file changes and protocol
 commands can be attributed without guessing.
+
+These launchers are never the first physical gate. Complete `01 PRECHECK`, one
+saved `02 REACTIVE SAFE` analysis, and one hash-bound `03 APPROVE LAST REPORT`
+print before capturing standardization. Normalization is always a later,
+separate session.

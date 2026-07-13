@@ -97,29 +97,20 @@ Current status after repair:
   `499A1F9D992F28CD022429F6F2CCAAFA0F03D898F68B606B7659CA29819571DA`
   was backed up under `C:\ARL\DOSBox-X-ARL\_backups\exe-20260708-220943`.
 - Operator shortcuts under `C:\Users\Public\Desktop` are intentionally short and
-  numbered. `Create-ArlHpShortcuts.ps1` removes old ARL/IMPACT shortcuts by
-  default and recreates only the active no-build matrix:
-  - `01 NOAUTOPRINT - 6000 SIMPLE386`
-  - `02 NO MOUSE.COM - 6000 SIMPLE386`
-  - `03 NOUMB - 6000 SIMPLE386`
-  - `04 EMSBOARD - 6000 SIMPLE386`
-  - `05 EMM386 - 6000 SIMPLE386`
-  - `06 ZEROEMS - 6000 SIMPLE386`
-  - `07 ZEROXMS - 6000 SIMPLE386`
-  - `08 MCBCOMPAT - 6000 SIMPLE386`
-  - `09 NOSHARE - 6000 SIMPLE386`
-  - `10 UNMASKDISKIO - 6000 SIMPLE386`
-  - `11 NOINT33 - 6000 SIMPLE386`
-  - `00 BASELINE - 6000 486`
-  - `90 EMU GOOD-THEN-REJECT`
-  - `91 EMU REJECT-FIRST`
+  numbered. `Create-ArlHpShortcuts.ps1` removes old ARL/IMPACT research shortcuts
+  and recreates only the active operational sequence:
+  - `00 DIRECTSERIAL BYPASS`
+  - `01 PRECHECK`
+  - `02 REACTIVE SAFE`
+  - `03 APPROVE LAST REPORT`
+  - `04 STANDARDIZATION PASSIVE`
+  - `05 NORMALIZATION PASSIVE`
+  - `90 EMULATOR`
   - `Diagnostics - Serial Traces`
-- `FORCELINES` and `HOLDRTS-DTR` are not recreated unless
-  `-IncludeBuildRequired` is passed explicitly.
-- `FORCELINES` was dry-run verified to emit
-  `arlforcects:1 arlforcedsr:1 arlforcedcd:1`.
-- `HOLDRTS-DTR` was dry-run verified to emit
-  `arlholdrts:1 arlholddtr:1`.
+- `01 PRECHECK` only reads PnP/SERIALCOMM, process, disk, Agent health and Epson
+  state. It never opens COM5.
+- `03 APPROVE LAST REPORT` refuses zero or multiple pending reports, re-hashes
+  the selected report, and requires the operator to type `APROBAR`.
 - The no-launch verification directories were removed so they do not appear as
   real ARL diagnostic runs.
 - Emulator shortcuts are hardware-safe: they use DOSBox-X `nullmodem` on

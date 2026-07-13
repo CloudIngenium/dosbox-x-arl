@@ -1,7 +1,7 @@
 param(
     [string]$DosboxExe = "C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe",
 
-    [string]$ProfilePath = "C:\ARL\DOSBox-X-ARL\profiles\impact-full-205041-sequence.json",
+    [string]$ProfilePath = "",
 
     [ValidateSet("happy-path", "silent-after-spark", "delayed-result", "line-drop", "bad-response")]
     [string]$Mode = "happy-path",
@@ -33,6 +33,11 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProfilePath = if ([string]::IsNullOrWhiteSpace($ProfilePath)) {
+    Join-Path $root "profiles\impact-full-205041-sequence.json"
+} else {
+    $ProfilePath
+}
 $launcher = Join-Path $root "Start-ArlTraceRun.ps1"
 if (-not (Test-Path -Path $launcher -PathType Leaf)) {
     throw "Start-ArlTraceRun.ps1 not found below $root"
