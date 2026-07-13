@@ -100,8 +100,10 @@ jobs:
           New-Item -ItemType Directory -Force arl-curve-finalizer-test\run, arl-curve-finalizer-test\IMPLUS | Out-Null
           Set-Content -LiteralPath arl-curve-finalizer-test\IMPLUS\AL.CAL -Value 'fixture' -NoNewline
           Set-Content -LiteralPath arl-curve-finalizer-test\IMPLUS\JUL-26.RES -Value 'before' -NoNewline
+          Set-Content -LiteralPath arl-curve-finalizer-test\IMPLUS\DECOY.RES -Value 'before' -NoNewline
           @([ordered]@{ name = 'JUL-26.RES'; length = 6; last_write_utc = (Get-Item arl-curve-finalizer-test\IMPLUS\JUL-26.RES).LastWriteTimeUtc.ToString('o') }) | ConvertTo-Json | Set-Content -LiteralPath arl-curve-finalizer-test\run\result-files-before.json
           Add-Content -LiteralPath arl-curve-finalizer-test\IMPLUS\JUL-26.RES -Value 'after' -NoNewline
+          Add-Content -LiteralPath arl-curve-finalizer-test\IMPLUS\DECOY.RES -Value 'changed but not opened' -NoNewline
           @(
             '{"epoch_ms":1,"event":"guest_impact_file_open","kind":"calibration","drive":"C:","path":"AL.CAL","access_mode":0}',
             '{"epoch_ms":2,"event":"guest_impact_file_open","kind":"result","drive":"C:","path":"JUL-26.RES","access_mode":2}'
@@ -117,6 +119,7 @@ jobs:
           if (-not (Test-Path arl-curve-finalizer-test\run\accessed-AL.CAL)) { throw 'Finalizer did not preserve the accessed CAL file' }
           if ($curveMarker.metadata.result_file -ne 'JUL-26.RES') { throw 'Finalizer did not resolve the active monthly RES file' }
           if (-not (Test-Path arl-curve-finalizer-test\run\result-JUL-26.RES)) { throw 'Finalizer did not preserve the active monthly RES file' }
+          if (Test-Path arl-curve-finalizer-test\run\result-DECOY.RES) { throw 'Explicit guest open must take priority over changed-file fallback' }
           if ($curveMarker.metadata.calibration_candidates -ne 'AL.CAL') { throw 'Finalizer metadata must remain scalar' }
           pwsh -NoProfile -File contrib\arl\Analyze-ArlTrace.ps1 `
             -TracePath contrib\arl\fixtures\sample-protocol-trace.ndjson `

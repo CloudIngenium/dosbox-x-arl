@@ -298,6 +298,7 @@ $resultFilesBefore = @(Get-ChildItem -LiteralPath $ImplusPath -File -Filter "*.R
         name = $_.Name
         length = $_.Length
         last_write_utc = $_.LastWriteTimeUtc.ToString("o")
+        last_write_utc_ticks = $_.LastWriteTimeUtc.Ticks
     }
 })
 [IO.File]::WriteAllText($resultFilesBeforePath, ($resultFilesBefore | ConvertTo-Json -Depth 3), [Text.UTF8Encoding]::new($false))
