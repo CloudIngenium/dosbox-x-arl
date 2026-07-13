@@ -288,9 +288,19 @@ $lptWatchLogPath = Join-ArlPath $runDir "lpt-watch.log"
 $lptWatchErrPath = Join-ArlPath $runDir "lpt-watch.err.log"
 $lptWatchLaunchPath = Join-ArlPath $runDir "lpt-watch-launch.ps1"
 $calibrationAccessPath = Join-ArlPath $runDir "calibration-access.ndjson"
+$resultFilesBeforePath = Join-ArlPath $runDir "result-files-before.json"
 $interfacPath = Join-ArlPath $ImplusPath "INTERFAC.DAT"
 $usesEmulator = $Session -eq "impact-emulator" -or $Session -eq "tics-emulator"
 $usesTics = $Session -eq "tics" -or $Session -eq "tics-emulator"
+
+$resultFilesBefore = @(Get-ChildItem -LiteralPath $ImplusPath -File -Filter "*.RES" -ErrorAction SilentlyContinue | ForEach-Object {
+    [ordered]@{
+        name = $_.Name
+        length = $_.Length
+        last_write_utc = $_.LastWriteTimeUtc.ToString("o")
+    }
+})
+[IO.File]::WriteAllText($resultFilesBeforePath, ($resultFilesBefore | ConvertTo-Json -Depth 3), [Text.UTF8Encoding]::new($false))
 
 if ($usesTics) {
     New-Item -ItemType Directory -Force -Path (Join-ArlPath $ImplusPath "TICS\PROC") | Out-Null
@@ -609,7 +619,8 @@ if (-not $usesEmulator) {
         "-ParentPid", [string]$process.Id,
         "-ParentStartTime", $process.StartTime.ToString("o"),
         "-RunDirectory", $runDir,
-        "-ImplusPath", $ImplusPath
+        "-ImplusPath", $ImplusPath,
+        "-ResultFilesBeforePath", $resultFilesBeforePath
     )
     if (-not [string]::IsNullOrWhiteSpace($WorkflowKind)) {
         $finalizerArgs += @(

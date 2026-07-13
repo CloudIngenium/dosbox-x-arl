@@ -86,8 +86,11 @@ a compact record:
 ...
 ```
 
-Observed examples include production alloys such as `SS-413BD` and `Al`. The
-large `0.RES` file also includes the July 2026 DOSBox/emulator test results.
+Observed examples include production alloys such as `SS-413BD` and `Al`.
+IMPACT lets the operator choose the destination result file. Production uses
+monthly files with names such as `MAY-26.RES`, while the July 2026 diagnostic
+sessions deliberately used `0.RES`. Therefore `0.RES` is not a stable protocol
+or storage contract.
 
 Implications:
 
@@ -97,6 +100,8 @@ Implications:
   renderer.
 - It does not contain raw serial frames or enough information to reconstruct the
   ARL protocol by itself.
+- Capture must identify the file opened or modified during the current session,
+  preserve its original name, and never assume `0.RES` is active.
 
 ### `LPTCAP.PRN`
 

@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory = $true)][datetime]$ParentStartTime,
     [Parameter(Mandatory = $true)][string]$RunDirectory,
     [Parameter(Mandatory = $true)][string]$ImplusPath,
+    [string]$ResultFilesBeforePath = "",
     [string]$TraceFile = "serial.ndjson",
     [string]$DosBoxVersion = "dosbox-x-arl",
     [string]$WorkflowKind = "",
@@ -38,7 +39,9 @@ if (Test-Path -LiteralPath $calibrationAccessTrace -PathType Leaf) {
     $accessedCalibrationFiles = @(Get-Content -LiteralPath $calibrationAccessTrace | ForEach-Object {
         try { $_ | ConvertFrom-Json -ErrorAction Stop } catch { $null }
     } | Where-Object {
-        $null -ne $_ -and $_.event -eq "guest_calibration_open" -and $_.path -match '(?i)\.CAL$'
+        $null -ne $_ -and
+        (($_.event -eq "guest_impact_file_open" -and $_.kind -eq "calibration") -or $_.event -eq "guest_calibration_open") -and
+        $_.path -match '(?i)\.CAL$'
     } | ForEach-Object {
         [IO.Path]::GetFileName(($_.path -replace '/', '\'))
     } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
@@ -52,6 +55,29 @@ if (Test-Path -LiteralPath $calibrationAccessTrace -PathType Leaf) {
         }
     }
 }
+$accessedResultFiles = @()
+if (Test-Path -LiteralPath $calibrationAccessTrace -PathType Leaf) {
+    $accessedResultFiles = @(Get-Content -LiteralPath $calibrationAccessTrace | ForEach-Object {
+        try { $_ | ConvertFrom-Json -ErrorAction Stop } catch { $null }
+    } | Where-Object {
+        $null -ne $_ -and $_.event -eq "guest_impact_file_open" -and $_.kind -eq "result" -and $_.path -match '(?i)\.RES$'
+    } | ForEach-Object {
+        [IO.Path]::GetFileName(($_.path -replace '/', '\'))
+    } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
+}
+
+$changedResultFiles = @()
+if (-not [string]::IsNullOrWhiteSpace($ResultFilesBeforePath) -and (Test-Path -LiteralPath $ResultFilesBeforePath -PathType Leaf)) {
+    $beforeByName = @{}
+    foreach ($item in @(Get-Content -Raw -LiteralPath $ResultFilesBeforePath | ConvertFrom-Json)) {
+        $beforeByName[$item.name] = $item
+    }
+    $changedResultFiles = @(Get-ChildItem -LiteralPath $ImplusPath -File -Filter "*.RES" -ErrorAction SilentlyContinue | Where-Object {
+        $before = $beforeByName[$_.Name]
+        $null -eq $before -or [long]$before.length -ne $_.Length -or [datetime]$before.last_write_utc -ne $_.LastWriteTimeUtc
+    } | ForEach-Object Name | Sort-Object -Unique)
+}
+$resultFiles = @($accessedResultFiles + $changedResultFiles | Sort-Object -Unique)
 $workflowChanges = @()
 if (-not [string]::IsNullOrWhiteSpace($WorkflowKind)) {
     if (-not (Test-Path -LiteralPath $WorkflowSnapshotBeforePath -PathType Container)) {
@@ -101,8 +127,12 @@ $correctionCount = if (Test-Path -LiteralPath $tracePath -PathType Leaf) {
 } else {
     0
 }
-if (Copy-RunArtifact (Join-Path $ImplusPath "0.RES") "0.final.RES") {
-    $artifacts.Add([ordered]@{ path = "0.final.RES"; name = "0.final.RES"; role = "legacy_result" })
+foreach ($resultName in $resultFiles) {
+    $source = Join-Path $ImplusPath $resultName
+    $destinationName = "result-$resultName"
+    if (Copy-RunArtifact $source $destinationName) {
+        $artifacts.Add([ordered]@{ path = $destinationName; name = $destinationName; role = "legacy_result" })
+    }
 }
 foreach ($entry in @(
     @{ Path = "LPTCAP.PRN"; Role = "lpt_raw" },
@@ -120,8 +150,10 @@ $markerMetadata = [ordered]@{
     mutation = if ($correctionCount -gt 0) { "true" } else { "false" }
     correction_count = $correctionCount.ToString([Globalization.CultureInfo]::InvariantCulture)
     finalizer = "Finalize-ArlDirectSerialRun.ps1"
-    calibration_candidates = @($accessedCalibrationFiles)
-    curve_file = if (@($accessedCalibrationFiles).Count -eq 1) { $accessedCalibrationFiles[0] } else { $null }
+    calibration_candidates = ($accessedCalibrationFiles -join ",")
+    curve_file = if (@($accessedCalibrationFiles).Count -eq 1) { $accessedCalibrationFiles[0] } else { "" }
+    result_file_candidates = ($resultFiles -join ",")
+    result_file = if (@($resultFiles).Count -eq 1) { $resultFiles[0] } else { "" }
 }
 if (-not [string]::IsNullOrWhiteSpace($WorkflowKind)) {
     $markerMetadata.workflow = $WorkflowKind

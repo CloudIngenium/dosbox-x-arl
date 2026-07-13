@@ -1835,3 +1835,20 @@ Simplified next emulator test:
    respondio #em`, the low-checksum override is accepted.
 6. Close DOSBox and repeat only with `80 EMU NORMAL LOOP` if a normal control
    comparison is needed.
+
+2026-07-13 dynamic production result-file discovery:
+
+- The operator confirmed that `0.RES` was selected only for the diagnostic
+  sessions. Production stores results in operator-selected monthly `.RES`
+  files.
+- The HP currently contains 165 `.RES` files directly below
+  `C:\ARL\IMPLUS`, including monthly names such as `MAY-26.RES`, `ENE-26.RES`,
+  and `JUL-25.RES`.
+- The capture pipeline no longer treats `0.RES` as canonical. At launch it
+  snapshots only name, length, and modification time for `.RES` files. DOSBox-X
+  also records guest opens of `.RES` files. At finalization it preserves only
+  the files accessed or changed during the session, under their original names.
+- `result_file` is emitted only for an unambiguous active file;
+  `result_file_candidates` records ambiguity without guessing.
+- This result-file identity is independent from the IMPACT program/alloy and
+  the five Sample ID fields.

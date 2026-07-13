@@ -56,12 +56,15 @@ extern bool enable_share_exe, enable_dbcs_tables;
 extern int dos_clipboard_device_access;
 extern const char *dos_clipboard_device_name;
 
-static bool arl_is_calibration_file(const char *path)
+static const char *arl_impact_file_kind(const char *path)
 {
-	if (path == NULL) return false;
+	if (path == NULL) return NULL;
 	const char *extension = strrchr(path, '.');
-	return extension != NULL &&
-	       (!strcasecmp(extension, ".CAL") || !strcasecmp(extension, ".REG"));
+	if (extension == NULL) return NULL;
+	if (!strcasecmp(extension, ".CAL") || !strcasecmp(extension, ".REG"))
+		return "calibration";
+	if (!strcasecmp(extension, ".RES")) return "result";
+	return NULL;
 }
 
 static void arl_write_json_string(FILE *file, const char *value)
@@ -83,17 +86,18 @@ static void arl_write_json_string(FILE *file, const char *value)
 	fputc('"', file);
 }
 
-static void arl_trace_calibration_open(const char *path, const uint8_t drive,
-	                                   const uint8_t flags)
+static void arl_trace_impact_file_open(const char *path, const uint8_t drive,
+	                                  const uint8_t flags)
 {
-	if (!arl_is_calibration_file(path)) return;
+	const char *kind = arl_impact_file_kind(path);
+	if (kind == NULL) return;
 	const char *trace_path = getenv("DOSBOX_ARL_CALTRACE");
 	if (trace_path == NULL || *trace_path == '\0') return;
 
 	FILE *trace = fopen(trace_path, "ab");
 	if (trace == NULL) return;
-	fprintf(trace, "{\"epoch_ms\":%lld,\"event\":\"guest_calibration_open\",\"drive\":\"",
-	        static_cast<long long>(time(nullptr)) * 1000LL);
+	fprintf(trace, "{\"epoch_ms\":%lld,\"event\":\"guest_impact_file_open\",\"kind\":\"%s\",\"drive\":\"",
+	        static_cast<long long>(time(nullptr)) * 1000LL, kind);
 	fputc('A' + drive, trace);
 	fputs(":\",\"path\":", trace);
 	arl_write_json_string(trace, path);
@@ -1169,7 +1173,7 @@ bool DOS_OpenFile(char const * name,uint8_t flags,uint16_t * entry,bool fcb) {
 		Files[handle]->AddRef();
 		psp.SetFileHandle(*entry,handle);
 		Files[handle]->drive = drive;
-		if (exists && !device) arl_trace_calibration_open(fullname, drive, flags);
+		if (exists && !device) arl_trace_impact_file_open(fullname, drive, flags);
 		return true;
 	} else {
 		//Test if file exists, but opened in read-write mode (and writeprotected)
