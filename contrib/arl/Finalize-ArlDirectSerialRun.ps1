@@ -32,6 +32,26 @@ if (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue) {
 }
 
 $artifacts = New-Object System.Collections.Generic.List[object]
+$calibrationAccessTrace = Join-Path $RunDirectory "calibration-access.ndjson"
+$accessedCalibrationFiles = @()
+if (Test-Path -LiteralPath $calibrationAccessTrace -PathType Leaf) {
+    $accessedCalibrationFiles = @(Get-Content -LiteralPath $calibrationAccessTrace | ForEach-Object {
+        try { $_ | ConvertFrom-Json -ErrorAction Stop } catch { $null }
+    } | Where-Object {
+        $null -ne $_ -and $_.event -eq "guest_calibration_open" -and $_.path -match '(?i)\.CAL$'
+    } | ForEach-Object {
+        [IO.Path]::GetFileName(($_.path -replace '/', '\'))
+    } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
+
+    foreach ($calibrationName in $accessedCalibrationFiles) {
+        $source = Join-Path $ImplusPath $calibrationName
+        if (Test-Path -LiteralPath $source -PathType Leaf) {
+            $destinationName = "accessed-$calibrationName"
+            Copy-Item -LiteralPath $source -Destination (Join-Path $RunDirectory $destinationName) -Force
+            $artifacts.Add([ordered]@{ path = $destinationName; name = $destinationName; role = "calibration" })
+        }
+    }
+}
 $workflowChanges = @()
 if (-not [string]::IsNullOrWhiteSpace($WorkflowKind)) {
     if (-not (Test-Path -LiteralPath $WorkflowSnapshotBeforePath -PathType Container)) {
@@ -86,6 +106,7 @@ if (Copy-RunArtifact (Join-Path $ImplusPath "0.RES") "0.final.RES") {
 }
 foreach ($entry in @(
     @{ Path = "LPTCAP.PRN"; Role = "lpt_raw" },
+    @{ Path = "calibration-access.ndjson"; Role = "other" },
     @{ Path = "run-metadata.json"; Role = "other" },
     @{ Path = "dosbox.log"; Role = "other" }
 )) {
@@ -99,6 +120,8 @@ $markerMetadata = [ordered]@{
     mutation = if ($correctionCount -gt 0) { "true" } else { "false" }
     correction_count = $correctionCount.ToString([Globalization.CultureInfo]::InvariantCulture)
     finalizer = "Finalize-ArlDirectSerialRun.ps1"
+    calibration_candidates = @($accessedCalibrationFiles)
+    curve_file = if (@($accessedCalibrationFiles).Count -eq 1) { $accessedCalibrationFiles[0] } else { $null }
 }
 if (-not [string]::IsNullOrWhiteSpace($WorkflowKind)) {
     $markerMetadata.workflow = $WorkflowKind

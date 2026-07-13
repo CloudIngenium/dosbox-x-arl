@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <ctype.h>
+#include <stdio.h>
 #if defined(WIN32) && defined(__MINGW32__)
 # include <malloc.h>
 #endif
@@ -54,6 +55,51 @@ extern bool log_fileio;
 extern bool enable_share_exe, enable_dbcs_tables;
 extern int dos_clipboard_device_access;
 extern const char *dos_clipboard_device_name;
+
+static bool arl_is_calibration_file(const char *path)
+{
+	if (path == NULL) return false;
+	const char *extension = strrchr(path, '.');
+	return extension != NULL &&
+	       (!strcasecmp(extension, ".CAL") || !strcasecmp(extension, ".REG"));
+}
+
+static void arl_write_json_string(FILE *file, const char *value)
+{
+	fputc('"', file);
+	for (const unsigned char *cursor = reinterpret_cast<const unsigned char *>(value);
+	     cursor != NULL && *cursor != '\0'; ++cursor) {
+		switch (*cursor) {
+		case '\\': fputs("\\\\", file); break;
+		case '"': fputs("\\\"", file); break;
+		case '\n': fputs("\\n", file); break;
+		case '\r': fputs("\\r", file); break;
+		case '\t': fputs("\\t", file); break;
+		default:
+			if (*cursor < 0x20) fprintf(file, "\\u%04x", *cursor);
+			else fputc(*cursor, file);
+		}
+	}
+	fputc('"', file);
+}
+
+static void arl_trace_calibration_open(const char *path, const uint8_t drive,
+	                                   const uint8_t flags)
+{
+	if (!arl_is_calibration_file(path)) return;
+	const char *trace_path = getenv("DOSBOX_ARL_CALTRACE");
+	if (trace_path == NULL || *trace_path == '\0') return;
+
+	FILE *trace = fopen(trace_path, "ab");
+	if (trace == NULL) return;
+	fprintf(trace, "{\"epoch_ms\":%lld,\"event\":\"guest_calibration_open\",\"drive\":\"",
+	        static_cast<long long>(time(nullptr)) * 1000LL);
+	fputc('A' + drive, trace);
+	fputs(":\",\"path\":", trace);
+	arl_write_json_string(trace, path);
+	fprintf(trace, ",\"access_mode\":%u}\n", flags & 3);
+	fclose(trace);
+}
 
 #if defined(__APPLE__) && defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED < 101200
 
@@ -1123,6 +1169,7 @@ bool DOS_OpenFile(char const * name,uint8_t flags,uint16_t * entry,bool fcb) {
 		Files[handle]->AddRef();
 		psp.SetFileHandle(*entry,handle);
 		Files[handle]->drive = drive;
+		if (exists && !device) arl_trace_calibration_open(fullname, drive, flags);
 		return true;
 	} else {
 		//Test if file exists, but opened in read-write mode (and writeprotected)
