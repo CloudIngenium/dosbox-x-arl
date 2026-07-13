@@ -87,8 +87,12 @@ if (Test-Path -Path $emulatorLog -PathType Leaf) {
     $lines | Select-Object -Last $Tail | ForEach-Object { $_ }
 }
 
-foreach ($name in @("0.RES", "INTERFAC.DAT")) {
-    $path = Join-Path $ImplusPath $name
+foreach ($path in @(
+    @(Get-ChildItem -LiteralPath $ImplusPath -File -Filter "*.RES" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTimeUtc -Descending |
+        Select-Object -First 3 -ExpandProperty FullName),
+    (Join-Path $ImplusPath "INTERFAC.DAT")
+)) {
     if (Test-Path -Path $path -PathType Leaf) {
         $file = Get-Item -LiteralPath $path
         Write-Host ""
