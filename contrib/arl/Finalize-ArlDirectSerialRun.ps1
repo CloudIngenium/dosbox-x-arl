@@ -44,7 +44,7 @@ while ([datetime]::UtcNow -lt $deadline) {
     $process = Get-Process -Id $ParentPid -ErrorAction SilentlyContinue
     if ($null -eq $process) { break }
     if ([math]::Abs(($process.StartTime - $ParentStartTime).TotalSeconds) -gt 2) {
-        # The pid was recycled by an unrelated process — our DOSBox is gone.
+        # The pid was recycled by an unrelated process - our DOSBox is gone.
         $waitOutcome = "parent_replaced"
         break
     }
@@ -61,7 +61,7 @@ while ([datetime]::UtcNow -lt $deadline) {
 
 if (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue) {
     $waitOutcome = "timeout_parent_still_running"
-    Write-Host ("[{0:o}] DOSBox pid {1} did not exit within {2}s — finalizing anyway rather than losing the run." -f `
+    Write-Host ("[{0:o}] DOSBox pid {1} did not exit within {2}s - finalizing anyway rather than losing the run." -f `
         [datetime]::UtcNow, $ParentPid, $WaitTimeoutSeconds)
 }
 $waitedSeconds = [int][math]::Round(([datetime]::UtcNow - $waitStartedUtc).TotalSeconds)

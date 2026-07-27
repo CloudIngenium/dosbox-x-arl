@@ -42,6 +42,18 @@ $implus = Join-Path $root 'IMPLUS'
 New-Item -ItemType Directory -Force -Path $implus | Out-Null
 
 try {
+    # The HP runs Windows PowerShell 5.1, which reads a BOM-less .ps1 as the ANSI codepage --
+    # so a UTF-8 character that parses fine under pwsh 7 becomes mojibake there and can break
+    # the script outright. (A UTF-8 em dash in a comment did exactly that on 2026-07-26: 0 parse
+    # errors on the authoring machine, 4 on the HP.) Keeping these scripts ASCII-only is cheaper
+    # than reasoning about codepages, and this check is what makes that stick.
+    Write-Host 'Script stays ASCII-only, so Windows PowerShell 5.1 cannot mis-decode it'
+    $nonAscii = @(Select-String -Path $finalizer -Pattern '[^\x00-\x7F]' -Encoding UTF8)
+    if ($nonAscii.Count -gt 0) {
+        $nonAscii | Select-Object -First 5 | ForEach-Object { Write-Host "        line $($_.LineNumber): $($_.Line.Trim())" }
+    }
+    Assert-Equal 'no non-ASCII characters' 0 $nonAscii.Count
+
     Write-Host 'DOSBox still open at the deadline: the run is finalized anyway, and says so'
     $run = New-RunDirectory $root 'sample-analysis-timeout'
     $process = Start-Placeholder 120
