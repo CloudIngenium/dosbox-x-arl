@@ -20,17 +20,51 @@ function Copy-RunArtifact([string]$Source, [string]$DestinationName) {
     return $true
 }
 
-$deadline = [datetime]::UtcNow.AddSeconds($WaitTimeoutSeconds)
+# Wait for DOSBox to exit, then collect the run's evidence.
+#
+# The wait must never be allowed to DESTROY the session. Operators routinely leave DOSBox open
+# between turns ("waiting until it is needed again"), so the timeout is reached in normal
+# operation, not only when something is wrong -- and until 2026-07-26 reaching it threw, which
+# left the run permanently unfinalized and therefore never uploaded. Two real production
+# sessions were lost that way (sample-analysis-20260725-154514, carrying colada 31550, and
+# sample-analysis-20260724-075735 with 157 attempts); both had to be finalized by hand, and the
+# only reason anyone noticed is that someone went looking for a specific colada.
+#
+# So on timeout we finalize ANYWAY and record that we did. Collecting a run while DOSBox is
+# still open risks capturing a session the operator may yet add to; losing it entirely is worse
+# and certain. The outcome is written to the marker (`finalize_wait_outcome`) so a bundle
+# collected under the timeout is never mistaken for one collected after a clean exit.
+$waitStartedUtc = [datetime]::UtcNow
+$deadline = $waitStartedUtc.AddSeconds($WaitTimeoutSeconds)
+$heartbeatInterval = [timespan]::FromMinutes(15)
+$nextHeartbeat = $waitStartedUtc.Add($heartbeatInterval)
+$waitOutcome = "parent_exited"
+
 while ([datetime]::UtcNow -lt $deadline) {
     $process = Get-Process -Id $ParentPid -ErrorAction SilentlyContinue
     if ($null -eq $process) { break }
-    if ([math]::Abs(($process.StartTime - $ParentStartTime).TotalSeconds) -gt 2) { break }
+    if ([math]::Abs(($process.StartTime - $ParentStartTime).TotalSeconds) -gt 2) {
+        # The pid was recycled by an unrelated process — our DOSBox is gone.
+        $waitOutcome = "parent_replaced"
+        break
+    }
+    # A heartbeat, because a silent 0-byte log for 24 hours is indistinguishable from a finalizer
+    # that never started. This line is what makes a stuck wait visible while it is still stuck.
+    if ([datetime]::UtcNow -ge $nextHeartbeat) {
+        $waitedMinutes = [math]::Round(([datetime]::UtcNow - $waitStartedUtc).TotalMinutes)
+        Write-Host ("[{0:o}] still waiting for DOSBox pid {1} to exit ({2} min elapsed, timeout at {3:o})" -f `
+            [datetime]::UtcNow, $ParentPid, $waitedMinutes, $deadline)
+        $nextHeartbeat = [datetime]::UtcNow.Add($heartbeatInterval)
+    }
     Start-Sleep -Milliseconds 500
 }
 
 if (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue) {
-    throw "DOSBox process $ParentPid did not exit before the finalizer timeout."
+    $waitOutcome = "timeout_parent_still_running"
+    Write-Host ("[{0:o}] DOSBox pid {1} did not exit within {2}s — finalizing anyway rather than losing the run." -f `
+        [datetime]::UtcNow, $ParentPid, $WaitTimeoutSeconds)
 }
+$waitedSeconds = [int][math]::Round(([datetime]::UtcNow - $waitStartedUtc).TotalSeconds)
 
 $artifacts = New-Object System.Collections.Generic.List[object]
 $calibrationAccessTrace = Join-Path $RunDirectory "calibration-access.ndjson"
@@ -155,6 +189,11 @@ $markerMetadata = [ordered]@{
     mutation = if ($correctionCount -gt 0) { "true" } else { "false" }
     correction_count = $correctionCount.ToString([Globalization.CultureInfo]::InvariantCulture)
     finalizer = "Finalize-ArlDirectSerialRun.ps1"
+    # `timeout_parent_still_running` means DOSBox was STILL OPEN when this bundle was collected,
+    # so the operator may have added burns to the session afterwards. Treat such a bundle as
+    # complete-as-of-collection, not as a closed session.
+    finalize_wait_outcome = $waitOutcome
+    finalize_waited_seconds = $waitedSeconds.ToString([Globalization.CultureInfo]::InvariantCulture)
     calibration_candidates = ($accessedCalibrationFiles -join ",")
     curve_file = if (@($accessedCalibrationFiles).Count -eq 1) { $accessedCalibrationFiles[0] } else { "" }
     result_file_candidates = ($resultFiles -join ",")
