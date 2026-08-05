@@ -54,23 +54,50 @@ try {
     }
     Assert-Equal 'no non-ASCII characters' 0 $nonAscii.Count
 
-    Write-Host 'DOSBox still open at the deadline: the run is finalized anyway, and says so'
+    Write-Host 'DOSBox still open at the deadline: finalized anyway, then RE-finalized at the real exit'
+    # The finalizer no longer returns at the timeout (it keeps waiting for the true exit), so it
+    # runs as a background process and the test observes BOTH marker writes: the timeout bundle
+    # while DOSBox still lives, and the rewritten marker after DOSBox exits. The hole this pins:
+    # in production (2026-08-01..05) the +24 h marker was the ONLY collection, and days of burns
+    # after it never reached the canonical bundle.
     $run = New-RunDirectory $root 'sample-analysis-timeout'
-    $process = Start-Placeholder 120
+    $process = Start-Placeholder 25
+    $markerPath = Join-Path $run 'directserial-finalized.json'
+    $finalizerProcess = $null
     try {
-        & $finalizer -ParentPid $process.Id -ParentStartTime $process.StartTime `
-            -RunDirectory $run -ImplusPath $implus -WaitTimeoutSeconds 2 | Out-Null
-    } catch {
-        Write-Host "  FAIL  finalizer threw instead of finalizing: $($_.Exception.Message)"
-        $failures++
+        $startTimeText = $process.StartTime.ToString('o')
+        $launch = @{
+            FilePath = if ($IsWindows) { 'powershell.exe' } else { 'pwsh' }
+            PassThru = $true
+            ArgumentList = @(
+                '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $finalizer,
+                '-ParentPid', "$($process.Id)", '-ParentStartTime', $startTimeText,
+                '-RunDirectory', $run, '-ImplusPath', $implus, '-WaitTimeoutSeconds', '2')
+        }
+        if ($IsWindows) { $launch.WindowStyle = 'Hidden' }
+        $finalizerProcess = Start-Process @launch
+
+        $deadline = [datetime]::UtcNow.AddSeconds(20)
+        while (-not (Test-Path -LiteralPath $markerPath) -and [datetime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 250 }
+        Assert-Equal 'timeout marker written while DOSBox still lives' $true (Test-Path -LiteralPath $markerPath)
+        if (Test-Path -LiteralPath $markerPath) {
+            $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json
+            Assert-Equal 'outcome recorded as a timeout' 'timeout_parent_still_running' $marker.metadata.finalize_wait_outcome
+        }
+
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        $deadline = [datetime]::UtcNow.AddSeconds(30)
+        $refinalized = $null
+        while ([datetime]::UtcNow -lt $deadline) {
+            Start-Sleep -Milliseconds 250
+            if (-not (Test-Path -LiteralPath $markerPath)) { continue }
+            try { $refinalized = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json } catch { continue }
+            if ($refinalized.metadata.finalize_wait_outcome -ne 'timeout_parent_still_running') { break }
+        }
+        Assert-Equal 'marker rewritten at the real exit' 'parent_exited_after_timeout' $refinalized.metadata.finalize_wait_outcome
     } finally {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-    }
-    $markerPath = Join-Path $run 'directserial-finalized.json'
-    Assert-Equal 'marker written (the session survives)' $true (Test-Path -LiteralPath $markerPath)
-    if (Test-Path -LiteralPath $markerPath) {
-        $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json
-        Assert-Equal 'outcome recorded as a timeout' 'timeout_parent_still_running' $marker.metadata.finalize_wait_outcome
+        if ($null -ne $finalizerProcess) { Stop-Process -Id $finalizerProcess.Id -Force -ErrorAction SilentlyContinue }
     }
 
     Write-Host 'DOSBox exits normally: unchanged fast path, recorded as a clean exit'

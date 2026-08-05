@@ -74,6 +74,15 @@ jobs:
           cmd.exe /d /s /c $command
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Behavioural contract of the finalizer's wait: the run survives whatever DOSBox does
+      # (timeout-finalize + re-finalize at the true exit). This suite existed but was wired to no
+      # workflow — a green test nobody runs is worth zero.
+      - name: Test ARL directserial finalizer wait contract
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File contrib\arl\tests\Test-FinalizeArlDirectSerialRun.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Validate ARL toolkit scripts
         shell: pwsh
         run: |
