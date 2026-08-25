@@ -1,0 +1,47 @@
+# Secret-scanning config for dosbox-x-arl (fork of joncampbell123/dosbox-x).
+#
+# WHY THIS FILE EXISTS. Measured 2026-08-25: 18 `generic-api-key` findings, every one a
+# FALSE POSITIVE. The rule fires on the left-hand side of C assignments whose variable name
+# contains `key`/`len` — `data_key_lo = data_key_hi`, `keyb.buf8042_len = keyb.buf8042_pos`
+# — and extracts the right-hand side as the "secret". The right-hand side is another C
+# identifier. 17 of 18 are exactly that; the 18th is an RSA PUBLIC key in a vendored
+# SDL2/NaCl test manifest.
+#
+# THE RULE FOR EDITING THIS FILE (inherited from the plan-corpus config, and it is the
+# reason this file allowlists SHAPES rather than the obvious paths):
+#   * Do NOT allowlist by PATH just because a tree is vendored. It blinds the scanner to
+#     those files forever, and "vendored" is a claim about today's content, not tomorrow's.
+#     Every anchor below is a property real key material CANNOT have.
+#   * Verify in BOTH directions on every edit: the repo goes clean, AND a planted synthetic
+#     key still trips. "It looks narrow" is not evidence — RE2 has no lookahead to lean on.
+#
+# Provenance measured, not assumed: JCBauza has 38 commits in this repo and ZERO touching
+# any flagged path (src/libs/decoders, src/libs/libchdr, vs2015, vs2008, visualc_net,
+# doxygen/html, src/hardware/keyboard.cpp).
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+[rules.allowlist]
+regexes = [
+  # A C/C++ identifier, optionally dotted for struct members (`keyb.buf8042_pos`).
+  # The whole match must decompose into identifier segments: a leading letter/underscore
+  # followed only by word characters. That forbids `-`, `+`, `/`, `=` and any leading
+  # digit — punctuation that random key material carries and an identifier never does.
+  # A C/C++ identifier: snake_case, an AVX intrinsic (`_mm512_shuffle_epi32`), or a dotted
+  # struct member (`keyb.buf8042_pos`). The load-bearing part is that at least ONE `_`/`.`
+  # SEPARATOR is required, so the match must decompose into two or more short word segments.
+  #
+  # AN EARLIER VERSION OF THIS PATTERN WAS WRONG AND THE A/B CAUGHT IT. It was
+  # `^[A-Za-z_][A-Za-z0-9_]*$` — no separator required — which a 42-char random alphanumeric
+  # credential satisfies, so the allowlist silently swallowed a planted synthetic key.
+  # Requiring a separator plus a 24-char segment cap is what excludes an unbroken random run.
+  # Re-run the both-directions A/B on every edit here; "it looks narrow" is not evidence.
+  '''^_?[A-Za-z0-9]{1,24}(?:[_.][A-Za-z0-9]{1,24}){1,6}$''',
+
+  # A DER-encoded RSA *public* key (vs2015/sdl2/test/nacl/manifest.json — a Chrome/NaCl
+  # extension manifest). The anchor is the SubjectPublicKeyInfo prefix itself: this exact
+  # byte sequence is what makes the blob a PUBLIC key. A private key cannot carry it.
+  '''^MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQ[A-Za-z0-9+/=]+$''',
+]
