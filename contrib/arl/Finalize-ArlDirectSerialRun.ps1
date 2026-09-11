@@ -9,7 +9,11 @@ param(
     [string]$WorkflowKind = "",
     [string]$WorkflowSnapshotBeforePath = "",
     [string]$WorkflowSnapshotScriptPath = "",
-    [int]$WaitTimeoutSeconds = 86400
+    [int]$WaitTimeoutSeconds = 86400,
+    # Slack on each side of the session window the .RES fallback uses (Select-ArlSessionResultFiles).
+    # DOS file times have a 2-second resolution, so a file written in the first instant of the
+    # session can carry a time just before it.
+    [int]$ResultWindowToleranceSeconds = 2
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,6 +22,125 @@ function Copy-RunArtifact([string]$Source, [string]$DestinationName) {
     if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) { return $false }
     Copy-Item -LiteralPath $Source -Destination (Join-Path $RunDirectory $DestinationName) -Force
     return $true
+}
+
+# Reads result-files-before.json (Start-ArlTraceRun writes it before DOSBox starts) into a
+# name -> entry map. Throws rather than return a partial map.
+#
+# Why "assign, then enumerate": this used to be
+#     foreach ($item in @(Get-Content -Raw $path | ConvertFrom-Json)) { $map[$item.name] = $item }
+# Windows PowerShell 5.1 -- the engine Start-ArlTraceRun launches this finalizer with -- writes a
+# JSON ARRAY from ConvertFrom-Json to the pipeline as ONE object (pwsh 7 enumerates it; its
+# -NoEnumerate switch restores the 5.1 shape). So @() held a single element, the whole array; the
+# loop ran once; $item.name member-enumerated to an array of every name; and that array became
+# the only key of the map. Every per-file lookup returned $null, every .RES in IMPLUS looked new,
+# and all of them were copied: 171 historic .RES files into each of the four 2026-09-09
+# normalization bundles, which pushed them past the Agent's artifact cap into quarantine. CI never
+# saw it because it ran this path under pwsh with a ONE-entry list, which ConvertTo-Json writes as
+# an object, not an array.
+function Read-ArlResultFilesBefore([string]$Path) {
+    $map = @{}
+    $raw = [IO.File]::ReadAllText($Path)
+    if ([string]::IsNullOrWhiteSpace($raw)) { return $map }   # no .RES existed at launch
+    $parsed = ConvertFrom-Json -InputObject $raw
+    foreach ($item in @($parsed)) {
+        # A nested array (the 5.1 shape above) is flattened, never taken as one entry.
+        foreach ($entry in @($item)) {
+            if ($null -eq $entry) { continue }
+            $name = $entry.name
+            if ($name -isnot [string] -or [string]::IsNullOrWhiteSpace($name)) {
+                throw "an entry has no scalar file name"
+            }
+            $map[$name] = $entry
+        }
+    }
+    return $map
+}
+
+# The .RES fallback for a session in which the guest opened no .RES file (normalization and
+# standardization normally open none). Captures only the .RES files that DIFFER from
+# result-files-before.json AND whose last write falls inside the session window -- from the
+# earlier of the before-list write and DOSBox's start, to now. A file that differs but was last
+# written outside the window is not copied: it is LISTED as skipped, with its reason, so no
+# evidence is dropped silently. Without a readable before list the window alone decides, and the
+# returned basis says so.
+function Select-ArlSessionResultFiles {
+    $selection = [ordered]@{
+        basis = "not_requested"
+        before_list = ""
+        before_list_entries = 0
+        window_start_utc = ""
+        window_end_utc = ""
+        captured = @()
+        skipped = @()
+        vanished = @()
+    }
+    if ([string]::IsNullOrWhiteSpace($ResultFilesBeforePath)) { return $selection }
+
+    $windowStart = $ParentStartTime.ToUniversalTime()
+    $beforeByName = $null
+    if (-not (Test-Path -LiteralPath $ResultFilesBeforePath -PathType Leaf)) {
+        $selection.before_list = "missing"
+    } else {
+        $listWrittenUtc = (Get-Item -LiteralPath $ResultFilesBeforePath).LastWriteTimeUtc
+        if ($listWrittenUtc -lt $windowStart) { $windowStart = $listWrittenUtc }
+        try {
+            $beforeByName = Read-ArlResultFilesBefore $ResultFilesBeforePath
+            $selection.before_list = "ok"
+            $selection.before_list_entries = $beforeByName.Count
+        } catch {
+            $beforeByName = $null
+            $selection.before_list = "unreadable: " + $_.Exception.Message
+        }
+    }
+    $windowStart = $windowStart.AddSeconds(-$ResultWindowToleranceSeconds)
+    $windowEnd = [datetime]::UtcNow.AddSeconds($ResultWindowToleranceSeconds)
+    $selection.window_start_utc = $windowStart.ToString("o")
+    $selection.window_end_utc = $windowEnd.ToString("o")
+    $selection.basis = if ($null -ne $beforeByName) { "before_list_and_session_window" } else { "session_window_only" }
+
+    $captured = New-Object System.Collections.Generic.List[string]
+    $skipped = New-Object System.Collections.Generic.List[object]
+    $present = @{}
+    foreach ($file in @(Get-ChildItem -LiteralPath $ImplusPath -File -Filter "*.RES" -ErrorAction SilentlyContinue | Sort-Object Name)) {
+        $present[$file.Name] = $true
+        $writeUtc = $file.LastWriteTimeUtc
+        $inWindow = ($writeUtc -ge $windowStart) -and ($writeUtc -le $windowEnd)
+        if ($null -eq $beforeByName) {
+            # No before list: a write inside the window is the only evidence of change there is.
+            if ($inWindow) { $captured.Add($file.Name) }
+            continue
+        }
+        $before = $beforeByName[$file.Name]
+        $reason = $null
+        $beforeTicks = $null
+        if ($null -eq $before) {
+            $reason = "not_in_before_list"
+        } else {
+            $beforeTicks = if ($null -ne $before.last_write_utc_ticks) { [long]$before.last_write_utc_ticks } elseif ($null -ne $before.last_write_utc) { ([datetime]$before.last_write_utc).ToUniversalTime().Ticks } else { [long]0 }
+            if ([long]$before.length -ne $file.Length) { $reason = "length_changed" }
+            elseif ($beforeTicks -ne $writeUtc.Ticks) { $reason = "last_write_changed" }
+        }
+        if ($null -eq $reason) { continue }   # unchanged since launch: not this session's evidence
+        if ($inWindow) {
+            $captured.Add($file.Name)
+        } else {
+            $skipped.Add([ordered]@{
+                name = $file.Name
+                reason = $reason + "_outside_session_window"
+                length = $file.Length
+                last_write_utc = $writeUtc.ToString("o")
+                before_length = if ($null -ne $before) { $before.length } else { $null }
+                before_last_write_utc_ticks = $beforeTicks
+            })
+        }
+    }
+    if ($null -ne $beforeByName) {
+        $selection.vanished = @($beforeByName.Keys | Where-Object { -not $present.ContainsKey($_) } | Sort-Object)
+    }
+    $selection.captured = @($captured.ToArray())
+    $selection.skipped = @($skipped.ToArray())
+    return $selection
 }
 
 # Collect the run's evidence and write (or REWRITE) the finalized marker. Extracted into a
@@ -61,22 +184,15 @@ function Invoke-ArlRunCollection([string]$WaitOutcome, [int]$WaitedSeconds, $Wor
         } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
     }
 
-    $changedResultFiles = @()
-    if (-not [string]::IsNullOrWhiteSpace($ResultFilesBeforePath) -and (Test-Path -LiteralPath $ResultFilesBeforePath -PathType Leaf)) {
-        $beforeByName = @{}
-        foreach ($item in @(Get-Content -Raw -LiteralPath $ResultFilesBeforePath | ConvertFrom-Json)) {
-            $beforeByName[$item.name] = $item
-        }
-        $changedResultFiles = @(Get-ChildItem -LiteralPath $ImplusPath -File -Filter "*.RES" -ErrorAction SilentlyContinue | Where-Object {
-            $before = $beforeByName[$_.Name]
-            $beforeTicks = if ($null -ne $before -and $null -ne $before.last_write_utc_ticks) { [long]$before.last_write_utc_ticks } elseif ($null -ne $before) { ([datetime]$before.last_write_utc).ToUniversalTime().Ticks } else { 0 }
-            $null -eq $before -or [long]$before.length -ne $_.Length -or $beforeTicks -ne $_.LastWriteTimeUtc.Ticks
-        } | ForEach-Object Name | Sort-Object -Unique)
-    }
-    $resultFiles = if ($accessedResultFiles.Count -gt 0) {
-        @($accessedResultFiles)
-    } else {
-        @($changedResultFiles)
+    # IMPACT's own .RES opens are the authoritative signal. Only a session in which the guest
+    # opened no .RES at all (normalization/standardization) falls back to the session window.
+    $resultSelection = $null
+    $resultSource = "guest_open_event"
+    $resultFiles = @($accessedResultFiles)
+    if ($accessedResultFiles.Count -eq 0) {
+        $resultSelection = Select-ArlSessionResultFiles
+        $resultFiles = @($resultSelection.captured)
+        $resultSource = if ($resultFiles.Count -gt 0) { "session_window_fallback" } else { "none" }
     }
 
     # NOT wrapped in @(): pwsh's array coercion of an EMPTY List[object] received as a parameter
@@ -102,6 +218,19 @@ function Invoke-ArlRunCollection([string]$WaitOutcome, [int]$WaitedSeconds, $Wor
         $destinationName = "result-$resultName"
         if (Copy-RunArtifact $source $destinationName) {
             $artifacts.Add([ordered]@{ path = $destinationName; name = $destinationName; role = "legacy_result" })
+        }
+    }
+    if ($null -ne $resultSelection -and $resultSelection.basis -ne "not_requested") {
+        # The fallback's decision is evidence too: what it compared against, the window, what it
+        # copied and what it deliberately did not. Rewritten on every collection.
+        $selectionName = "finalizer-result-selection.json"
+        [IO.File]::WriteAllText((Join-Path $RunDirectory $selectionName), ($resultSelection | ConvertTo-Json -Depth 6), [Text.UTF8Encoding]::new($false))
+        $artifacts.Add([ordered]@{ path = $selectionName; name = $selectionName; role = "other" })
+        Write-Host ("No guest .RES open in this session; result fallback basis={0}, before list={1}, window {2} .. {3}" -f `
+            $resultSelection.basis, $resultSelection.before_list, $resultSelection.window_start_utc, $resultSelection.window_end_utc)
+        Write-Host ("  captured {0} .RES: {1}" -f @($resultSelection.captured).Count, (@($resultSelection.captured) -join ","))
+        foreach ($skippedFile in @($resultSelection.skipped)) {
+            Write-Host ("  skipped (listed, not copied) {0}: {1}, last write {2}" -f $skippedFile.name, $skippedFile.reason, $skippedFile.last_write_utc)
         }
     }
     foreach ($entry in @(
@@ -130,6 +259,18 @@ function Invoke-ArlRunCollection([string]$WaitOutcome, [int]$WaitedSeconds, $Wor
         curve_file = if (@($accessedCalibrationFiles).Count -eq 1) { $accessedCalibrationFiles[0] } else { "" }
         result_file_candidates = ($resultFiles -join ",")
         result_file = if (@($resultFiles).Count -eq 1) { @($resultFiles)[0] } else { "" }
+        # Where result_file_candidates came from: guest_open_event | session_window_fallback | none.
+        result_file_source = $resultSource
+    }
+    if ($null -ne $resultSelection) {
+        $invariant = [Globalization.CultureInfo]::InvariantCulture
+        $markerMetadata.result_fallback_basis = [string]$resultSelection.basis
+        $markerMetadata.result_fallback_before_list = [string]$resultSelection.before_list
+        $markerMetadata.result_fallback_window_start_utc = [string]$resultSelection.window_start_utc
+        $markerMetadata.result_fallback_window_end_utc = [string]$resultSelection.window_end_utc
+        $markerMetadata.result_fallback_captured_count = @($resultSelection.captured).Count.ToString($invariant)
+        $markerMetadata.result_fallback_skipped = (@($resultSelection.skipped | ForEach-Object { $_.name }) -join ",")
+        $markerMetadata.result_fallback_skipped_count = @($resultSelection.skipped).Count.ToString($invariant)
     }
     if (-not [string]::IsNullOrWhiteSpace($WorkflowKind)) {
         $markerMetadata.workflow = $WorkflowKind
@@ -242,6 +383,8 @@ if (-not [string]::IsNullOrWhiteSpace($WorkflowKind)) {
         foreach ($file in Get-ChildItem -LiteralPath $snapshot.Path -File | Where-Object Name -ne "snapshot-manifest.json") {
             $name = "$($snapshot.Prefix)-$($file.Name)"
             Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $RunDirectory $name) -Force
+            # .GPX and IMPACT.INI copies stay "other": the Agent's gpx_snapshot/instrument_config
+            # roles mean "the program's file as captured at import", which a before/after copy is not.
             $role = if ($file.Extension -in @(".CAL", ".REG")) { "calibration" } else { "other" }
             $workflowArtifactEntries.Add([ordered]@{ path = $name; name = $name; role = $role })
         }
