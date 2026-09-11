@@ -83,10 +83,20 @@ jobs:
           pwsh -NoProfile -File contrib\arl\tests\Test-FinalizeArlDirectSerialRun.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # 01 PRECHECK's launcher text is the operator's only instruction after the gate: Spanish,
+      # ASCII, and naming only shortcuts that exist.
+      - name: Test ARL operator preflight launcher text
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File contrib\arl\tests\Test-ArlOperatorPreflightCmd.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Validate ARL toolkit scripts
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Capture-ArlWorkflowSnapshot.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlPassiveWorkflowTrace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Analyze-ArlTrace.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Start-ArlTraceRun.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Finalize-ArlDirectSerialRun.ps1)) | Out-Null

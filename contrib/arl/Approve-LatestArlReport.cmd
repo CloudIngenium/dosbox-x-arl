@@ -2,10 +2,10 @@
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\ARL\tools\Approve-LatestArlReport.ps1"
 if errorlevel 1 (
   echo.
-  echo REPORT APPROVAL DID NOT COMPLETE. Leave this window open and send the text to Codex.
+  echo LA APROBACION DEL REPORTE NO SE COMPLETO. Deje esta ventana abierta y comparta este texto con soporte tecnico.
   pause
   exit /b 1
 )
 echo.
-echo REPORT PRINTED AND RECORDED.
+echo REPORTE IMPRESO Y REGISTRADO.
 pause
