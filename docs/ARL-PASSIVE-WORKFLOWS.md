@@ -33,7 +33,8 @@ metadata (`result_fallback_skipped`), so the decision is never silent.
 The two workflows must use separate sessions so file changes and protocol
 commands can be attributed without guessing.
 
-These launchers are never the first physical gate. Complete `01 PRECHECK`, one
-saved `02 REACTIVE SAFE` analysis, and one hash-bound `03 APPROVE LAST REPORT`
-print before capturing standardization. Normalization is always a later,
-separate session.
+These launchers are never the first physical gate. Run `01 PRECHECK` first (it
+must end in `PRECHECK APROBADO`), then confirm the instrument really sparks with
+one analysis through `ARL 3460 - Analizar` before capturing standardization.
+Normalization is always a later, separate session. (`02 REACTIVE SAFE` no
+longer exists on the host; `Install-ArlOperatorExperience.ps1` removes it.)
