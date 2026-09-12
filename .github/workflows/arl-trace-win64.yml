@@ -83,12 +83,26 @@ jobs:
           pwsh -NoProfile -File contrib\arl\tests\Test-FinalizeArlDirectSerialRun.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      # 01 PRECHECK's launcher text is the operator's only instruction after the gate: Spanish,
-      # ASCII, and naming only shortcuts that exist.
+      # The preflight launcher's text is the operator's only instruction after the gate: Spanish,
+      # plain words with no English jargon, ASCII, and naming only launchers the desktop creates.
       - name: Test ARL operator preflight launcher text
         shell: pwsh
         run: |
           pwsh -NoProfile -File contrib\arl\tests\Test-ArlOperatorPreflightCmd.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # The operator desktop decides which run-id prefix a burn gets. The final icon set, the move
+      # map, the manifest/undo contract and the ACLs are proven in a temp tree under both engines.
+      - name: Test ARL operator desktop script
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File contrib\arl\tests\Test-SetArlOperatorDesktop.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Mutation-test ARL operator desktop script
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File contrib\arl\tests\Test-SetArlOperatorDesktop.ps1 -Mutants
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Validate ARL toolkit scripts
@@ -111,6 +125,7 @@ jobs:
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Print-ArlLptCapture.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Watch-ArlLptCapture.ps1)) | Out-Null
           [scriptblock]::Create((Get-Content -Raw contrib\arl\Compare-ArlResultTransactions.ps1)) | Out-Null
+          [scriptblock]::Create((Get-Content -Raw contrib\arl\Set-ArlOperatorDesktop.ps1)) | Out-Null
           pwsh -NoProfile -File contrib\arl\Analyze-ArlTrace.ps1 `
             -TracePath contrib\arl\fixtures\sample-trace.ndjson `
             -OutDir arl-toolkit-test
