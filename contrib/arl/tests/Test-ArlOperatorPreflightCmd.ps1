@@ -1,13 +1,17 @@
 <#
 .SYNOPSIS
-    Static checks for Run-ArlOperatorPreflight.cmd, the '01 PRECHECK' desktop launcher.
+    Static checks for Run-ArlOperatorPreflight.cmd, the preflight launcher the operator desktop
+    lays down.
 
 .DESCRIPTION
     After the gate runs, this launcher's text is the operator's only instruction, so it is pinned
-    here: Spanish, ASCII-only (cmd.exe prints the OEM codepage), no retired owner named, and a PASS
-    text that names only shortcuts that exist. Until 2026-09-11 it told operators to run
-    '02 REACTIVE SAFE' -- a shortcut Chispa's Install-ArlOperatorExperience.ps1 removes from the
-    desktop -- and to send failures to Codex, whose ownership was retired on 2026-07-14.
+    here: Spanish, plain words with no English jargon (PRECHECK/PASSIVE), ASCII-only (cmd.exe prints
+    the OEM codepage), and a PASS text that names only launchers the operator desktop actually
+    creates. The three names it points to are cross-checked against Set-ArlOperatorDesktop.ps1's
+    final rows, so renaming a launcher without fixing this text fails here.
+
+    Until 2026-09 the launcher spoke jargon (PRECHECK NO APROBADO / APROBADO) and pointed at the old
+    '04 STANDARDIZATION PASSIVE' / '05 NORMALIZATION PASSIVE' shortcut names. Both are retired.
 
     Run from anywhere:  pwsh -NoProfile -File contrib/arl/tests/Test-ArlOperatorPreflightCmd.ps1
     Exits non-zero on any failure.
@@ -22,8 +26,8 @@ param(
 $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($ToolkitDir)) { $ToolkitDir = Split-Path -Parent $PSScriptRoot }
 $cmdPath = Join-Path $ToolkitDir 'Run-ArlOperatorPreflight.cmd'
-$shortcutsPath = Join-Path $ToolkitDir 'Create-ArlHpShortcuts.ps1'
-foreach ($path in @($cmdPath, $shortcutsPath)) {
+$desktopScript = Join-Path $ToolkitDir 'Set-ArlOperatorDesktop.ps1'
+foreach ($path in @($cmdPath, $desktopScript)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "not found: $path" }
 }
 
@@ -41,7 +45,15 @@ $lines = @($text -split "`r?`n")
 
 Assert-True 'still runs the deployed gate script' ($text.Contains('-File "C:\ARL\tools\Test-ArlPhysicalPreflight.ps1"'))
 Assert-True 'names no retired owner (Codex)' ($text -notmatch '(?i)codex')
-Assert-True 'does not send operators to 02 REACTIVE SAFE' ($text -notmatch '(?i)02 REACTIVE')
+Assert-True 'speaks no English jargon (PRECHECK/PASSIVE)' ($text -notmatch '(?i)(precheck|passive)')
+
+# The three launcher names the PASS text points to. They must match the operator desktop's final
+# rows exactly, so this is the single source of truth for what the operator is told to open.
+$expectedNames = @(
+    'Analizar colada y estandar tipo',
+    'Ing. Serrano - Estandarizacion con muestras de ajuste',
+    'Ing. Serrano - Normalizacion'
+)
 
 # Split the launcher into the FAIL block (inside `if errorlevel 1 ( ... )`) and the PASS tail.
 $ifIndex = -1
@@ -56,19 +68,18 @@ $passBlock = if ($closeIndex -ge 0 -and $closeIndex + 1 -lt $lines.Count) { @($l
 $failText = $failBlock -join "`n"
 $passText = $passBlock -join "`n"
 
-Assert-True 'FAIL text is the Spanish one' ($failText.Contains('PRECHECK NO APROBADO'))
+Assert-True 'FAIL text is the Spanish one' ($failText.Contains('EQUIPO NO LISTO'))
 Assert-True 'FAIL branch keeps the window open and exits non-zero' ($failText -match '(?im)^\s*pause\s*$' -and $failText -match '(?im)^\s*exit /b 1\s*$')
-Assert-True 'PASS text is the Spanish one' ($passText.Contains('PRECHECK APROBADO'))
-foreach ($shortcut in @('05 NORMALIZATION PASSIVE', '04 STANDARDIZATION PASSIVE', 'ARL 3460 - Analizar')) {
-    Assert-True "PASS text names '$shortcut'" ($passText.Contains($shortcut))
+Assert-True 'PASS text is the Spanish one' ($passText.Contains('EQUIPO LISTO'))
+foreach ($name in $expectedNames) {
+    Assert-True "PASS text names '$name'" ($passText.Contains($name))
 }
 
-# The PASS text may name only shortcuts that exist. '04'/'05' are installed by
-# Create-ArlHpShortcuts.ps1 in this repo; 'ARL 3460 - Analizar' is installed by Chispa's
-# deploy/Install-ArlOperatorExperience.ps1 and cannot be cross-checked from here.
-$shortcutNames = @([regex]::Matches([IO.File]::ReadAllText($shortcutsPath), 'Name\s*=\s*"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
-foreach ($shortcut in @('04 STANDARDIZATION PASSIVE', '05 NORMALIZATION PASSIVE')) {
-    Assert-True "'$shortcut' is a shortcut Create-ArlHpShortcuts.ps1 installs" ($shortcutNames -contains $shortcut)
+# The PASS text may name only launchers the operator desktop actually creates. All three are final
+# rows in Set-ArlOperatorDesktop.ps1 (Name = '...'), so a rename there without fixing this text fails.
+$rowNames = @([regex]::Matches([IO.File]::ReadAllText($desktopScript), "Name\s*=\s*'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+foreach ($name in $expectedNames) {
+    Assert-True "'$name' is a launcher Set-ArlOperatorDesktop.ps1 creates" ($rowNames -contains $name)
 }
 
 # cmd.exe ends a parenthesised block at the first ')' -- even inside an echo -- and treats & | < > ^ %

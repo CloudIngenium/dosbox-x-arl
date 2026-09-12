@@ -2,14 +2,14 @@
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\ARL\tools\Test-ArlPhysicalPreflight.ps1"
 if errorlevel 1 (
   echo.
-  echo PRECHECK NO APROBADO. El equipo todavia no esta listo para trabajar con el ARL.
-  echo Deje esta ventana abierta y comparta este texto con soporte tecnico antes de continuar.
+  echo EQUIPO NO LISTO. No abra ningun icono del ARL.
+  echo Tome una foto de esta ventana y avise a Sistemas.
   pause
   exit /b 1
 )
 echo.
-echo PRECHECK APROBADO. Puede cerrar esta ventana y abrir el acceso directo que corresponda:
-echo   - 05 NORMALIZATION PASSIVE: normalizacion
-echo   - 04 STANDARDIZATION PASSIVE: estandarizacion
-echo   - ARL 3460 - Analizar: analisis de muestras
+echo EQUIPO LISTO. Cierre esta ventana y abra el icono que corresponda:
+echo   - Analizar colada y estandar tipo
+echo   - Ing. Serrano - Estandarizacion con muestras de ajuste
+echo   - Ing. Serrano - Normalizacion
 pause
