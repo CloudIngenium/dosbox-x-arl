@@ -70,19 +70,19 @@ Manual install fallback:
 
 1. Copy `arl-toolkit-simple386-matrix-20260708.zip` to the HP.
 2. Extract it over `C:\ARL\DOSBox-X-ARL`.
-3. From an interactive PowerShell window on the HP, run:
+3. From an elevated PowerShell window on the HP, review then apply the operator
+   desktop:
 
 ```powershell
-C:\ARL\DOSBox-X-ARL\Create-ArlHpShortcuts.ps1
+C:\ARL\DOSBox-X-ARL\contrib\arl\Set-ArlOperatorDesktop.ps1          # revisar (dry run)
+C:\ARL\DOSBox-X-ARL\contrib\arl\Set-ArlOperatorDesktop.ps1 -Apply
 ```
 
-This creates only the no-rebuild operator shortcuts. Pass
-`-IncludeBuildRequired` only after a build containing the ARL modem-line options
-is installed:
-
-```powershell
-C:\ARL\DOSBox-X-ARL\Create-ArlHpShortcuts.ps1 -IncludeBuildRequired
-```
+This lays down the three Spanish launchers, the guide card and the admin-only
+diagnostics groups under one undo manifest; see
+`docs/ARL-OPERATOR-DESKTOP.md`. `Create-ArlHpShortcuts.ps1` is retired
+(2026-09) and now throws pointing here; its old numbered-jargon desktop
+(`00 DIRECTSERIAL BYPASS` ... `90 EMULATOR`) is no longer created.
 
 Current status after repair:
 
@@ -96,17 +96,16 @@ Current status after repair:
 - The previous default executable hash
   `499A1F9D992F28CD022429F6F2CCAAFA0F03D898F68B606B7659CA29819571DA`
   was backed up under `C:\ARL\DOSBox-X-ARL\_backups\exe-20260708-220943`.
-- Operator shortcuts under `C:\Users\Public\Desktop` are intentionally short and
-  numbered. `Create-ArlHpShortcuts.ps1` removes old ARL/IMPACT research shortcuts
-  and recreates only the active operational sequence:
-  - `00 DIRECTSERIAL BYPASS`
-  - `01 PRECHECK`
-  - `02 REACTIVE SAFE`
-  - `03 APPROVE LAST REPORT`
-  - `04 STANDARDIZATION PASSIVE`
-  - `05 NORMALIZATION PASSIVE`
-  - `90 EMULATOR`
-  - `Diagnostics - Serial Traces`
+- Operator shortcuts under `C:\Users\Public\Desktop` were, on 2026-07-08, a short
+  numbered sequence created by `Create-ArlHpShortcuts.ps1` (`00 DIRECTSERIAL
+  BYPASS`, `01 PRECHECK`, `02 REACTIVE SAFE`, `03 APPROVE LAST REPORT`,
+  `04 STANDARDIZATION PASSIVE`, `05 NORMALIZATION PASSIVE`, `90 EMULATOR`,
+  `Diagnostics - Serial Traces`). The floor could not tell them apart, so the
+  2026-09 operator desktop replaced that whole set with three plain Spanish
+  launchers (`Analizar colada y estandar tipo`, `Ing. Serrano - Estandarizacion
+  con muestras de ajuste`, `Ing. Serrano - Normalizacion`) plus an
+  `Ayuda - Que icono uso` guide card and admin-only diagnostics groups, all under
+  one undo manifest. See `docs/ARL-OPERATOR-DESKTOP.md`.
 - `01 PRECHECK` only reads PnP/SERIALCOMM, process, disk, Agent health and Epson
   state. It never opens COM5.
 - `03 APPROVE LAST REPORT` refuses zero or multiple pending reports, re-hashes
@@ -141,6 +140,10 @@ pwsh -NoProfile -File contrib/arl/Invoke-ArlHpRemoteScript.ps1 `
 ```
 
 ## Shortcut Rules
+
+> As of 2026-09 the operator desktop is built declaratively by
+> `Set-ArlOperatorDesktop.ps1` (see `docs/ARL-OPERATOR-DESKTOP.md`); these rules
+> are the conventions it, and any manual shortcut, still follow.
 
 - Create shortcuts as `.lnk` in `C:\Users\Public\Desktop`.
 - Point shortcuts to `.cmd` wrappers, not directly to `.ps1`, so they do not

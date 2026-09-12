@@ -1,8 +1,12 @@
 # Passive standardization and normalization capture
 
-The `04 STANDARDIZATION PASSIVE` and `05 NORMALIZATION PASSIVE` launchers are
-observe-only evidence tools. They start normal IMPACT, capture serial/LPT, and
-never send a Chispa command or alter an ARL response.
+The `Ing. Serrano - Estandarizacion con muestras de ajuste` and
+`Ing. Serrano - Normalizacion` launchers are observe-only evidence tools. They
+start normal IMPACT, capture serial/LPT, and never send a Chispa command or
+alter an ARL response. (Both were named `04 STANDARDIZATION PASSIVE` /
+`05 NORMALIZATION PASSIVE` before the 2026-09 operator desktop; the `.cmd`
+wrappers behind them are unchanged, and each now sets a Spanish console title so
+the black window is unmistakably Ing. Serrano's.)
 
 Before IMPACT starts, the launcher snapshots every top-level `.CAL`, `.REG` and
 `.GPX` file plus `WORK.DAT`, `QUA.DAT`, `MAT.DAT`, `MESS.DAT` and `IMPACT.INI`.
@@ -33,8 +37,11 @@ metadata (`result_fallback_skipped`), so the decision is never silent.
 The two workflows must use separate sessions so file changes and protocol
 commands can be attributed without guessing.
 
-These launchers are never the first physical gate. Run `01 PRECHECK` first (it
-must end in `PRECHECK APROBADO`), then confirm the instrument really sparks with
-one analysis through `ARL 3460 - Analizar` before capturing standardization.
-Normalization is always a later, separate session. (`02 REACTIVE SAFE` no
-longer exists on the host; `Install-ArlOperatorExperience.ps1` removes it.)
+These launchers are never the first physical gate. Run the preflight launcher
+first (it must end in `EQUIPO LISTO`), then confirm the instrument really sparks
+with one analysis through `Analizar colada y estandar tipo` before capturing
+standardization. Normalization is always a later, separate session, in Ing.
+Serrano's own login. The operator desktop that lays down these launchers is
+applied and undone by `Set-ArlOperatorDesktop.ps1`; see
+`docs/ARL-OPERATOR-DESKTOP.md`. (`02 REACTIVE SAFE` no longer exists on the
+host; `Install-ArlOperatorExperience.ps1` removes it.)
