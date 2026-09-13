@@ -40,7 +40,7 @@ param(
 function Get-ArlCiGateProblems {
     param([string[]]$Lines, [string]$Depth, [string]$TestText, [int]$ExitCode = 0)
     $minControls = 22
-    $minMutants = 23
+    $minMutants = 24
     $engines = @('powershell', 'pwsh')
     $out = [System.Collections.Generic.List[string]]::new()
 

@@ -145,7 +145,7 @@ jobs:
           pwsh -NoProfile -File contrib\arl\tests\Invoke-ArlOperatorDesktopCiGate.ps1 -Depth Motor
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      # Each engine mutant (M01-M23) runs its self-test with -Controls set to the control that owns it,
+      # Each engine mutant (M01-M24) runs its self-test with -Controls set to the control that owns it,
       # and must be killed by that control; the gate fails on any SKIP or missing PASS line here too. The
       # gate passes -SkipEngine at this depth: the step above already ran the full engine self-test.
       - name: Mutation-test ARL operator desktop script

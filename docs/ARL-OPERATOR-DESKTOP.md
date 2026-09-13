@@ -244,7 +244,7 @@ Undo is LIFO: `-Undo` reverses the newest reversible run (`applying`, `applied`,
 
 - `contrib/arl/tests/Test-SetArlOperatorDesktop.ps1` — static parse + control
   self-test (22 controls, `C01`-`C21` plus `C04b`); `-Mutants` runs the engine
-  mutation suite (23 mutants `M01`-`M23`). Each mutant runs its self-test with
+  mutation suite (24 mutants `M01`-`M24`). Each mutant runs its self-test with
   `-SelfTest -Controls <its control>`, so it counts as killed only when the
   control named for it fails. `C20` kills the child inside an action
   (`ARL_DESKTOP_FAIL_INSIDE_ACTION`: after a move, after a backup, after a

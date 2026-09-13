@@ -1124,9 +1124,11 @@ function Invoke-ArlAction {
                 $fs = [System.IO.File]::Open($TempPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write)
                 try { $fs.Write($Bytes, 0, $Bytes.Length) } finally { $fs.Dispose() }
                 # A scanner or indexer holding the manifest for a moment is a sharing/lock violation, not a failure.
+                # No backup is [NullString]::Value: PowerShell hands $null to a string parameter as "", which
+                # Replace refuses as a path ("The path is not of a legal form").
                 $a = 0
                 while ($true) {
-                    try { [System.IO.File]::Replace($TempPath, $Path, $null); break }
+                    try { [System.IO.File]::Replace($TempPath, $Path, [NullString]::Value); break }
                     catch [System.IO.IOException] {
                         if ((@(-2147024864, -2147024863) -contains $_.Exception.HResult) -and $a -lt 5) { $a++; Start-Sleep -Milliseconds 200; continue }
                         throw
@@ -1479,7 +1481,9 @@ function Get-ArlManifests($P) {
         try { $j = [System.IO.File]::ReadAllText($m) | ConvertFrom-Json; $state = [string]$j.state } catch { continue }
         [void]$out.Add(@{ Ts = $d.Name; Path = $m; State = $state })
     }
-    return @($out | Sort-Object -Property Ts)
+    # The key goes through a script block: Windows PowerShell 5.1 Sort-Object does not read a hashtable key by
+    # property name, so -Property Ts left the order scrambled and LIFO named the wrong newest run (M24, C12).
+    return @($out | Sort-Object -Property { [string]$_.Ts })
 }
 
 # A run killed mid-apply or mid-undo leaves its manifest at applying or undoing; those stay reversible, and
@@ -1885,7 +1889,9 @@ function Set-ArlStProtect([string]$Path, [string]$Sddl) {
 }
 function Add-ArlStUserWrite([string]$Path, [string]$Sid) {
     $acl = Get-Acl -LiteralPath $Path
-    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(([System.Security.Principal.SecurityIdentifier]$Sid), 'Modify', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
+    # A file ACE takes no inheritance flags (AddAccessRule refuses them: "No flags can be set").
+    $inherit = if (Test-Path -LiteralPath $Path -PathType Container) { 'ContainerInherit,ObjectInherit' } else { 'None' }
+    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(([System.Security.Principal.SecurityIdentifier]$Sid), 'Modify', $inherit, 'None', 'Allow')
     $acl.AddAccessRule($rule)
     Set-Acl -LiteralPath $Path -AclObject $acl
 }
@@ -2105,7 +2111,10 @@ function Invoke-ArlStC12([string]$T, [hashtable]$SP) {
         $path = Write-ArlStTamperManifest -SP $SP -Mutate $c.Mutate -UserWritable:$c.Writable
         $res = Invoke-ArlStChild $T @('-Undo', '-Manifest', $path)
         $moved = @(Compare-ArlStSnapshot $toolsBefore (Get-ArlStSnapshot $SP.Tools)).Count -ne 0
-        if (($res.Exit -ne 2) -or $moved) { $ok = $false; $detail += ($c.Name + '(exit=' + $res.Exit + ') ') }
+        # The refusal must be the trust check itself (R11): an earlier R10 (LIFO picked the wrong newest run)
+        # would also exit 2 and hide a trust check that no longer runs (M08, M17, M24).
+        $ids = if ($null -ne $res.Result) { @($res.Result.failed_controls) } else { @() }
+        if (($res.Exit -ne 2) -or $moved -or ($ids -notcontains 'R11')) { $ok = $false; $detail += ($c.Name + '(exit=' + $res.Exit + ' rechazo=' + ($ids -join ',') + ') ') }
         Remove-ArlStTamper $SP
     }
     Add-ArlStResult 'C12' 'manifiestos manipulados rechazados' $ok $detail
@@ -2183,10 +2192,14 @@ function Invoke-ArlStGroup4([string]$T) {
     $a2 = if ($archives.Count -ge 2) { $archives[-1].FullName } else { '' }
     $dupOk = $a2 -and (Test-Path -LiteralPath (Join-Path $a2 'duplicados\ARL 3460 - Analizar.lnk'))
     $emuOk = Test-Path -LiteralPath (Join-Path $SP.Tools 'Simuladores\90 EMULATOR.lnk')
+    # The legacy colada shortcut belongs in Accesos-anteriores, never Diagnostico: without its own rule it
+    # falls to the under-ARL rule and still lands a duplicate there (M06).
+    $legacyOk = (Test-Path -LiteralPath (Join-Path $SP.Tools 'Accesos-anteriores\ARL 3460 - Analizar.lnk') -PathType Leaf) -and
+        (@(Get-ChildItem -LiteralPath (Join-Path $SP.Tools 'Diagnostico') -Filter 'ARL 3460 - Analizar*' -Force -ErrorAction SilentlyContinue).Count -eq 0)
     $chispaOnD = @(Get-ChildItem -LiteralPath $SP.PublicDesktop -Filter *.lnk -Force -ErrorAction SilentlyContinue | Where-Object {
         $lnk = (Read-ArlShortcut $_.FullName); $lnk -and ([System.IO.Path]::GetFileName($lnk.Target) -eq 'Chispa.Operator.exe') }).Count
-    $c07 = ($ap2.Exit -eq 0) -and $dupOk -and $emuOk -and ($chispaOnD -eq 1)
-    Add-ArlStResult 'C07' 'duplicado a duplicados; emulador a Simuladores' $c07 ('dup=' + $dupOk + ' emu=' + $emuOk + ' chispaEnD=' + $chispaOnD)
+    $c07 = ($ap2.Exit -eq 0) -and $dupOk -and $emuOk -and $legacyOk -and ($chispaOnD -eq 1)
+    Add-ArlStResult 'C07' 'duplicado a duplicados; emulador a Simuladores' $c07 ('dup=' + $dupOk + ' emu=' + $emuOk + ' anteriores=' + $legacyOk + ' chispaEnD=' + $chispaOnD)
 }
 
 # C08: a pre-existing H (exact SDDL, owner BA) already holding a DIFFERENT file at a move destination:
@@ -2281,8 +2294,11 @@ function Invoke-ArlStGroup6([string]$T) {
         $after = Get-ArlStSnapshot $victima
         $unchanged = (@(Compare-ArlStSnapshot $before $after).Count -eq 0)
         $noManifest = -not (Test-Path -LiteralPath (Join-Path $victima 'move-manifest.json'))
-        if (($res.Exit -ne 2) -or (-not $unchanged) -or (-not $noManifest)) {
-            $ok = $false; $detail += ($c.Name + '(exit=' + $res.Exit + ' intacto=' + $unchanged + ' sinmanif=' + $noManifest + ') ')
+        # The refusal must be R6: a later ownership or writer refusal (R7) of the junction target also exits 2
+        # and would hide a reparse check that no longer runs (M07).
+        $ids = if ($null -ne $res.Result) { @($res.Result.failed_controls) } else { @() }
+        if (($res.Exit -ne 2) -or (-not $unchanged) -or (-not $noManifest) -or ($ids -notcontains 'R6')) {
+            $ok = $false; $detail += ($c.Name + '(exit=' + $res.Exit + ' rechazo=' + ($ids -join ',') + ' intacto=' + $unchanged + ' sinmanif=' + $noManifest + ') ')
         }
     }
     Add-ArlStResult 'C11' 'enlaces (junctions) rechazados' $ok $detail
