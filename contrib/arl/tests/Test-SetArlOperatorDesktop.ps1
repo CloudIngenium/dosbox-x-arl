@@ -76,7 +76,7 @@ $mutantSpecs = @(
     @{ Id = 'M06'; Killer = 'C07'; Find = 'if ($P.LegacyDailyTargets -contains $Target) { return @{ Group = ''Accesos-anteriores''; Tag = '''' } }'; Replace = '' }
     @{ Id = 'M07'; Killer = 'C11'; Find = 'function Test-ArlReparseChain([string]$Path) {'; Replace = ('function Test-ArlReparseChain([string]$Path) {' + "`n" + '    return $false') }
     @{ Id = 'M08'; Killer = 'C12'; Find = 'if (-not (Test-ArlUnderAny -Path $candidate -Roots $trustRoots)) {'; Replace = 'if ($false) {' }
-    @{ Id = 'M09'; Killer = 'C14'; Find = 'Name = ''Analizar colada y estandar tipo'''; Replace = 'Name = ''ARL Analizar colada y estandar tipo''' }
+    @{ Id = 'M09'; Killer = 'C14'; Find = 'Name = ''Analizar colada'''; Replace = 'Name = ''ARL Analizar colada''' }
     @{ Id = 'M10'; Killer = 'C01'; Find = 'if (-not $PSCmdlet.ShouldProcess($Path, $Op)) { return $false }'; Replace = '' }
     @{ Id = 'M11'; Killer = 'C06'; Find = '(New-ArlClass ''desconocido'' '''' $note)'; Replace = '(New-ArlClass ''mover'' ''Diagnostico'' $note)' }
     @{ Id = 'M12'; Killer = 'C03'; Find = 'Test-ArlFieldsEqual -Actual $existing.Lnk -Expected $exp'; Replace = '$false' }
@@ -121,6 +121,42 @@ foreach ($id in $staticIds) {
     $ok = $bad.Count -eq 0
     $detail = if ($ok) { '' } else { '-- ' + (($bad | ForEach-Object { $_.Detail }) -join ' | ') }
     Assert-True "estatico $id  $($r[0].Name)" $ok $detail
+}
+
+# ---- depth 1c: card mutants (any OS) ------------------------------------------------------------
+# Each one plants a wording or layout defect in a private copy of the card; C15 must reject it. These
+# need no Windows APIs, so they run on every engine and on the CI runner off Windows too.
+$cardMutantSpecs = @(
+    @{ Id = 'K01'; Find = 'repita la quema. Si vuelve'; Replace = 'no repita la quema. Si vuelve' }
+    @{ Id = 'K02'; Find = 'Sali&oacute; la hoja <span class="marca">ARL 3460 - AVISO: SIN CHISPA</span>'; Replace = 'Hoja <span class="marca">SIN CHISPA</span>' }
+    @{ Id = 'K03'; Find = 'arg&oacute;n y soporte.</li>'; Replace = 'arg&oacute;n y la mesa de chispa (stand).</li>' }
+    @{ Id = 'K04'; Find = 'Los iconos <span class="nombre">Ing. Serrano</span> no son'; Replace = 'Los iconos <span class="nombre">Ing. Serrano - Normalizacion</span> no son' }
+    @{ Id = 'K05'; Find = 'body { font-size: 14pt; }'; Replace = 'body { font-size: 12.5pt; }' }
+    @{ Id = 'K06'; Find = 'No abra IMPACT de otra forma'; Replace = 'No abra IMPACT ni DOSBox-X de otra forma' }
+    @{ Id = 'K07'; Find = '<section class="hoja pagina serrano">'; Replace = '<section class="hoja serrano">' }
+    @{ Id = 'K08'; Find = 'No hubo chispa suficiente. Esa hoja'; Replace = 'Solo hubo ruido. Esa hoja' }
+)
+if (Test-Path -LiteralPath $cardPath -PathType Leaf) {
+    $cardText = [System.IO.File]::ReadAllText($cardPath)
+    $cardDir = Join-Path ([System.IO.Path]::GetTempPath()) ('arl-desktop-card-mutants-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $cardDir -Force | Out-Null
+    try {
+        foreach ($k in $cardMutantSpecs) {
+            $idx = $cardText.IndexOf($k.Find, [System.StringComparison]::Ordinal)
+            $last = $cardText.LastIndexOf($k.Find, [System.StringComparison]::Ordinal)
+            if ($idx -lt 0 -or $idx -ne $last) { Assert-True "mutante de tarjeta $($k.Id): patron unico" $false "idx=$idx last=$last"; continue }
+            $mutCard = Join-Path $cardDir ($k.Id + '.html')
+            [System.IO.File]::WriteAllText($mutCard, ($cardText.Substring(0, $idx) + $k.Replace + $cardText.Substring($idx + $k.Find.Length)), (New-Object System.Text.UTF8Encoding($false)))
+            $script:ArlStResults = New-Object System.Collections.Generic.List[object]
+            $consoleOut = [Console]::Out
+            [Console]::SetOut([System.IO.TextWriter]::Null)   # the expected FAIL line of the planted defect is noise here
+            try { Invoke-ArlStCardStatic -CardPath $mutCard | Out-Null } finally { [Console]::SetOut($consoleOut) }
+            $c15 = @($script:ArlStResults | Where-Object { $_.Id -eq 'C15' })
+            Assert-True "mutante de tarjeta $($k.Id) muere por C15" (($c15.Count -eq 1) -and (-not $c15[0].Pass)) ($(if ($c15.Count -eq 1) { '-- ' + $c15[0].Detail } else { '-- C15 no se ejecuto' }))
+        }
+    } finally {
+        Remove-Item -LiteralPath $cardDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 # ---- depth 2: run the script's own -SelfTest under each engine (Windows + elevated) -------------

@@ -9,7 +9,7 @@ if errorlevel 1 (
 )
 echo.
 echo EQUIPO LISTO. Cierre esta ventana y abra el icono que corresponda:
-echo   - Analizar colada y estandar tipo
+echo   - Analizar colada
 echo   - Ing. Serrano - Estandarizacion con muestras de ajuste
 echo   - Ing. Serrano - Normalizacion
 pause

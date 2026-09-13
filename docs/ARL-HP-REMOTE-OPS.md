@@ -102,14 +102,19 @@ Current status after repair:
   `04 STANDARDIZATION PASSIVE`, `05 NORMALIZATION PASSIVE`, `90 EMULATOR`,
   `Diagnostics - Serial Traces`). The floor could not tell them apart, so the
   2026-09 operator desktop replaced that whole set with three plain Spanish
-  launchers (`Analizar colada y estandar tipo`, `Ing. Serrano - Estandarizacion
-  con muestras de ajuste`, `Ing. Serrano - Normalizacion`) plus an
-  `Ayuda - Que icono uso` guide card and admin-only diagnostics groups, all under
-  one undo manifest. See `docs/ARL-OPERATOR-DESKTOP.md`.
-- `01 PRECHECK` only reads PnP/SERIALCOMM, process, disk, Agent health and Epson
-  state. It never opens COM5.
-- `03 APPROVE LAST REPORT` refuses zero or multiple pending reports, re-hashes
-  the selected report, and requires the operator to type `APROBAR`.
+  launchers (`Analizar colada`, `Ing. Serrano - Estandarizacion con muestras de
+  ajuste`, `Ing. Serrano - Normalizacion`) plus an `Ayuda - Que icono uso` guide
+  card and admin-only diagnostics groups, all under one undo manifest. See
+  `docs/ARL-OPERATOR-DESKTOP.md`.
+- `01 PRECHECK` and `03 APPROVE LAST REPORT` are no longer operator tools. Once
+  the operator desktop is applied they live in
+  `C:\ARL\Herramientas-Admin\Verificacion-y-aprobacion` (SYSTEM and
+  Administrators only); the floor's spark gate is one burn through
+  `Analizar colada` (see `docs/ARL-PASSIVE-WORKFLOWS.md`).
+  - `01 PRECHECK` only reads PnP/SERIALCOMM, process, disk, Agent health and
+    Epson state. It never opens COM5.
+  - `03 APPROVE LAST REPORT` refuses zero or multiple pending reports, re-hashes
+    the selected report, and requires the administrator to type `APROBAR`.
 - The no-launch verification directories were removed so they do not appear as
   real ARL diagnostic runs.
 - Emulator shortcuts are hardware-safe: they use DOSBox-X `nullmodem` on

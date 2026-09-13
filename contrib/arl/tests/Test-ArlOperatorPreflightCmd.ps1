@@ -50,7 +50,7 @@ Assert-True 'speaks no English jargon (PRECHECK/PASSIVE)' ($text -notmatch '(?i)
 # The three launcher names the PASS text points to. They must match the operator desktop's final
 # rows exactly, so this is the single source of truth for what the operator is told to open.
 $expectedNames = @(
-    'Analizar colada y estandar tipo',
+    'Analizar colada',
     'Ing. Serrano - Estandarizacion con muestras de ajuste',
     'Ing. Serrano - Normalizacion'
 )

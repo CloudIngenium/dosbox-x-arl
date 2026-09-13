@@ -3,8 +3,8 @@
 `contrib/arl/Set-ArlOperatorDesktop.ps1` builds the ARL floor desktop so a
 technician can tell, at a glance, which launcher is theirs. It replaces the old
 numbered-jargon shortcuts (`00 DIRECTSERIAL BYPASS` ... `90 EMULATOR`, created by
-the now-retired `Create-ArlHpShortcuts.ps1`) with three plain Spanish launchers,
-a guide card, and admin-only folders that hold everything else out of the way.
+the now-retired `Create-ArlHpShortcuts.ps1`) with four public shortcuts (three
+plain Spanish launchers plus the Ayuda guide card) and admin-only folders that hold everything else out of the way.
 
 Everything an operator sees is Spanish (Mexico), plain words, no English jargon.
 
@@ -15,7 +15,7 @@ sees). Exactly four `.lnk` files, in this order:
 
 | Launcher | For whom | Runs |
 |---|---|---|
-| `Analizar colada y estandar tipo` | Everyone, every day | the daily IMPACT analysis (coladas + tipo) |
+| `Analizar colada` | Floor technicians, every day | `Chispa.Operator.exe`, the daily colada analysis (`sample-analysis-`) |
 | `Ayuda - Que icono uso` | Anyone unsure | opens the guide card in Edge |
 | `Ing. Serrano - Estandarizacion con muestras de ajuste` | Ing. Serrano only | `Launch-ArlStandardizationPassiveTrace.cmd` |
 | `Ing. Serrano - Normalizacion` | Ing. Serrano only | `Launch-ArlNormalizationPassiveTrace.cmd` |

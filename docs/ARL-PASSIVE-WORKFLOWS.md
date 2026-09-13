@@ -37,11 +37,18 @@ metadata (`result_fallback_skipped`), so the decision is never silent.
 The two workflows must use separate sessions so file changes and protocol
 commands can be attributed without guessing.
 
-These launchers are never the first physical gate. Run the preflight launcher
-first (it must end in `EQUIPO LISTO`), then confirm the instrument really sparks
-with one analysis through `Analizar colada y estandar tipo` before capturing
-standardization. Normalization is always a later, separate session, in Ing.
-Serrano's own login. The operator desktop that lays down these launchers is
-applied and undone by `Set-ArlOperatorDesktop.ps1`; see
+These launchers are never the first physical gate. The gate is the spark check:
+burn one sample through `Analizar colada` and confirm it printed
+`ARL 3460 - REPORTE DE ANALISIS` with numbers, not
+`ARL 3460 - AVISO: SIN CHISPA`; then close IMPACT and open the Serrano launcher.
+The preflight launcher (`Run-ArlOperatorPreflight.cmd`, formerly `01 PRECHECK`)
+now lives in the admin-only
+`C:\ARL\Herramientas-Admin\Verificacion-y-aprobacion` folder, so the Piso
+session cannot open it; an administrator may still run it, but it is no longer
+a step the floor or Ing. Serrano is asked to do. There is no separate Serrano
+Windows account on the host: "separate session" means close IMPACT first and
+never continue after coladas in the same IMPACT window. Normalization is always
+a later, separate session. The operator desktop that lays down these launchers
+is applied and undone by `Set-ArlOperatorDesktop.ps1`; see
 `docs/ARL-OPERATOR-DESKTOP.md`. (`02 REACTIVE SAFE` no longer exists on the
 host; `Install-ArlOperatorExperience.ps1` removes it.)

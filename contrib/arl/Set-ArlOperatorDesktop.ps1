@@ -9,7 +9,7 @@
     choosing between fifteen icons named PASSIVE, TRACE and PRECHECK is the failure this fixes.
 
     Final desktop (C:\Users\Public\Desktop), besides the Epson/Edge items that are kept:
-      Analizar colada y estandar tipo            daily work (Chispa.Operator.exe)
+      Analizar colada                            daily work (Chispa.Operator.exe)
       Ayuda - Que icono uso                      the printable card (C:\ARL\Guia-Operador\cual-uso.html)
       Ing. Serrano - Estandarizacion con muestras de ajuste
       Ing. Serrano - Normalizacion
@@ -59,10 +59,10 @@ $ErrorActionPreference = 'Stop'
 # Analizar, Ayuda, Epson..., Ing. Serrano - Estandarizacion, Ing. Serrano - Normalizacion, Manual, Microsoft.
 function Get-ArlFinalRows {
     @(
-        @{ Name = 'Analizar colada y estandar tipo'; Target = '{ARL}\ChispaOperator\Chispa.Operator.exe'; Arguments = ''; WorkDir = '{ARL}\ChispaOperator'; Icon = '{ARL}\DOSBox-X-ARL\dosbox-x-arl.exe,0'; Description = 'Trabajo diario: coladas, estandar y estandar tipo. La hoja sale sola en la impresora HP.' }
+        @{ Name = 'Analizar colada'; Target = '{ARL}\ChispaOperator\Chispa.Operator.exe'; Arguments = ''; WorkDir = '{ARL}\ChispaOperator'; Icon = '{ARL}\DOSBox-X-ARL\dosbox-x-arl.exe,0'; Description = 'Trabajo diario: analisis de coladas. La hoja sale sola en la impresora HP.' }
         @{ Name = 'Ayuda - Que icono uso'; Target = '{EDGE}'; Arguments = '"{ARL}\Guia-Operador\cual-uso.html"'; WorkDir = '{ARL}\Guia-Operador'; Icon = '{SYS}\shell32.dll,23'; Description = 'Hoja de ayuda: que icono usar para cada trabajo.' }
-        @{ Name = 'Ing. Serrano - Estandarizacion con muestras de ajuste'; Target = '{ARL}\DOSBox-X-ARL\contrib\arl\Launch-ArlStandardizationPassiveTrace.cmd'; Arguments = ''; WorkDir = '{ARL}\DOSBox-X-ARL'; Icon = '{SYS}\shell32.dll,314'; Description = 'Solo Ing. Serrano. Tecnicos: no lo abran; usen Analizar colada y estandar tipo.' }
-        @{ Name = 'Ing. Serrano - Normalizacion'; Target = '{ARL}\DOSBox-X-ARL\contrib\arl\Launch-ArlNormalizationPassiveTrace.cmd'; Arguments = ''; WorkDir = '{ARL}\DOSBox-X-ARL'; Icon = '{SYS}\shell32.dll,314'; Description = 'Solo Ing. Serrano. Tecnicos: no lo abran; usen Analizar colada y estandar tipo.' }
+        @{ Name = 'Ing. Serrano - Estandarizacion con muestras de ajuste'; Target = '{ARL}\DOSBox-X-ARL\contrib\arl\Launch-ArlStandardizationPassiveTrace.cmd'; Arguments = ''; WorkDir = '{ARL}\DOSBox-X-ARL'; Icon = '{SYS}\shell32.dll,314'; Description = 'Solo Ing. Serrano. Tecnicos: no lo abran; usen Analizar colada.' }
+        @{ Name = 'Ing. Serrano - Normalizacion'; Target = '{ARL}\DOSBox-X-ARL\contrib\arl\Launch-ArlNormalizationPassiveTrace.cmd'; Arguments = ''; WorkDir = '{ARL}\DOSBox-X-ARL'; Icon = '{SYS}\shell32.dll,314'; Description = 'Solo Ing. Serrano. Tecnicos: no lo abran; usen Analizar colada.' }
     )
 }
 
@@ -1901,7 +1901,7 @@ function Invoke-ArlStGroup3([string]$T) {
     $subR5 = Join-Path $T 'r5'
     $SP5 = New-ArlStBaseTree $subR5
     New-ArlStMoveMap $subR5 | Out-Null
-    Set-Content -LiteralPath $SP5.CardSource -Value '<html><body>Analizar colada y estandar tipo sin iconos</body></html>' -Encoding Ascii -NoNewline
+    Set-Content -LiteralPath $SP5.CardSource -Value '<html><body>Analizar colada sin iconos</body></html>' -Encoding Ascii -NoNewline
     $r5 = Invoke-ArlStChild $subR5 @('-Apply')
     if (($r5.Exit -ne 2) -or (Test-Path -LiteralPath $SP5.ArchiveRoot)) { $ok = $false; $detail += ('R5(exit=' + $r5.Exit + ') ') }
     Add-ArlStResult 'C05' 'faltantes e insumos invalidos rechazados' $ok $detail
@@ -2101,7 +2101,7 @@ function Invoke-ArlStGroup8([string]$T) {
     $reemplazar = ($null -ne $r) -and ([int]$r.counts.reemplazar -eq 1)
     $archive = Get-ArlStManifestPath $SP
     $archDir = if ($archive) { Split-Path -Parent $archive } else { '' }
-    $backup = if ($archDir) { Join-Path $archDir 'reemplazados\Escritorio\Analizar colada y estandar tipo.lnk' } else { '' }
+    $backup = if ($archDir) { Join-Path $archDir 'reemplazados\Escritorio\Analizar colada.lnk' } else { '' }
     $backupOk = $backup -and (Test-Path -LiteralPath $backup -PathType Leaf) -and ((Get-FileHash -LiteralPath $backup -Algorithm SHA256).Hash.ToLowerInvariant() -eq $coladaShaOrig)
     $coladaFixed = $false
     if (Test-Path -LiteralPath $colada -PathType Leaf) {
@@ -2133,21 +2133,60 @@ function Invoke-ArlStGroup9([string]$T) {
 # invokes them directly off Windows). C09 is both static (this) and dynamic (group 1); the ids coincide
 # on purpose and the final tally keeps them distinct.
 
-function Invoke-ArlStCardStatic {
-    $card = Join-Path (Split-Path -Parent $PSCommandPath) 'operator-desktop\cual-uso.html'
+# Card text as a reader sees it: entities decoded, accents folded, lower case. Used for the wording checks,
+# so "arg&oacute;n" on the card matches "argon" on the notice Chispa prints.
+function ConvertTo-ArlStReadable([string]$Html) {
+    $t = [System.Net.WebUtility]::HtmlDecode(($Html -replace '<[^>]+>', ' ')).Normalize([System.Text.NormalizationForm]::FormD)
+    $sb = New-Object System.Text.StringBuilder
+    foreach ($ch in $t.ToCharArray()) {
+        if ([System.Globalization.CharUnicodeInfo]::GetUnicodeCategory($ch) -ne [System.Globalization.UnicodeCategory]::NonSpacingMark) { [void]$sb.Append($ch) }
+    }
+    return (($sb.ToString() -replace '\s+', ' ').ToLowerInvariant())
+}
+
+# C15: the card is ASCII, offline, names every final icon, and says what the paper Chispa prints says.
+# Wording pinned to Chispa 4d72e1d (SinChispaNoticeComposer): its ForbiddenWording list never appears, the
+# notice title and its QUE HACER steps appear on the technicians' page, and no emulator jargon leaks in.
+# Structure: two printable pages, technicians first; the full Serrano icon names only on the second page;
+# printed body type of 14pt or more. The page count itself is checked by rendering (see the PR), not here.
+function Invoke-ArlStCardStatic([string]$CardPath = '') {
+    $card = if ($CardPath) { $CardPath } else { Join-Path (Split-Path -Parent $PSCommandPath) 'operator-desktop\cual-uso.html' }
     if (-not (Test-Path -LiteralPath $card -PathType Leaf)) { Add-ArlStResult 'C15' 'tarjeta cual-uso.html valida' $false 'no existe junto al script'; return }
     $cardBytes = [System.IO.File]::ReadAllBytes($card)
     $ascii = (@($cardBytes | Where-Object { $_ -gt 0x7F }).Count -eq 0)
     $text = [System.Text.Encoding]::ASCII.GetString($cardBytes)
-    $names = @((Get-ArlFinalRows) | ForEach-Object { $_.Name })
+    $rows = @(Get-ArlFinalRows)
+    $names = @($rows | ForEach-Object { $_.Name })
     $missing = @($names | Where-Object { $text.IndexOf($_, [System.StringComparison]::Ordinal) -lt 0 })
     $wantPng = @((Get-ArlIconSet @{ DosboxExe = ''; ShellDll = '' }) | ForEach-Object { $_.Png } | Sort-Object)
     $gotPng = @([regex]::Matches($text, '(?i)src\s*=\s*"iconos/([^"]+)"') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
     $pngOk = (($wantPng -join '|') -eq ($gotPng -join '|'))
     $noWeb = ($text -notmatch '(?i)https?:') -and ($text -notmatch '(?i)<script')
-    $sinChispa = ($text.IndexOf('SIN CHISPA', [System.StringComparison]::Ordinal) -ge 0)
-    $c15 = $ascii -and (@($missing).Count -eq 0) -and $pngOk -and $noWeb -and $sinChispa
-    Add-ArlStResult 'C15' 'tarjeta cual-uso.html valida' $c15 ('ascii=' + $ascii + ' faltan=[' + (@($missing) -join ',') + '] png=' + $pngOk + '(' + ($gotPng -join ',') + ') web=' + $noWeb + ' chispa=' + $sinChispa)
+
+    $read = ConvertTo-ArlStReadable $text
+    $forbidden = @('ruido', 'razon', 'no repita', 'fuera de banda', 'dosbox', '(stand)', 'nullmodem', 'directserial', 'emulator')
+    $saysForbidden = @($forbidden | Where-Object { $read.IndexOf($_, [System.StringComparison]::Ordinal) -ge 0 })
+
+    $sections = @([regex]::Matches($text, '(?s)<section class="hoja pagina ([a-z]+)">(.*?)</section>'))
+    $shapeOk = ($sections.Count -eq 2) -and ($sections[0].Groups[1].Value -eq 'tecnicos') -and ($sections[1].Groups[1].Value -eq 'serrano')
+    $wordingOk = $false; $pageOneClean = $false
+    if ($shapeOk) {
+        $one = $sections[0].Groups[2].Value
+        $oneRead = ConvertTo-ArlStReadable $one
+        $must = @('arl 3460 - aviso: sin chispa', 'prepare de nuevo la muestra y repita la quema', 'revise fuente de chispa, argon y soporte')
+        $wordingOk = (@($must | Where-Object { $oneRead.IndexOf($_, [System.StringComparison]::Ordinal) -lt 0 }).Count -eq 0) -and
+            ($one.IndexOf($rows[0].Name, [System.StringComparison]::Ordinal) -ge 0)
+        $serranoNames = @($names | Where-Object { $_.StartsWith('Ing. Serrano - ', [System.StringComparison]::Ordinal) })
+        $pageOneClean = ($serranoNames.Count -eq 2) -and (@($serranoNames | Where-Object { $one.IndexOf($_, [System.StringComparison]::Ordinal) -ge 0 }).Count -eq 0)
+    }
+    $printPt = 0.0
+    $pm = [regex]::Match($text, '(?s)@media print\s*\{\s*body\s*\{[^}]*?font-size:\s*([0-9.]+)pt')
+    if ($pm.Success) { $printPt = [double]::Parse($pm.Groups[1].Value, [System.Globalization.CultureInfo]::InvariantCulture) }
+    $printOk = ($printPt -ge 14)
+
+    $c15 = $ascii -and (@($missing).Count -eq 0) -and $pngOk -and $noWeb -and (@($saysForbidden).Count -eq 0) -and $shapeOk -and $wordingOk -and $pageOneClean -and $printOk
+    Add-ArlStResult 'C15' 'tarjeta cual-uso.html valida' $c15 ('ascii=' + $ascii + ' faltan=[' + (@($missing) -join ',') + '] png=' + $pngOk + '(' + ($gotPng -join ',') + ') web=' + $noWeb +
+        ' prohibidas=[' + (@($saysForbidden) -join ',') + '] paginas=' + $shapeOk + ' chispa=' + $wordingOk + ' hoja1-sin-serrano=' + $pageOneClean + ' letra=' + $printPt)
 }
 
 # C09 static: no process/serial verbs anywhere, and every filesystem/ACL mutation verb lives either in the
