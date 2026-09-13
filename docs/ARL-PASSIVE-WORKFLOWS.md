@@ -37,11 +37,16 @@ metadata (`result_fallback_skipped`), so the decision is never silent.
 The two workflows must use separate sessions so file changes and protocol
 commands can be attributed without guessing.
 
-These launchers are never the first physical gate. The gate is the spark check:
-burn one sample through `Analizar colada` and confirm it printed
-`ARL 3460 - REPORTE DE ANALISIS` with numbers, not
-`ARL 3460 - AVISO: SIN CHISPA`; then close IMPACT and open the Serrano launcher.
-The preflight launcher (`Run-ArlOperatorPreflight.cmd`, formerly `01 PRECHECK`)
+These launchers are never the first physical gate. The gate is the spark check,
+and it never creates a colada record (a sample burnt in `Analizar colada` prints
+a colada sheet that is sent to the portal). Ing. Serrano first looks at the last
+colada sheet printed today: `ARL 3460 - REPORTE DE ANALISIS` with numbers means
+the instrument sparked; `ARL 3460 - AVISO: SIN CHISPA` means do not start. If no
+colada was analyzed today, he checks the channel intensities on IMPACT's screen
+in his first normal burn of the Serrano launcher, before accepting anything: a
+burn with spark reaches tens of kp (107.7 kp on 2026-09-09), a burn without it
+stays near 0.2 kp on every channel. If every channel stays below 1 kp he stops,
+accepts no factors and follows the card's `SIN CHISPA` steps. The preflight launcher (`Run-ArlOperatorPreflight.cmd`, formerly `01 PRECHECK`)
 now lives in the admin-only
 `C:\ARL\Herramientas-Admin\Verificacion-y-aprobacion` folder, so the Piso
 session cannot open it; an administrator may still run it, but it is no longer
@@ -50,5 +55,9 @@ Windows account on the host: "separate session" means close IMPACT first and
 never continue after coladas in the same IMPACT window. Normalization is always
 a later, separate session. The operator desktop that lays down these launchers
 is applied and undone by `Set-ArlOperatorDesktop.ps1`; see
-`docs/ARL-OPERATOR-DESKTOP.md`. (`02 REACTIVE SAFE` no longer exists on the
-host; `Install-ArlOperatorExperience.ps1` removes it.)
+`docs/ARL-OPERATOR-DESKTOP.md`. (`Install-ArlOperatorExperience.ps1` removed
+`02 REACTIVE SAFE` from the public desktop, but Chispa's
+`Install-DosboxArlArtifact.ps1` puts it back, with `00 DIRECTSERIAL BYPASS`,
+`01 OBSERVE ONLY`, `90 EMULATOR` and `Diagnosticos ARL`, on every DOSBox-X-ARL
+install until the Chispa generators PR is merged and deployed; the rollout gate
+in that doc covers it.)

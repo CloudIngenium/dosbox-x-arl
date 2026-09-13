@@ -81,8 +81,13 @@ C:\ARL\DOSBox-X-ARL\contrib\arl\Set-ArlOperatorDesktop.ps1 -Apply
 This lays down the three Spanish launchers, the guide card and the admin-only
 diagnostics groups under one undo manifest; see
 `docs/ARL-OPERATOR-DESKTOP.md`. `Create-ArlHpShortcuts.ps1` is retired
-(2026-09) and now throws pointing here; its old numbered-jargon desktop
-(`00 DIRECTSERIAL BYPASS` ... `90 EMULATOR`) is no longer created.
+(2026-09) and now throws pointing here. The old numbered-jargon desktop is still
+re-created by Chispa: `deploy/Install-DosboxArlArtifact.ps1` puts
+`00 DIRECTSERIAL BYPASS`, `01 OBSERVE ONLY`, `02 REACTIVE SAFE`, `90 EMULATOR`
+and `Diagnosticos ARL` back on every DOSBox-X-ARL install until the Chispa
+generators PR (branch `feat/operator-desktop-generators`) is merged and
+deployed. After each install run the review, then `-Apply -WhatIf`, then
+`-Apply` only when the host is idle (the rollout gate in that doc).
 
 Current status after repair:
 
@@ -109,8 +114,10 @@ Current status after repair:
 - `01 PRECHECK` and `03 APPROVE LAST REPORT` are no longer operator tools. Once
   the operator desktop is applied they live in
   `C:\ARL\Herramientas-Admin\Verificacion-y-aprobacion` (SYSTEM and
-  Administrators only); the floor's spark gate is one burn through
-  `Analizar colada` (see `docs/ARL-PASSIVE-WORKFLOWS.md`).
+  Administrators only). Ing. Serrano's spark check reads today's last colada
+  sheet or IMPACT's channel intensities and never burns a sample in
+  `Analizar colada` (see `docs/ARL-PASSIVE-WORKFLOWS.md`). No pre-analysis
+  equipment check is left on the floor; that is pending JC's acceptance.
   - `01 PRECHECK` only reads PnP/SERIALCOMM, process, disk, Agent health and
     Epson state. It never opens COM5.
   - `03 APPROVE LAST REPORT` refuses zero or multiple pending reports, re-hashes
