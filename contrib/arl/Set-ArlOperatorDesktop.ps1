@@ -25,7 +25,7 @@
       -Undo [-Manifest <path>]        deshacer (elevated). Prefer fixing forward: an exact undo puts the
                                       simulator icons back on the public desktop.
       -SelfTest [-Controls C02,C10]   autoprueba (elevated): builds a fake tree under %TEMP% and runs the
-                                      contract controls C01-C20 against child runs of this same file.
+                                      contract controls C01-C21 against child runs of this same file.
 
     Exit codes: 0 sin-cambios|cambios-pendientes|aplicado|deshecho|autoprueba-ok, 1 error|autoprueba-fallo,
     2 rechazado (nothing written), 3 deshecho-parcial. The last stdout line is always
@@ -2431,10 +2431,83 @@ function Invoke-ArlStGroup10([string]$T) {
     }
     Add-ArlStResult 'C20' 'aplicacion cortada dentro de una accion se deshace' $ok $detail
 }
+
+# C21: the shortcuts Chispa's deploy scripts lay on the public desktop, with the names, targets, working
+# folders and icon they use on Chispa main 4d72e1d: Install-DosboxArlArtifact.ps1 (every DOSBox-X-ARL install:
+# 00 DIRECTSERIAL BYPASS, 01 OBSERVE ONLY, 02 REACTIVE SAFE, 90 EMULATOR, Diagnosticos ARL),
+# Reset-ArlDesktopShortcuts.ps1 (Diagnostics - Serial Traces at the top level) and
+# Install-ArlOperatorExperience.ps1 (ARL 3460 - Analizar). -Apply must move each one to its admin group and
+# leave the four final icons. Then Install-ArlOperatorShortcuts.ps1's set is laid down on top, as the next
+# deploy does: revisar must report cambios-pendientes (the rollout gate relies on it), -Apply clears them
+# (a different target takes a suffix, the same launcher goes to duplicados) and a last revisar is
+# sin-cambios. M23 (targets under the ARL root no longer routed to Diagnostico) is caught here.
+function Invoke-ArlStGroup11([string]$T) {
+    $SP = New-ArlStBaseTree $T
+    $icon = $SP.DosboxExe + ',0'
+    $diagDir = Join-Path $SP.ArlRoot 'diagnostics'
+    $toolsDir = Join-Path $SP.ArlRoot 'tools'
+    $bypassKit = Join-Path $SP.Toolkit 'Launch-ArlImpactDirectSerialBypass.cmd'
+    $bypassTools = Join-Path $toolsDir 'Launch-ImpactDirectSerialBypass.cmd'
+    $observe = Join-Path $SP.Toolkit 'Launch-ArlImpactObserveOnlyTrace.cmd'
+    $reactive = Join-Path $SP.Toolkit 'Launch-ArlImpactReactiveSafeTrace.cmd'
+    $emu = Join-Path $SP.Contrib 'Launch-ArlImpactEmulatorFormatSafeLoopTrace.cmd'
+    foreach ($f in @($bypassKit, $bypassTools, $observe, $emu)) { New-ArlStCmd $f }
+    $D = $SP.PublicDesktop
+
+    $round1 = @(
+        @{ Name = '00 DIRECTSERIAL BYPASS'; Target = $bypassKit; WorkDir = $SP.Toolkit; Description = ''; Group = 'Diagnostico' },
+        @{ Name = '01 OBSERVE ONLY'; Target = $observe; WorkDir = $SP.Toolkit; Description = ''; Group = 'Diagnostico' },
+        @{ Name = '02 REACTIVE SAFE'; Target = $reactive; WorkDir = $SP.Toolkit; Description = ''; Group = 'Diagnostico' },
+        @{ Name = '90 EMULATOR'; Target = $emu; WorkDir = $SP.Contrib; Description = ''; Group = 'Simuladores' },
+        @{ Name = 'Diagnosticos ARL'; Target = $diagDir; WorkDir = $diagDir; Description = ''; Group = 'Diagnostico' },
+        @{ Name = 'Diagnostics - Serial Traces'; Target = $diagDir; WorkDir = $diagDir; Description = ''; Group = 'Diagnostico' },
+        @{ Name = 'ARL 3460 - Analizar'; Target = $SP.ChispaExe; WorkDir = $SP.OperatorDir; Description = 'Analizar muestras con el ARL 3460'; Group = 'Accesos-anteriores' }
+    )
+    foreach ($l in $round1) { New-ArlStLnk (Join-Path $D ($l.Name + '.lnk')) $l.Target '' $l.WorkDir $icon $l.Description }
+    $ap1 = Invoke-ArlStChild $T @('-Apply')
+    $r1 = $ap1.Result
+    $placed = @($round1 | Where-Object { (-not (Test-Path -LiteralPath (Join-Path $D ($_.Name + '.lnk')))) -and (Test-Path -LiteralPath (Join-Path (Join-Path $SP.Tools $_.Group) ($_.Name + '.lnk')) -PathType Leaf) })
+    $finalsOk = $true
+    foreach ($f in (Get-ArlStFinalLeaves)) { if (-not (Test-Path -LiteralPath (Join-Path $D $f) -PathType Leaf)) { $finalsOk = $false } }
+    $round1Ok = ($ap1.Exit -eq 0) -and ($null -ne $r1) -and ([string]$r1.status -eq 'aplicado') -and ([int]$r1.counts.mover -eq $round1.Count) -and
+        ([int]$r1.counts.desconocidos -eq 0) -and ($placed.Count -eq $round1.Count) -and $finalsOk
+
+    $round2 = @(
+        @{ Name = '00 DIRECTSERIAL BYPASS'; Target = $bypassTools; WorkDir = $toolsDir },
+        @{ Name = '01 OBSERVE ONLY'; Target = $observe; WorkDir = $SP.Toolkit },
+        @{ Name = '02 REACTIVE SAFE'; Target = $reactive; WorkDir = $SP.Toolkit },
+        @{ Name = '90 EMULATOR'; Target = $emu; WorkDir = $SP.Contrib },
+        @{ Name = 'Diagnosticos ARL'; Target = $diagDir; WorkDir = $diagDir }
+    )
+    foreach ($l in $round2) { New-ArlStLnk (Join-Path $D ($l.Name + '.lnk')) $l.Target '' $l.WorkDir $icon '' }
+    $rev = Invoke-ArlStChild $T @()
+    $revOk = ($rev.Exit -eq 0) -and ($null -ne $rev.Result) -and ([string]$rev.Result.status -eq 'cambios-pendientes') -and
+        ([int]$rev.Result.counts.mover -eq 1) -and ([int]$rev.Result.counts.archivar -eq ($round2.Count - 1))
+    $ap2 = Invoke-ArlStChild $T @('-Apply')
+    $left = @($round2 | Where-Object { Test-Path -LiteralPath (Join-Path $D ($_.Name + '.lnk')) })
+    $suffixed = @(Get-ChildItem -LiteralPath (Join-Path $SP.Tools 'Diagnostico') -Filter '00 DIRECTSERIAL BYPASS (*).lnk' -Force -ErrorAction SilentlyContinue).Count -eq 1
+    $archives = @(Get-ChildItem -LiteralPath $SP.ArchiveRoot -Directory -Force -ErrorAction SilentlyContinue | Sort-Object Name)
+    $dups = 0
+    if ($archives.Count -ge 2) {
+        foreach ($l in @($round2 | Select-Object -Skip 1)) { if (Test-Path -LiteralPath (Join-Path (Join-Path $archives[-1].FullName 'duplicados') ($l.Name + '.lnk')) -PathType Leaf) { $dups++ } }
+    }
+    $rev2 = Invoke-ArlStChild $T @()
+    $round2Ok = $revOk -and ($ap2.Exit -eq 0) -and ($null -ne $ap2.Result) -and ([string]$ap2.Result.status -eq 'aplicado') -and ($left.Count -eq 0) -and
+        $suffixed -and ($dups -eq ($round2.Count - 1)) -and ($rev2.Exit -eq 0) -and ($null -ne $rev2.Result) -and ([string]$rev2.Result.status -eq 'sin-cambios')
+
+    $c21 = $round1Ok -and $round2Ok
+    Add-ArlStResult 'C21' 'accesos de los instaladores de Chispa van a Herramientas-Admin' $c21 ('ronda1=' + $round1Ok + ' exit=' + $ap1.Exit +
+        ' mover=' + $(if ($r1) { $r1.counts.mover } else { '?' }) + ' desconocidos=' + $(if ($r1) { $r1.counts.desconocidos } else { '?' }) +
+        ' en-grupo=' + $placed.Count + '/' + $round1.Count + ' finales=' + $finalsOk +
+        ' revisar=' + $(if ($rev.Result) { [string]$rev.Result.status + '/m' + $rev.Result.counts.mover + '/a' + $rev.Result.counts.archivar } else { 'nulo' }) +
+        ' ronda2-exit=' + $ap2.Exit + ' quedan=' + $left.Count + ' sufijo=' + $suffixed + ' duplicados=' + $dups +
+        ' revisar-final=' + $(if ($rev2.Result) { [string]$rev2.Result.status } else { 'nulo' }))
+}
 # --- static (source-level) controls ---------------------------------------------------------------------
-# These read the shipped .ps1 and card and need no Windows APIs, so they run on any engine (the CI test
-# invokes them directly off Windows). C09 is both static (this) and dynamic (group 1); the ids coincide
-# on purpose and the final tally keeps them distinct.
+# These read the shipped .ps1 and card and need no Windows APIs, so they run on any engine: the test
+# harness dot-sources this file and calls them directly, which also works on a developer machine off
+# Windows. CI itself runs only on windows-latest. C09 is both static (this) and dynamic (group 1); the
+# ids coincide on purpose and the final tally keeps them distinct.
 
 # Card text as a reader sees it: entities decoded, accents folded, lower case. Used for the wording checks,
 # so "arg&oacute;n" on the card matches "argon" on the notice Chispa prints.
@@ -2451,7 +2524,9 @@ function ConvertTo-ArlStReadable([string]$Html) {
 # Wording pinned to Chispa 4d72e1d (SinChispaNoticeComposer): its ForbiddenWording list never appears, the
 # notice title and its QUE HACER steps appear on the technicians' page, and no emulator jargon leaks in.
 # Structure: two printable pages, technicians first; the full Serrano icon names only on the second page;
-# printed body type of 14pt or more. The page count itself is checked by rendering (see the PR), not here.
+# printed body type of 14pt or more. Serrano's spark check reads a sheet or IMPACT's screen and never
+# sends him to burn a sample in the daily icon. The page count itself is checked by rendering (see the PR),
+# not here.
 function Invoke-ArlStCardStatic([string]$CardPath = '') {
     $card = if ($CardPath) { $CardPath } else { Join-Path (Split-Path -Parent $PSCommandPath) 'operator-desktop\cual-uso.html' }
     if (-not (Test-Path -LiteralPath $card -PathType Leaf)) { Add-ArlStResult 'C15' 'tarjeta cual-uso.html valida' $false 'no existe junto al script'; return }
@@ -2470,10 +2545,19 @@ function Invoke-ArlStCardStatic([string]$CardPath = '') {
     $forbidden = @('ruido', 'razon', 'no repita', 'fuera de banda', 'dosbox', '(stand)', 'nullmodem', 'directserial', 'emulator')
     $saysForbidden = @($forbidden | Where-Object { $read.IndexOf($_, [System.StringComparison]::Ordinal) -ge 0 })
 
+    # The spark check never creates a colada record: burning a sample in the daily icon prints a sheet that is
+    # already on the portal (the NO VALIDA case on page two), so no sentence may tell anyone to burn in it.
+    $noThrowaway = -not [regex]::IsMatch($read, 'queme[^.]*en analizar colada')
+
     $sections = @([regex]::Matches($text, '(?s)<section class="hoja pagina ([a-z]+)">(.*?)</section>'))
     $shapeOk = ($sections.Count -eq 2) -and ($sections[0].Groups[1].Value -eq 'tecnicos') -and ($sections[1].Groups[1].Value -eq 'serrano')
-    $wordingOk = $false; $pageOneClean = $false
+    $wordingOk = $false; $pageOneClean = $false; $sparkOk = $false
     if ($shapeOk) {
+        # Page two, before B or C: today's last colada sheet, or the channel intensities on IMPACT's screen in
+        # the first B/C burn with the 1 kp stop, and no factors accepted without spark.
+        $twoRead = ConvertTo-ArlStReadable $sections[1].Groups[2].Value
+        $mustTwo = @('ultima hoja de colada real de hoy', 'reporte de analisis con numeros', 'pantalla de impact la intensidad de cada canal', 'por debajo de 1 kp', 'no acepte los factores')
+        $sparkOk = (@($mustTwo | Where-Object { $twoRead.IndexOf($_, [System.StringComparison]::Ordinal) -lt 0 }).Count -eq 0)
         $one = $sections[0].Groups[2].Value
         $oneRead = ConvertTo-ArlStReadable $one
         $must = @('arl 3460 - aviso: sin chispa', 'prepare de nuevo la muestra y repita la quema', 'revise fuente de chispa, argon y soporte')
@@ -2487,9 +2571,10 @@ function Invoke-ArlStCardStatic([string]$CardPath = '') {
     if ($pm.Success) { $printPt = [double]::Parse($pm.Groups[1].Value, [System.Globalization.CultureInfo]::InvariantCulture) }
     $printOk = ($printPt -ge 14)
 
-    $c15 = $ascii -and (@($missing).Count -eq 0) -and $pngOk -and $noWeb -and (@($saysForbidden).Count -eq 0) -and $shapeOk -and $wordingOk -and $pageOneClean -and $printOk
+    $c15 = $ascii -and (@($missing).Count -eq 0) -and $pngOk -and $noWeb -and (@($saysForbidden).Count -eq 0) -and $shapeOk -and $wordingOk -and $pageOneClean -and $printOk -and $sparkOk -and $noThrowaway
     Add-ArlStResult 'C15' 'tarjeta cual-uso.html valida' $c15 ('ascii=' + $ascii + ' faltan=[' + (@($missing) -join ',') + '] png=' + $pngOk + '(' + ($gotPng -join ',') + ') web=' + $noWeb +
-        ' prohibidas=[' + (@($saysForbidden) -join ',') + '] paginas=' + $shapeOk + ' chispa=' + $wordingOk + ' hoja1-sin-serrano=' + $pageOneClean + ' letra=' + $printPt)
+        ' prohibidas=[' + (@($saysForbidden) -join ',') + '] paginas=' + $shapeOk + ' chispa=' + $wordingOk + ' hoja1-sin-serrano=' + $pageOneClean + ' letra=' + $printPt +
+        ' revision-chispa=' + $sparkOk + ' sin-quema-de-prueba=' + $noThrowaway)
 }
 
 # C09 static: no process/serial verbs anywhere, and every filesystem/ACL mutation verb lives either in the
@@ -2582,7 +2667,8 @@ function Invoke-ArlSelfTest([string[]]$Controls) {
         @{ Name = 'g7'; Controls = @('C16'); Run = { param($d) Invoke-ArlStGroup7 $d } },
         @{ Name = 'g8'; Controls = @('C17', 'C18'); Run = { param($d) Invoke-ArlStGroup8 $d } },
         @{ Name = 'g9'; Controls = @('C19'); Run = { param($d) Invoke-ArlStGroup9 $d } },
-        @{ Name = 'g10'; Controls = @('C20'); Run = { param($d) Invoke-ArlStGroup10 $d } }
+        @{ Name = 'g10'; Controls = @('C20'); Run = { param($d) Invoke-ArlStGroup10 $d } },
+        @{ Name = 'g11'; Controls = @('C21'); Run = { param($d) Invoke-ArlStGroup11 $d } }
     )
     try {
         foreach ($g in $groups) {

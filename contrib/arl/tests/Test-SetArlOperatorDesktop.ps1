@@ -12,27 +12,33 @@
       1. Static (any engine, no Windows APIs): the script is ASCII with no BOM, the operator-facing
          names carry none of the old cleanup jargon, the card is a valid offline Spanish page whose
          icon references match the icon set, and every filesystem/ACL mutation lives inside the one
-         Invoke-ArlAction chokepoint. These run everywhere, including on the CI runner off Windows.
-         So do the card mutants K01-K08 (C15 must reject each) and the planner checks: the planner's
-         own functions, called on in-memory items and a temp folder, must give three distinct names to
-         three same-name items, send a launcher planned twice in one run to duplicados once, route an
-         Emulator/Bridge target (directly or through cmd.exe / powershell.exe) to Simuladores, and leave
-         a folder in place when it holds an item that stays. Planner mutants P01-P05 plant the defects
-         the reviewers found; each must fail its named check.
+         Invoke-ArlAction chokepoint. These need no Windows API, so they also run on a developer
+         machine off Windows (CI itself runs only on windows-latest). So do the card mutants K01-K10
+         (C15 must reject each) and the planner checks: the planner's own functions, called on
+         in-memory items and a temp folder, must give three distinct names to three same-name items,
+         send a launcher planned twice in one run to duplicados once, route an Emulator/Bridge target
+         (directly or through cmd.exe / powershell.exe) to Simuladores, leave a folder in place when it
+         holds an item that stays, and send every shortcut Chispa's installers put back (00 DIRECTSERIAL
+         BYPASS ... ARL 3460 - Analizar) to its admin group. Planner mutants P01-P06 plant the defects
+         the reviewers found; each must fail its named check. The CI gate's log reader
+         (Invoke-ArlOperatorDesktopCiGate.ps1) is checked here too, against good and broken logs.
 
       2. Engine (Windows + elevated): the script's own -SelfTest is run under each available engine
          (powershell.exe = Windows PowerShell 5.1, pwsh = 7). It must exit 0, report autoprueba-ok,
-         and print a PASS line for each of the 21 controls C01-C20 + C04b.
+         and print a PASS line for each of the 22 controls C01-C21 + C04b.
 
-      3. Mutation (-Mutants, Windows + elevated): each of the 22 seeded mutants is applied to a
-         private copy of the script and its self-test is run under Windows PowerShell 5.1; each must
-         be caught (exit 1 with a FAIL line for the control that owns it).
+      3. Mutation (-Mutants, Windows + elevated): each of the 23 seeded mutants is applied to a
+         private copy of the script and its self-test is run under Windows PowerShell 5.1 with
+         -Controls set to the control that owns it; each must be caught (exit 1 with a FAIL line for
+         that control), so a mutant counts as killed only by the control named for it.
 
     Run from anywhere:
       pwsh -NoProfile -File contrib/arl/tests/Test-SetArlOperatorDesktop.ps1
       pwsh -NoProfile -File contrib/arl/tests/Test-SetArlOperatorDesktop.ps1 -Mutants
-    Exits non-zero on any failure. Off Windows the engine and mutant depths SKIP, and only turn into
-    a failure when $env:CI is set (a CI runner that reached them on the wrong OS is a wiring bug).
+    Exits non-zero on any failure. Off Windows, or unelevated, the engine and mutant depths print SKIP
+    and do not fail on their own (a developer laptop); with $env:CI set they fail. CI does not rely on
+    that: it runs this file through Invoke-ArlOperatorDesktopCiGate.ps1, which fails the step on any SKIP
+    and on any engine control or mutant without its PASS line.
 #>
 [CmdletBinding()]
 param(
@@ -67,12 +73,14 @@ function Test-Elevated {
 }
 $inCI = -not [string]::IsNullOrEmpty($env:CI)
 
-# The 21 controls the self-test prints a PASS line for on a healthy tree (C04b is distinct from C04).
+# The 22 controls the self-test prints a PASS line for on a healthy tree (C04b is distinct from C04).
+# Invoke-ArlOperatorDesktopCiGate.ps1 reads this list from this file, so keep it a single @(...) literal.
 $allControls = @('C01', 'C02', 'C03', 'C04', 'C04b', 'C05', 'C06', 'C07', 'C08', 'C09',
-    'C10', 'C11', 'C12', 'C13', 'C14', 'C15', 'C16', 'C17', 'C18', 'C19', 'C20')
+    'C10', 'C11', 'C12', 'C13', 'C14', 'C15', 'C16', 'C17', 'C18', 'C19', 'C20', 'C21')
 
 # The seeded mutants. Find must occur exactly once in the script; Replace is spliced in with LF
-# newlines; Killer is the control whose FAIL line must appear when the mutant's self-test runs.
+# newlines; Killer is the control whose FAIL line must appear when the mutant's self-test runs with
+# -Controls <Killer>. The CI gate reads the Id/Killer pairs from these lines, so keep their shape.
 $mutantSpecs = @(
     @{ Id = 'M01'; Killer = 'C05'; Find = '$missing.Count -gt 0'; Replace = '$false' }
     @{ Id = 'M02'; Killer = 'C08'; Find = 'function Resolve-ArlCollision([string]$Desired, [string]$Stamp) {'; Replace = ('function Resolve-ArlCollision([string]$Desired, [string]$Stamp) {' + "`n" + '    return $Desired') }
@@ -96,6 +104,7 @@ $mutantSpecs = @(
     @{ Id = 'M20'; Killer = 'C15'; Find = 'Png = ''serrano.png''; Source = $P.ShellDll; Index = 314'; Replace = 'Png = ''ingeniero.png''; Source = $P.ShellDll; Index = 314' }
     @{ Id = 'M21'; Killer = 'C20'; Find = '$script:ArlReversibleStates = @(''applying'', ''applied'', ''failed-partial'', ''undoing'', ''undone-partial'')'; Replace = '$script:ArlReversibleStates = @(''applied'', ''failed-partial'', ''undone-partial'')' }
     @{ Id = 'M22'; Killer = 'C20'; Find = 'return (Test-ArlFieldsEqual -Actual (Read-ArlShortcut $Path) -Expected $want)'; Replace = 'return $false' }
+    @{ Id = 'M23'; Killer = 'C21'; Find = 'if (Test-ArlUnder -Path $Target -Root $P.ArlRoot) {'; Replace = 'if ($false) {' }
 )
 
 # ---- depth 1: files exist + parse + one occurrence of every mutant find -------------------------
@@ -133,7 +142,9 @@ foreach ($id in $staticIds) {
 
 # ---- depth 1c: card mutants (any OS) ------------------------------------------------------------
 # Each one plants a wording or layout defect in a private copy of the card; C15 must reject it. These
-# need no Windows APIs, so they run on every engine and on the CI runner off Windows too.
+# need no Windows APIs, so they run on every engine, on Windows in CI and on a developer machine alike.
+# K09 puts back the old spark check (burn a sample in the daily icon, which prints a colada sheet that
+# reaches the portal) next to the new one; K10 drops the 1 kp stop before accepting factors.
 $cardMutantSpecs = @(
     @{ Id = 'K01'; Find = 'repita la quema. Si vuelve'; Replace = 'no repita la quema. Si vuelve' }
     @{ Id = 'K02'; Find = 'Sali&oacute; la hoja <span class="marca">ARL 3460 - AVISO: SIN CHISPA</span>'; Replace = 'Hoja <span class="marca">SIN CHISPA</span>' }
@@ -143,6 +154,8 @@ $cardMutantSpecs = @(
     @{ Id = 'K06'; Find = 'No abra IMPACT de otra forma'; Replace = 'No abra IMPACT ni DOSBox-X de otra forma' }
     @{ Id = 'K07'; Find = '<section class="hoja pagina serrano">'; Replace = '<section class="hoja serrano">' }
     @{ Id = 'K08'; Find = 'No hubo chispa suficiente. Esa hoja'; Replace = 'Solo hubo ruido. Esa hoja' }
+    @{ Id = 'K09'; Find = '<h2>Antes: revise que haya chispa</h2>'; Replace = ('<h2>Antes: revise que haya chispa</h2>' + "`n" + '    <p>Queme una muestra en <img class="icono-linea" src="iconos/analizar-colada.png" alt=""> <span class="nombre">Analizar colada</span> y confirme que sali&oacute; <strong>ARL 3460 - REPORTE DE ANALISIS</strong> con n&uacute;meros. Luego cierre IMPACT.</p>') }
+    @{ Id = 'K10'; Find = 'Si todos quedan por debajo de 1 kp: pare, no acepte los factores y siga el punto SIN CHISPA de abajo.'; Replace = 'Luego acepte en IMPACT como siempre.' }
 )
 if (Test-Path -LiteralPath $cardPath -PathType Leaf) {
     $cardText = [System.IO.File]::ReadAllText($cardPath)
@@ -171,8 +184,10 @@ if (Test-Path -LiteralPath $cardPath -PathType Leaf) {
 # The planner decides where each old shortcut goes before anything is touched. These checks call its
 # functions directly on in-memory items and a private temp folder, with host-native paths, so they need
 # no Windows APIs and no elevation: a triple name collision, a duplicate planned twice in one run, the
-# Emulator/Bridge rule on the target name and on a cmd.exe / powershell.exe wrapper, and a folder that
-# holds an item that stays on the desktop. Each planner mutant plants the defect a reviewer found in a
+# Emulator/Bridge rule on the target name and on a cmd.exe / powershell.exe wrapper, a folder that
+# holds an item that stays on the desktop, and the shortcuts Chispa's installers put back on every
+# DOSBox-X-ARL deploy (the engine control C21 proves the same with real .lnk files, Windows only). Each
+# planner mutant plants the defect a reviewer found in a
 # private copy of the script, which is dot-sourced in place of the real one; its named check must fail.
 $plannerMutantSpecs = @(
     @{ Id = 'P01'; Killer = 'carpeta-conserva'; Find = 'return @{ Cleared = (-not $unknown -and -not $kept); Unknown = $unknown; Kept = $kept; Moved = $moved }'; Replace = 'return @{ Cleared = (-not $unknown); Unknown = $unknown; Kept = $kept; Moved = $moved }' }
@@ -180,6 +195,7 @@ $plannerMutantSpecs = @(
     @{ Id = 'P03'; Killer = 'duplicado-misma-corrida'; Find = 'if (-not $dup -and $script:ArlPlannedLaunchers.ContainsKey($dest)) {'; Replace = 'if ($false) {' }
     @{ Id = 'P04'; Killer = 'regla-destino-emulator'; Find = ' -or ($tleaf -match ''(?i)Emulator|Bridge'')'; Replace = '' }
     @{ Id = 'P05'; Killer = 'regla-cmd-bridge'; Find = 'if ($scriptArg) { $Target = $scriptArg }'; Replace = '' }
+    @{ Id = 'P06'; Killer = 'generadores-chispa'; Find = 'if (Test-ArlUnder -Path $Target -Root $P.ArlRoot) {'; Replace = 'if ($false) {' }
 )
 
 function New-PlItem([string]$Dir, [string]$Leaf, [string]$Target, [string]$Arguments = '', [string]$Icon = '') {
@@ -272,6 +288,33 @@ function Invoke-PlannerChecks([string]$Root) {
                 Children = @((New-PlItem -Dir $fdir -Leaf 'Prueba IMPACT.lnk' -Target $emuCmd)) }
             $res = Add-ArlFolderContents -P $P -Item $folder -Stamp $stamp -Moves $st.Moves -Report $st.Report -Counts $st.Counts
             return @{ Pass = (($res.Cleared -eq $true) -and ($res.Moved -eq 1)); Detail = ('Kept=' + $res.Kept + ' Cleared=' + $res.Cleared + ' Moved=' + $res.Moved) } } }
+        @{ Id = 'generadores-chispa'; Name = 'regla: los accesos que ponen los instaladores de Chispa van a su grupo de administradores'; Body = {
+            # Names and targets as Chispa's deploy scripts write them (Install-DosboxArlArtifact.ps1,
+            # Install-ArlOperatorShortcuts.ps1, Reset-ArlDesktopShortcuts.ps1, Install-ArlOperatorExperience.ps1).
+            # Targets are joined with a backslash under the fake ARL root, as the host records them. Off
+            # Windows the backslash is an ordinary character, so the rule still sees them under that root;
+            # only the group is asserted, because the tag reads the file name, which differs there.
+            $kit = $arl + '\DOSBox-X-ARL'
+            $PG = @{ ArlRoot = $arl; Bridge = ($arl + '\ChispaBridge'); LegacyDailyTargets = @($arl + '\ChispaOperator\Chispa.Operator.exe')
+                VerificationTargets = @(); VerificationLeaves = @('Run-ArlOperatorPreflight.cmd', 'Approve-LatestArlReport.cmd'); FinalRows = @() }
+            $legacy = @(
+                @{ Leaf = '00 DIRECTSERIAL BYPASS.lnk'; Target = ($kit + '\Launch-ArlImpactDirectSerialBypass.cmd'); Group = 'Diagnostico' },
+                @{ Leaf = '00 DIRECTSERIAL BYPASS.lnk'; Target = ($arl + '\tools\Launch-ImpactDirectSerialBypass.cmd'); Group = 'Diagnostico' },
+                @{ Leaf = '01 OBSERVE ONLY.lnk'; Target = ($kit + '\Launch-ArlImpactObserveOnlyTrace.cmd'); Group = 'Diagnostico' },
+                @{ Leaf = '02 REACTIVE SAFE.lnk'; Target = ($kit + '\Launch-ArlImpactReactiveSafeTrace.cmd'); Group = 'Diagnostico' },
+                @{ Leaf = '90 EMULATOR.lnk'; Target = ($kit + '\contrib\arl\Launch-ArlImpactEmulatorFormatSafeLoopTrace.cmd'); Group = 'Simuladores' },
+                @{ Leaf = 'Diagnosticos ARL.lnk'; Target = ($arl + '\diagnostics'); Group = 'Diagnostico' },
+                @{ Leaf = 'Diagnostics - Serial Traces.lnk'; Target = ($arl + '\diagnostics'); Group = 'Diagnostico' },
+                @{ Leaf = 'ARL 3460 - Analizar.lnk'; Target = ($arl + '\ChispaOperator\Chispa.Operator.exe'); Group = 'Accesos-anteriores' }
+            )
+            $bad = New-Object System.Collections.Generic.List[string]
+            foreach ($l in $legacy) {
+                $it = New-PlItem -Dir (Join-Path $Root 'escritorio') -Leaf $l.Leaf -Target $l.Target
+                $it.Depth = 0
+                $cls = Get-ArlItemClass -P $PG -Item $it -Scope 'publico'
+                if (($cls.Action -ne 'mover') -or ($cls.Group -ne $l.Group)) { $bad.Add($l.Leaf + ' -> ' + $cls.Action + '/' + $cls.Group) }
+            }
+            return @{ Pass = ($bad.Count -eq 0); Detail = ($bad -join ' | ') } } }
     )
     foreach ($c in $checks) {
         try { $r = & $c.Body; $out.Add(@{ Id = $c.Id; Name = $c.Name; Pass = [bool]$r.Pass; Detail = [string]$r.Detail }) }
@@ -306,6 +349,41 @@ try {
     }
 } finally {
     Remove-Item -LiteralPath $plRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# ---- depth 1e: the CI gate's log reader (any OS) ---------------------------------------------------
+# CI runs this file through Invoke-ArlOperatorDesktopCiGate.ps1, which must fail the step whenever an
+# engine control or engine mutant did not really run. Its reader is fed a complete log built from this
+# file's own control and mutant lists, then logs with one planted gap each; only the complete log passes.
+$gatePath = Join-Path $PSScriptRoot 'Invoke-ArlOperatorDesktopCiGate.ps1'
+if (-not (Test-Path -LiteralPath $gatePath -PathType Leaf)) {
+    Assert-True 'la puerta de CI Invoke-ArlOperatorDesktopCiGate.ps1 existe' $false "-- $gatePath"
+} else {
+    . $gatePath   # dot-source: defines Get-ArlCiGateProblems and runs nothing
+    $selfText = [System.IO.File]::ReadAllText($PSCommandPath)
+    $goodLog = New-Object System.Collections.Generic.List[string]
+    foreach ($eng in @('powershell', 'pwsh')) {
+        $goodLog.Add("  PASS  motor ${eng}: autoprueba exit 0")
+        $goodLog.Add("  PASS  motor ${eng}: status autoprueba-ok")
+        foreach ($id in $allControls) { $goodLog.Add("  PASS  motor ${eng}: PASS $id") }
+    }
+    foreach ($ms in $mutantSpecs) { $goodLog.Add("  PASS  mutante $($ms.Id) muere por $($ms.Killer)") }
+    $goodLog.Add('all passed')
+    $good = @($goodLog)
+    $gateCases = @(
+        @{ Name = 'un registro completo pasa (motor)'; Lines = $good; Depth = 'Motor'; WantOk = $true },
+        @{ Name = 'un registro completo pasa (mutantes)'; Lines = $good; Depth = 'Mutantes'; WantOk = $true },
+        @{ Name = 'un SKIP de motor falla'; Lines = ($good + '  SKIP  autoprueba por motor (requiere elevacion)'); Depth = 'Motor'; WantOk = $false },
+        @{ Name = 'sin PASS C21 en pwsh falla'; Lines = @($good | Where-Object { $_ -ne '  PASS  motor pwsh: PASS C21' }); Depth = 'Motor'; WantOk = $false },
+        @{ Name = 'PASS C04b no cuenta como PASS C04'; Lines = @($good | Where-Object { $_ -ne '  PASS  motor powershell: PASS C04' }); Depth = 'Motor'; WantOk = $false },
+        @{ Name = 'sin la linea de un mutante falla'; Lines = @($good | Where-Object { $_ -notlike '*mutante M23 *' }); Depth = 'Mutantes'; WantOk = $false },
+        @{ Name = 'un registro de laptop (estatico + SKIP) falla'; Lines = @('  PASS  estatico C15  tarjeta cual-uso.html valida', '  SKIP  autoprueba por motor (requiere Windows)', 'all passed'); Depth = 'Motor'; WantOk = $false }
+    )
+    foreach ($gc in $gateCases) {
+        $probs = @(Get-ArlCiGateProblems -Lines $gc.Lines -Depth $gc.Depth -TestText $selfText)
+        $gateOk = ($probs.Count -eq 0)
+        Assert-True "puerta CI: $($gc.Name)" ($gateOk -eq $gc.WantOk) ('-- problemas=' + $probs.Count + ' ' + (@($probs | Select-Object -First 2) -join ' | '))
+    }
 }
 
 # ---- depth 2: run the script's own -SelfTest under each engine (Windows + elevated) -------------
@@ -361,7 +439,8 @@ if ($Mutants) {
                 $mutText = $scriptText.Substring(0, $idx) + $m.Replace + $scriptText.Substring($idx + $m.Find.Length)
                 [System.IO.File]::WriteAllText($copy, $mutText, (New-Object System.Text.UTF8Encoding($false)))
                 Copy-Item -LiteralPath (Join-Path $ToolkitDir 'operator-desktop') -Destination (Join-Path $dir 'operator-desktop') -Recurse -Force
-                $out = & $ps51.Source -NoProfile -ExecutionPolicy Bypass -File $copy -SelfTest 2>&1
+                # Only the owning control's group runs, so the mutant is killed by the control named for it.
+                $out = & $ps51.Source -NoProfile -ExecutionPolicy Bypass -File $copy -SelfTest -Controls $m.Killer 2>&1
                 $code = $LASTEXITCODE
                 $outText = ($out | Out-String)
                 $killed = ($code -eq 1) -and ($outText -match ('(?m)^FAIL\s+' + [regex]::Escape($m.Killer) + '\b'))

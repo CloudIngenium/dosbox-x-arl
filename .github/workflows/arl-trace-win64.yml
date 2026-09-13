@@ -91,18 +91,72 @@ jobs:
           pwsh -NoProfile -File contrib\arl\tests\Test-ArlOperatorPreflightCmd.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # The two operator desktop suites take long (child PowerShell runs under both engines, one
+      # self-test per mutant), and this workflow is a single job, so a job-level paths filter would
+      # also skip the build. Instead this step decides from the diff whether anything under
+      # contrib/arl/ or this workflow changed. It fails open: when the diff cannot be computed
+      # (workflow_dispatch, a new or force-pushed branch, a missing base) both suites run. The parse
+      # check of Set-ArlOperatorDesktop.ps1 in "Validate ARL toolkit scripts" runs on every change.
+      - name: Decide whether the operator desktop suites run
+        id: arl-desktop-scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          run=true
+          reason="diff not computable; running by default"
+          base=""
+          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$BASE_REF" ]; then
+            base="origin/$BASE_REF"
+          elif [ "$EVENT_NAME" = "push" ] && [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+            base="$BEFORE_SHA"
+          fi
+          if [ -n "$base" ] && changed="$(git diff --name-only "$base...HEAD" 2>/dev/null)"; then
+            # A here-string, not a pipe: with pipefail, grep -q closing the pipe early could read as "no match".
+            if grep -qE '^(contrib/arl/|\.github/workflows/arl-trace-win64\.yml$)' <<< "$changed"; then
+              reason="changes under contrib/arl/ or in this workflow (vs $base)"
+            else
+              run=false
+              reason="no change under contrib/arl/ nor in this workflow (vs $base)"
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "operator desktop suites: run=$run ($reason)"
+
       # The operator desktop decides which run-id prefix a burn gets. The final icon set, the move
       # map, the manifest/undo contract and the ACLs are proven in a temp tree under both engines.
+      # The engine checks need an elevated Windows session (GitHub-hosted Windows runners run as an
+      # administrator with UAC off). If they cannot run, the step FAILS instead of printing SKIP and
+      # passing: the elevation check below exits 1, and the gate fails on any SKIP line or on any
+      # engine control (C01-C21, C04b) without its PASS line under powershell 5.1 and pwsh 7.
       - name: Test ARL operator desktop script
+        if: steps.arl-desktop-scope.outputs.run == 'true'
         shell: pwsh
+        timeout-minutes: 30
         run: |
-          pwsh -NoProfile -File contrib\arl\tests\Test-SetArlOperatorDesktop.ps1
+          $principal = New-Object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
+          if (-not $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            Write-Output '::error::Runner session is not elevated: the operator desktop engine checks cannot run, so this step fails.'
+            exit 1
+          }
+          pwsh -NoProfile -File contrib\arl\tests\Invoke-ArlOperatorDesktopCiGate.ps1 -Depth Motor
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Each engine mutant (M01-M23) runs its self-test with -Controls set to the control that owns it,
+      # and must be killed by that control; the gate fails on any SKIP or missing PASS line here too.
       - name: Mutation-test ARL operator desktop script
+        if: steps.arl-desktop-scope.outputs.run == 'true'
         shell: pwsh
+        timeout-minutes: 90
         run: |
-          pwsh -NoProfile -File contrib\arl\tests\Test-SetArlOperatorDesktop.ps1 -Mutants
+          $principal = New-Object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
+          if (-not $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            Write-Output '::error::Runner session is not elevated: the operator desktop engine mutants cannot run, so this step fails.'
+            exit 1
+          }
+          pwsh -NoProfile -File contrib\arl\tests\Invoke-ArlOperatorDesktopCiGate.ps1 -Depth Mutantes
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Validate ARL toolkit scripts
