@@ -2433,7 +2433,7 @@ function Invoke-ArlStGroup10([string]$T) {
 }
 
 # C21: the shortcuts Chispa's deploy scripts lay on the public desktop, with the names, targets, working
-# folders and icon they use on Chispa main 4d72e1d: Install-DosboxArlArtifact.ps1 (every DOSBox-X-ARL install:
+# folders and icon they use on Chispa main 4d72e1d (deploy scripts unchanged at b9c5053): Install-DosboxArlArtifact.ps1 (every DOSBox-X-ARL install:
 # 00 DIRECTSERIAL BYPASS, 01 OBSERVE ONLY, 02 REACTIVE SAFE, 90 EMULATOR, Diagnosticos ARL),
 # Reset-ArlDesktopShortcuts.ps1 (Diagnostics - Serial Traces at the top level) and
 # Install-ArlOperatorExperience.ps1 (ARL 3460 - Analizar). -Apply must move each one to its admin group and
@@ -2521,10 +2521,11 @@ function ConvertTo-ArlStReadable([string]$Html) {
 }
 
 # C15: the card is ASCII, offline, names every final icon, and says what the paper Chispa prints says.
-# Wording pinned to Chispa 4d72e1d (SinChispaNoticeComposer): its ForbiddenWording list never appears, the
-# notice title and its QUE HACER steps appear on the technicians' page, and no emulator jargon leaks in.
-# Structure: two printable pages, technicians first; the full Serrano icon names only on the second page;
-# printed body type of 14pt or more. Serrano's spark check reads a sheet or IMPACT's screen and never
+# Wording pinned to Chispa b9c5053 (SinChispaNoticeComposer, unchanged since 4d72e1d; Chispa.Operator's launcher
+# error popup): its ForbiddenWording list never appears, the notice title and its QUE HACER steps appear on the
+# technicians' page, and no emulator jargon leaks in. Structure: two printable pages, technicians first; the
+# full Serrano icon names only on the second page; printed body type of 14pt or more. Serrano's spark check
+# reads IMPACT's screen on every B/C session (and today's last colada sheet as an extra stop) and never
 # sends him to burn a sample in the daily icon. The page count itself is checked by rendering (see the PR),
 # not here.
 function Invoke-ArlStCardStatic([string]$CardPath = '') {
@@ -2551,13 +2552,35 @@ function Invoke-ArlStCardStatic([string]$CardPath = '') {
 
     $sections = @([regex]::Matches($text, '(?s)<section class="hoja pagina ([a-z]+)">(.*?)</section>'))
     $shapeOk = ($sections.Count -eq 2) -and ($sections[0].Groups[1].Value -eq 'tecnicos') -and ($sections[1].Groups[1].Value -eq 'serrano')
-    $wordingOk = $false; $pageOneClean = $false; $sparkOk = $false
+    $wordingOk = $false; $pageOneClean = $false; $sparkOk = $false; $noDailyTest = $false
     if ($shapeOk) {
-        # Page two, before B or C: today's last colada sheet, or the channel intensities on IMPACT's screen in
-        # the first B/C burn with the 1 kp stop, and no factors accepted without spark.
-        $twoRead = ConvertTo-ArlStReadable $sections[1].Groups[2].Value
-        $mustTwo = @('ultima hoja de colada real de hoy', 'reporte de analisis con numeros', 'pantalla de impact la intensidad de cada canal', 'por debajo de 1 kp', 'no acepte los factores')
-        $sparkOk = (@($mustTwo | Where-Object { $twoRead.IndexOf($_, [System.StringComparison]::Ordinal) -lt 0 }).Count -eq 0)
+        # Page two opens with the spark box, pinned word for word (tags and accents dropped), before the B/C
+        # rows. A list of required phrases let every weakening a reviewer planted through: dropping the
+        # prohibition or the SIN CHISPA stop, making the screen check apply only on days with no colada, a
+        # 1 kp floor, a sentence appended to accept anyway. The screen check runs on every B/C session, since a
+        # sheet from earlier in the day says nothing about later (the spark stopped on the afternoon of
+        # 2026-09-09; standardization-20260909-170217 was dark). Its floor is Chispa's BurnSparkClassifier.SparkedMaximumFloorKilopulses,
+        # 10 kp, the limit the SIN CHISPA sheet prints; "no se puede leer" covers the groups Chispa b9c5053
+        # withholds with no sheet at all (no_readable_intensities).
+        $twoHtml = $sections[1].Groups[2].Value
+        $twoRead = ConvertTo-ArlStReadable $twoHtml
+        $sparkBox = 'antes de aceptar: revise que haya chispa ' +
+            'si la ultima hoja de colada real de hoy es aviso: sin chispa , no empiece y avise a calidad. ' +
+            'si es reporte de analisis , de todos modos haga el punto 2. ' +
+            'siempre, en su primera quema de b o c y antes de aceptar, vea en la pantalla de impact la intensidad de cada canal. ' +
+            'si el canal mas alto queda por debajo de 10 kp (el mismo limite que imprime la hoja sin chispa) o no se puede leer: ' +
+            'pare, no acepte los factores y siga el punto sin chispa de abajo. ' +
+            'no use analizar colada para probar la chispa: esa hoja se envia al portal.'
+        $boxes = @([regex]::Matches($twoHtml, '(?s)<div class="caja[^"]*">\s*<h2>Antes de aceptar: revise que haya chispa</h2>.*?</div>'))
+        $firstRow = $twoHtml.IndexOf('<span class="letra">B</span>', [System.StringComparison]::Ordinal)
+        $sparkOk = ($boxes.Count -eq 1) -and ((ConvertTo-ArlStReadable $boxes[0].Value).Trim() -eq $sparkBox) -and
+            ($firstRow -gt $boxes[0].Index)
+        # Anywhere on page two, a sentence may name Analizar colada next to a burn, a test, a sample or the spark
+        # only to forbid it: any other such sentence sends Ing. Serrano to burn a colada record in the daily icon.
+        $prohibition = 'no use analizar colada para probar la chispa: esa hoja se envia al portal'
+        $dailyTest = @($twoRead.Split('.') | ForEach-Object { $_.Trim() } | Where-Object {
+                ($_.IndexOf('analizar colada', [System.StringComparison]::Ordinal) -ge 0) -and ($_ -match 'quem|prueb|prob|muestra|chispa') -and ($_ -ne $prohibition) })
+        $noDailyTest = ($dailyTest.Count -eq 0)
         $one = $sections[0].Groups[2].Value
         $oneRead = ConvertTo-ArlStReadable $one
         $must = @('arl 3460 - aviso: sin chispa', 'prepare de nuevo la muestra y repita la quema', 'revise fuente de chispa, argon y soporte')
@@ -2571,10 +2594,10 @@ function Invoke-ArlStCardStatic([string]$CardPath = '') {
     if ($pm.Success) { $printPt = [double]::Parse($pm.Groups[1].Value, [System.Globalization.CultureInfo]::InvariantCulture) }
     $printOk = ($printPt -ge 14)
 
-    $c15 = $ascii -and (@($missing).Count -eq 0) -and $pngOk -and $noWeb -and (@($saysForbidden).Count -eq 0) -and $shapeOk -and $wordingOk -and $pageOneClean -and $printOk -and $sparkOk -and $noThrowaway
+    $c15 = $ascii -and (@($missing).Count -eq 0) -and $pngOk -and $noWeb -and (@($saysForbidden).Count -eq 0) -and $shapeOk -and $wordingOk -and $pageOneClean -and $printOk -and $sparkOk -and $noThrowaway -and $noDailyTest
     Add-ArlStResult 'C15' 'tarjeta cual-uso.html valida' $c15 ('ascii=' + $ascii + ' faltan=[' + (@($missing) -join ',') + '] png=' + $pngOk + '(' + ($gotPng -join ',') + ') web=' + $noWeb +
         ' prohibidas=[' + (@($saysForbidden) -join ',') + '] paginas=' + $shapeOk + ' chispa=' + $wordingOk + ' hoja1-sin-serrano=' + $pageOneClean + ' letra=' + $printPt +
-        ' revision-chispa=' + $sparkOk + ' sin-quema-de-prueba=' + $noThrowaway)
+        ' revision-chispa=' + $sparkOk + ' sin-quema-de-prueba=' + $noThrowaway + ' hoja2-sin-prueba-diaria=' + $noDailyTest)
 }
 
 # C09 static: no process/serial verbs anywhere, and every filesystem/ACL mutation verb lives either in the

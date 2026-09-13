@@ -39,14 +39,21 @@ commands can be attributed without guessing.
 
 These launchers are never the first physical gate. The gate is the spark check,
 and it never creates a colada record (a sample burnt in `Analizar colada` prints
-a colada sheet that is sent to the portal). Ing. Serrano first looks at the last
-colada sheet printed today: `ARL 3460 - REPORTE DE ANALISIS` with numbers means
-the instrument sparked; `ARL 3460 - AVISO: SIN CHISPA` means do not start. If no
-colada was analyzed today, he checks the channel intensities on IMPACT's screen
-in his first normal burn of the Serrano launcher, before accepting anything: a
-burn with spark reaches tens of kp (107.7 kp on 2026-09-09), a burn without it
-stays near 0.2 kp on every channel. If every channel stays below 1 kp he stops,
-accepts no factors and follows the card's `SIN CHISPA` steps. The preflight launcher (`Run-ArlOperatorPreflight.cmd`, formerly `01 PRECHECK`)
+a colada sheet that is sent to the portal). If the last colada sheet printed
+today is `ARL 3460 - AVISO: SIN CHISPA`, Ing. Serrano does not start. An
+`ARL 3460 - REPORTE DE ANALISIS` with numbers is not enough on its own: the
+spark stopped on the afternoon of 2026-09-09 (`standardization-20260909-170217`
+was dark), so a sheet from earlier in the day says nothing about later. So in
+**every** session, in his first normal burn of the Serrano launcher and before
+accepting anything, he reads the channel intensities on IMPACT's screen. If the
+highest channel stays below 10 kp, or cannot be read, he stops, accepts no
+factors and follows the card's `SIN CHISPA` steps. 10 kp is Chispa's own floor
+(`BurnSparkClassifier.SparkedMaximumFloorKilopulses`), the limit the
+`AVISO: SIN CHISPA` sheet prints (`max < 10 kp`): the highest dark burn measured
+on the host peaked at 9.139 kp and the lowest lit one at 10.827 kp. From Chispa
+b9c5053 on, a group whose intensities cannot be read prints no sheet at all
+(`no_readable_intensities`), which is why an unreadable screen also stops him.
+The preflight launcher (`Run-ArlOperatorPreflight.cmd`, formerly `01 PRECHECK`)
 now lives in the admin-only
 `C:\ARL\Herramientas-Admin\Verificacion-y-aprobacion` folder, so the Piso
 session cannot open it; an administrator may still run it, but it is no longer

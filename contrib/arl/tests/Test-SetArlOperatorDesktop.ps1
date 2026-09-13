@@ -13,8 +13,9 @@
          names carry none of the old cleanup jargon, the card is a valid offline Spanish page whose
          icon references match the icon set, and every filesystem/ACL mutation lives inside the one
          Invoke-ArlAction chokepoint. These need no Windows API, so they also run on a developer
-         machine off Windows (CI itself runs only on windows-latest). So do the card mutants K01-K10
-         (C15 must reject each) and the planner checks: the planner's own functions, called on
+         machine off Windows (CI itself runs only on windows-latest). So do the card mutants K01-K19
+         (C15 must reject each; K09-K19 weaken Ing. Serrano's spark check, each caught by a named C15
+         rule) and the planner checks: the planner's own functions, called on
          in-memory items and a temp folder, must give three distinct names to three same-name items,
          send a launcher planned twice in one run to duplicados once, route an Emulator/Bridge target
          (directly or through cmd.exe / powershell.exe) to Simuladores, leave a folder in place when it
@@ -143,8 +144,14 @@ foreach ($id in $staticIds) {
 # ---- depth 1c: card mutants (any OS) ------------------------------------------------------------
 # Each one plants a wording or layout defect in a private copy of the card; C15 must reject it. These
 # need no Windows APIs, so they run on every engine, on Windows in CI and on a developer machine alike.
-# K09 puts back the old spark check (burn a sample in the daily icon, which prints a colada sheet that
-# reaches the portal) next to the new one; K10 drops the 1 kp stop before accepting factors.
+# K09-K19 target Ing. Serrano's spark check on page two. K09 puts back the old check (burn a sample in the
+# daily icon, which prints a colada sheet that reaches the portal); K10 drops the stop before accepting
+# factors; K11 drops the prohibition; K12 rewords it into a test burn in Analizar colada; K13 drops the stop
+# on a SIN CHISPA sheet; K14 puts back the 1 kp floor (Chispa's is 10 kp); K15 limits the screen check to
+# days with no colada; K16 appends a sentence that accepts anyway; K17 adds a test burn in Analizar colada
+# outside the spark box; K18 puts a B row above the spark box; K19 adds a second, weaker spark box. Rule,
+# when given, names the C15 flag that must read False for that mutant, so each rule is shown to catch a
+# defect on its own.
 $cardMutantSpecs = @(
     @{ Id = 'K01'; Find = 'repita la quema. Si vuelve'; Replace = 'no repita la quema. Si vuelve' }
     @{ Id = 'K02'; Find = 'Sali&oacute; la hoja <span class="marca">ARL 3460 - AVISO: SIN CHISPA</span>'; Replace = 'Hoja <span class="marca">SIN CHISPA</span>' }
@@ -154,8 +161,17 @@ $cardMutantSpecs = @(
     @{ Id = 'K06'; Find = 'No abra IMPACT de otra forma'; Replace = 'No abra IMPACT ni DOSBox-X de otra forma' }
     @{ Id = 'K07'; Find = '<section class="hoja pagina serrano">'; Replace = '<section class="hoja serrano">' }
     @{ Id = 'K08'; Find = 'No hubo chispa suficiente. Esa hoja'; Replace = 'Solo hubo ruido. Esa hoja' }
-    @{ Id = 'K09'; Find = '<h2>Antes: revise que haya chispa</h2>'; Replace = ('<h2>Antes: revise que haya chispa</h2>' + "`n" + '    <p>Queme una muestra en <img class="icono-linea" src="iconos/analizar-colada.png" alt=""> <span class="nombre">Analizar colada</span> y confirme que sali&oacute; <strong>ARL 3460 - REPORTE DE ANALISIS</strong> con n&uacute;meros. Luego cierre IMPACT.</p>') }
-    @{ Id = 'K10'; Find = 'Si todos quedan por debajo de 1 kp: pare, no acepte los factores y siga el punto SIN CHISPA de abajo.'; Replace = 'Luego acepte en IMPACT como siempre.' }
+    @{ Id = 'K09'; Rule = 'sin-quema-de-prueba'; Find = '<h2>Antes de aceptar: revise que haya chispa</h2>'; Replace = ('<h2>Antes de aceptar: revise que haya chispa</h2>' + "`n" + '    <p>Queme una muestra en <img class="icono-linea" src="iconos/analizar-colada.png" alt=""> <span class="nombre">Analizar colada</span> y confirme que sali&oacute; <strong>ARL 3460 - REPORTE DE ANALISIS</strong> con n&uacute;meros. Luego cierre IMPACT.</p>') }
+    @{ Id = 'K10'; Rule = 'revision-chispa'; Find = 'Si el canal m&aacute;s alto queda por debajo de 10 kp (el mismo l&iacute;mite que imprime la hoja SIN CHISPA) o no se puede leer: pare, no acepte los factores y siga el punto SIN CHISPA de abajo.'; Replace = 'Luego acepte en IMPACT como siempre.' }
+    @{ Id = 'K11'; Rule = 'revision-chispa'; Find = '<p>No use <span class="nombre">Analizar colada</span> para probar la chispa: esa hoja se env&iacute;a al portal.</p>'; Replace = '' }
+    @{ Id = 'K12'; Rule = 'hoja2-sin-prueba-diaria'; Find = '<p>No use <span class="nombre">Analizar colada</span> para probar la chispa: esa hoja se env&iacute;a al portal.</p>'; Replace = '<p>Haga una quema de prueba con el icono <span class="nombre">Analizar colada</span>.</p>' }
+    @{ Id = 'K13'; Rule = 'revision-chispa'; Find = 'es <strong>AVISO: SIN CHISPA</strong>, no empiece y avise a Calidad. Si es '; Replace = 'es ' }
+    @{ Id = 'K14'; Rule = 'revision-chispa'; Find = 'por debajo de 10 kp'; Replace = 'por debajo de 1 kp' }
+    @{ Id = 'K15'; Rule = 'revision-chispa'; Find = 'Siempre, en su primera quema de B o C'; Replace = 'Si hoy no hubo coladas, en su primera quema de B o C' }
+    @{ Id = 'K16'; Rule = 'revision-chispa'; Find = 'siga el punto SIN CHISPA de abajo.'; Replace = 'siga el punto SIN CHISPA de abajo. Si la siguiente quema sale bien, acepte los de la siguiente.' }
+    @{ Id = 'K17'; Rule = 'hoja2-sin-prueba-diaria'; Find = '<li><strong>Con B o C sale REPORTE DE ANALISIS:</strong>'; Replace = ('<li>Si duda de la chispa, pruebe con una muestra en <span class="nombre">Analizar colada</span>.</li>' + "`n" + '      <li><strong>Con B o C sale REPORTE DE ANALISIS:</strong>') }
+    @{ Id = 'K18'; Rule = 'revision-chispa'; Find = '<h1>Solo Ing. Serrano'; Replace = ('<div class="cab"><span class="letra">B</span> <span class="nombre">Ing. Serrano - Estandarizacion con muestras de ajuste</span></div>' + "`n" + '  <h1>Solo Ing. Serrano') }
+    @{ Id = 'K19'; Rule = 'revision-chispa'; Find = '<span class="letra">B</span>'; Replace = ('<div class="caja alerta"><h2>Antes de aceptar: revise que haya chispa</h2><p>Si tiene prisa, acepte los factores.</p></div>' + "`n" + '      <span class="letra">B</span>') }
 )
 if (Test-Path -LiteralPath $cardPath -PathType Leaf) {
     $cardText = [System.IO.File]::ReadAllText($cardPath)
@@ -173,7 +189,13 @@ if (Test-Path -LiteralPath $cardPath -PathType Leaf) {
             [Console]::SetOut([System.IO.TextWriter]::Null)   # the expected FAIL line of the planted defect is noise here
             try { Invoke-ArlStCardStatic -CardPath $mutCard | Out-Null } finally { [Console]::SetOut($consoleOut) }
             $c15 = @($script:ArlStResults | Where-Object { $_.Id -eq 'C15' })
-            Assert-True "mutante de tarjeta $($k.Id) muere por C15" (($c15.Count -eq 1) -and (-not $c15[0].Pass)) ($(if ($c15.Count -eq 1) { '-- ' + $c15[0].Detail } else { '-- C15 no se ejecuto' }))
+            $killed = ($c15.Count -eq 1) -and (-not $c15[0].Pass)
+            $label = "mutante de tarjeta $($k.Id) muere por C15"
+            if ($k.ContainsKey('Rule')) {
+                $killed = $killed -and ($c15[0].Detail -match ('(^|\s)' + [regex]::Escape($k.Rule) + '=False(\s|$)'))
+                $label = $label + " ($($k.Rule))"
+            }
+            Assert-True $label $killed ($(if ($c15.Count -eq 1) { '-- ' + $c15[0].Detail } else { '-- C15 no se ejecuto' }))
         }
     } finally {
         Remove-Item -LiteralPath $cardDir -Recurse -Force -ErrorAction SilentlyContinue
