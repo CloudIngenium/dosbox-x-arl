@@ -1,8 +1,12 @@
 # Passive standardization and normalization capture
 
-The `04 STANDARDIZATION PASSIVE` and `05 NORMALIZATION PASSIVE` launchers are
-observe-only evidence tools. They start normal IMPACT, capture serial/LPT, and
-never send a Chispa command or alter an ARL response.
+The `Ing. Serrano - Estandarizacion con muestras de ajuste` and
+`Ing. Serrano - Normalizacion` launchers are observe-only evidence tools. They
+start normal IMPACT, capture serial/LPT, and never send a Chispa command or
+alter an ARL response. (Both were named `04 STANDARDIZATION PASSIVE` /
+`05 NORMALIZATION PASSIVE` before the 2026-09 operator desktop; the `.cmd`
+wrappers behind them are unchanged, and each now sets a Spanish console title so
+the black window is unmistakably Ing. Serrano's.)
 
 Before IMPACT starts, the launcher snapshots every top-level `.CAL`, `.REG` and
 `.GPX` file plus `WORK.DAT`, `QUA.DAT`, `MAT.DAT`, `MESS.DAT` and `IMPACT.INI`.
@@ -33,8 +37,34 @@ metadata (`result_fallback_skipped`), so the decision is never silent.
 The two workflows must use separate sessions so file changes and protocol
 commands can be attributed without guessing.
 
-These launchers are never the first physical gate. Run `01 PRECHECK` first (it
-must end in `PRECHECK APROBADO`), then confirm the instrument really sparks with
-one analysis through `ARL 3460 - Analizar` before capturing standardization.
-Normalization is always a later, separate session. (`02 REACTIVE SAFE` no
-longer exists on the host; `Install-ArlOperatorExperience.ps1` removes it.)
+These launchers are never the first physical gate. The gate is the spark check,
+and it never creates a colada record (a sample burnt in `Analizar colada` prints
+a colada sheet that is sent to the portal). If the last colada sheet printed
+today is `ARL 3460 - AVISO: SIN CHISPA`, Ing. Serrano does not start. An
+`ARL 3460 - REPORTE DE ANALISIS` with numbers is not enough on its own: the
+spark stopped on the afternoon of 2026-09-09 (`standardization-20260909-170217`
+was dark), so a sheet from earlier in the day says nothing about later. So in
+**every** session, in his first normal burn of the Serrano launcher and before
+accepting anything, he reads the channel intensities on IMPACT's screen. If the
+highest channel stays below 10 kp, or cannot be read, he stops, accepts no
+factors and follows the card's `SIN CHISPA` steps. 10 kp is Chispa's own floor
+(`BurnSparkClassifier.SparkedMaximumFloorKilopulses`), the limit the
+`AVISO: SIN CHISPA` sheet prints (`max < 10 kp`): the highest dark burn measured
+on the host peaked at 9.139 kp and the lowest lit one at 10.827 kp. From Chispa
+b9c5053 on, a group whose intensities cannot be read prints no sheet at all
+(`no_readable_intensities`), which is why an unreadable screen also stops him.
+The preflight launcher (`Run-ArlOperatorPreflight.cmd`, formerly `01 PRECHECK`)
+now lives in the admin-only
+`C:\ARL\Herramientas-Admin\Verificacion-y-aprobacion` folder, so the Piso
+session cannot open it; an administrator may still run it, but it is no longer
+a step the floor or Ing. Serrano is asked to do. There is no separate Serrano
+Windows account on the host: "separate session" means close IMPACT first and
+never continue after coladas in the same IMPACT window. Normalization is always
+a later, separate session. The operator desktop that lays down these launchers
+is applied and undone by `Set-ArlOperatorDesktop.ps1`; see
+`docs/ARL-OPERATOR-DESKTOP.md`. (`Install-ArlOperatorExperience.ps1` removed
+`02 REACTIVE SAFE` from the public desktop, but Chispa's
+`Install-DosboxArlArtifact.ps1` puts it back, with `00 DIRECTSERIAL BYPASS`,
+`01 OBSERVE ONLY`, `90 EMULATOR` and `Diagnosticos ARL`, on every DOSBox-X-ARL
+install until the Chispa generators PR is merged and deployed; the rollout gate
+in that doc covers it.)
