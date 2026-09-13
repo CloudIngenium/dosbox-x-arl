@@ -20,7 +20,9 @@
     put down into <ts>\deshecho instead of deleting it; only empty folders apply created are removed.
 
     Modes
-      (no switch) or -Apply -WhatIf   revisar: validate, inventory, print the plan. Writes nothing.
+      (no switch)                     revisar: validate, inventory, print the plan. Writes nothing.
+      -Apply -WhatIf                  the revisar checks plus elevation (R1), the same plan; stops at the
+                                      first write with cambios-pendientes. Rehearses no move.
       -Apply                          aplicar (elevated).
       -Undo [-Manifest <path>]        deshacer (elevated). Prefer fixing forward: an exact undo puts the
                                       simulator icons back on the public desktop.
