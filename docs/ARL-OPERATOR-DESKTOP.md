@@ -2,9 +2,22 @@
 
 `contrib/arl/Set-ArlOperatorDesktop.ps1` builds the ARL floor desktop so a
 technician can tell, at a glance, which launcher is theirs. It replaces the old
-numbered-jargon shortcuts (`00 DIRECTSERIAL BYPASS` ... `90 EMULATOR`, created by
-the now-retired `Create-ArlHpShortcuts.ps1`) with four public shortcuts (three
-plain Spanish launchers plus the Ayuda guide card) and admin-only folders that hold everything else out of the way.
+numbered-jargon shortcuts (`00 DIRECTSERIAL BYPASS`, `01 OBSERVE ONLY`,
+`02 REACTIVE SAFE`, `90 EMULATOR`, `Diagnosticos ARL`, `01 PRECHECK` ...) with
+four public shortcuts (three plain Spanish launchers plus the Ayuda guide card)
+and admin-only folders that hold everything else out of the way.
+
+Those old shortcuts are **not** gone just because this repo's
+`Create-ArlHpShortcuts.ps1` is retired (it now throws). Chispa's
+`deploy/Install-DosboxArlArtifact.ps1` re-creates `00 DIRECTSERIAL BYPASS`,
+`01 OBSERVE ONLY`, `02 REACTIVE SAFE`, `90 EMULATOR` and `Diagnosticos ARL` on
+the public desktop on **every DOSBox-X-ARL install**, and Chispa's
+`Install-ArlOperatorShortcuts.ps1`, `Reset-ArlDesktopShortcuts.ps1` and
+`Install-ArlOperatorExperience.ps1` (`ARL 3460 - Analizar`) put back their own
+sets. A Chispa PR (branch `feat/operator-desktop-generators`, link to be added)
+makes those scripts leave the desktop alone when `Set-ArlOperatorDesktop.ps1` is
+present and only run its review mode. Until that PR is merged **and** deployed,
+follow the [rollout gate](#rollout-gate).
 
 Everything an operator sees is Spanish (Mexico), plain words, no English jargon.
 
@@ -122,21 +135,65 @@ apply deadline scales with the plan (60 s plus 10 s per action).
 
 ### Rollout gate
 
-Chispa's own generators are still live on its `main`: `Install-ArlOperatorExperience`
-re-creates `ARL 3460 - Analizar`, and `Reset/Install-ArlOperatorShortcuts` can put
-emulator shortcuts back on the public desktop. Until a Chispa PR retires or
-redirects them:
+**The first `-Apply` on Laboratorio-ARL waits** until the Chispa PR that stops
+the generators (branch `feat/operator-desktop-generators`, link to be added) is
+**merged and deployed** on the host. Before that, the next DOSBox-X-ARL install
+(`Install-DosboxArlArtifact.ps1`) puts `00 DIRECTSERIAL BYPASS`, `01 OBSERVE
+ONLY`, `02 REACTIVE SAFE`, `90 EMULATOR` and `Diagnosticos ARL` straight back on
+the public desktop, and its delete-by-regex cleanup assumes it owns that desktop.
 
-1. After **every** Chispa agent deploy, run `revisar` (the default dry run). If it
-   reports anything other than `sin-cambios`, run `-Apply` again.
-2. Remove the Piso taskbar pin to `dosbox-x-arl.exe` by hand. The script only
-   reports it (`desanclar a mano`); it does not edit the taskbar.
-3. Confirm by hand that the Piso desktop is not redirected (see "Not detected").
-4. Before printing the card, read the Chispa agent version deployed on the host
-   (read-only) and compare it with the card's `arl-card-chispa` meta tag. The card
-   text (the `ARL 3460 - AVISO: SIN CHISPA` steps, which sheets print for a
-   standardization or normalization) was written against that Chispa commit; if
-   the host runs an older or newer build, check the card against it first.
+After that, and again after **every** DOSBox-X-ARL install or Chispa deploy, in
+this order:
+
+1. **Revisar** (the default dry run, no switch). Read the plan. Every old
+   shortcut must show as `SE MUEVE` (to its admin group) or `SE ARCHIVA` (a
+   duplicate of one already there); no old shortcut may show as `DESCONOCIDO`.
+   `sin-cambios` means there is nothing to do: stop here.
+2. **`-Apply -WhatIf`.** Walks the apply path without writing; it must end in
+   `cambios-pendientes`, with no `RECHAZADO`.
+3. **`-Apply`, only when idle:** IMPACT and DOSBox-X-ARL closed, no burn or
+   session in progress, nobody working at the Piso login. Elevated, at the host
+   console or over RDP (see above). The script never looks at processes (control
+   `C09` forbids it), so "idle" is a person's check.
+
+What each shortcut the installers put back becomes (engine control `C21` with
+real `.lnk` files; planner check `generadores-chispa` on any OS):
+
+| Put back by | Shortcut | Goes to |
+|---|---|---|
+| `Install-DosboxArlArtifact.ps1`, `Install-ArlOperatorShortcuts.ps1` | `00 DIRECTSERIAL BYPASS`, `01 OBSERVE ONLY`, `02 REACTIVE SAFE`, `Diagnosticos ARL` | `Diagnostico` |
+| `Install-DosboxArlArtifact.ps1`, `Install-ArlOperatorShortcuts.ps1` | `90 EMULATOR` | `Simuladores` |
+| `Reset-ArlDesktopShortcuts.ps1` | `01`-`03 Bridge Emulator - ...` | `Simuladores` |
+| `Reset-ArlDesktopShortcuts.ps1` | `10 Direct Serial - Baseline`, `20 Inspect Last ARL Run`, `30`/`31 Print ...`, `Diagnostics - Serial Traces` | `Diagnostico` |
+| `Install-ArlOperatorExperience.ps1` | `ARL 3460 - Analizar` | `Accesos-anteriores` |
+| retired `Create-ArlHpShortcuts.ps1` (still on the host today) | `01 PRECHECK`, `03 APPROVE LAST REPORT` | `Verificacion-y-aprobacion` |
+| retired `Create-ArlHpShortcuts.ps1` (still on the host today) | `04 STANDARDIZATION PASSIVE`, `05 NORMALIZATION PASSIVE` | `Accesos-anteriores` |
+
+A shortcut whose launcher is already in its group goes to the run's
+`duplicados\`; one with the same name but a different target is moved in with a
+` (<timestamp>)` suffix. Nothing is deleted.
+
+### Manual sign-off
+
+The script cannot see or fix these. Tick each one before calling the rollout done:
+
+- [ ] The Chispa generators PR (`feat/operator-desktop-generators`) is merged
+      **and** deployed on Laboratorio-ARL (deployed version read, read-only).
+- [ ] Revisar, `-Apply -WhatIf` and `-Apply` ran in that order, when idle, and a
+      last revisar reports `sin-cambios`.
+- [ ] The Piso taskbar pin **`DOSBox-X DOS Emulator`** is unpinned by hand. It
+      starts `C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe` bare: no session, no run id,
+      no Chispa capture, so it goes nowhere. The script only reports it
+      (`PENDIENTE MANUAL ... desanclar a mano`); it never edits the taskbar.
+- [ ] The Piso desktop is not redirected (see "Not detected").
+- [ ] The Chispa agent version deployed on the host (read-only) matches the
+      card's `arl-card-chispa` meta tag. The card text (the `ARL 3460 - AVISO: SIN
+      CHISPA` steps, which sheets print for a standardization or normalization)
+      was written against that Chispa commit; on an older or newer build, check
+      the card against it first.
+- [ ] The card, printed from Edge on the host (Ctrl+P, Letter), is exactly two
+      pages, technicians first. A local Chrome render leaves about two lines free
+      on page two, and Segoe UI on the host can wrap differently.
 
 ## Result line and exit codes
 
@@ -178,31 +235,56 @@ Undo is LIFO: `-Undo` reverses the newest reversible run (`applying`, `applied`,
 ## Tests and CI
 
 - `contrib/arl/tests/Test-SetArlOperatorDesktop.ps1` — static parse + control
-  self-test (21 controls, `C01`-`C20` plus `C04b`); `-Mutants` runs the mutation
-  suite (22 engine mutants `M01`-`M22` plus card mutants `K01`-`K08`; each planted
-  defect must be caught by a named control). `C20` kills the child inside an
-  action (`ARL_DESKTOP_FAIL_INSIDE_ACTION`: after a move, after a backup, after a
+  self-test (22 controls, `C01`-`C21` plus `C04b`); `-Mutants` runs the engine
+  mutation suite (23 mutants `M01`-`M23`). Each mutant runs its self-test with
+  `-SelfTest -Controls <its control>`, so it counts as killed only when the
+  control named for it fails. `C20` kills the child inside an action
+  (`ARL_DESKTOP_FAIL_INSIDE_ACTION`: after a move, after a backup, after a
   shortcut lands but before its ACL reset) and checks that `-Undo` restores both
-  desktops exactly. The planner checks call the planner's own functions on
+  desktops exactly. `C21` lays down the shortcuts Chispa's installers create,
+  with their real names, targets, working folders and icon; `-Apply` must move
+  each to its group (table above). It then lays down the next installer's set:
+  revisar must report `cambios-pendientes`, `-Apply` must clear it, and a last
+  revisar must report `sin-cambios`. At every depth the file also runs the card
+  mutants `K01`-`K10` (`C15` must reject each; `K09` puts back the old "burn a
+  sample in Analizar colada" spark check, `K10` drops the 1 kp stop) and the
+  planner checks. The planner checks call the planner's own functions on
   in-memory items and a temp folder: three items with the same name get three
   distinct destinations (also when an alternate name is already on disk), a
   launcher planned twice in one run goes once to `duplicados\`, a shortcut whose
   target (or whose `cmd.exe /c` / `powershell.exe -File` script) is an Emulator or
-  Bridge launcher goes to `Simuladores`, and a token-named folder that holds a
-  kept item (`Microsoft Edge.lnk`) is left in place. Planner mutants `P01`-`P05`
-  plant the defects the reviewers reported; each must fail its named check.
+  Bridge launcher goes to `Simuladores`, a token-named folder that holds a kept
+  item (`Microsoft Edge.lnk`) is left in place, and every shortcut Chispa's
+  installers put back goes to its group (`generadores-chispa`). Planner mutants
+  `P01`-`P06` plant the defects the reviewers reported; each must fail its named
+  check. The CI gate's log reader is checked there too, against a complete log
+  and logs with one planted gap each.
+- `contrib/arl/tests/Invoke-ArlOperatorDesktopCiGate.ps1` — the CI gate. It
+  refuses to start off Windows or unelevated, runs the test above (`-Depth Motor`,
+  or `-Depth Mutantes` for `-Mutants`), streams its output, and fails on a
+  non-zero exit, on any `SKIP` or `FAIL` line, on any control without its
+  `PASS` line under both `powershell` (5.1) and `pwsh` (7), on any engine mutant
+  not killed by its named control, or without the final `all passed`. It reads
+  the control and mutant lists from the test file, so there is one list to keep.
 - `contrib/arl/tests/Test-ArlOperatorPreflightCmd.ps1` — pins the preflight
   launcher's Spanish, jargon-free text and cross-checks the launcher names it
   points to against this script's final rows.
 
-Both are wired into `.github/workflows/arl-trace-win64.yml` (the windows-latest
-`build-win64-sdl2` job, `shell: pwsh`). The engine controls (`C01`-`C08`,
-`C04b`, `C10`-`C12`, `C16`-`C20`, and the run-time half of `C09`), the engine
-mutants and PS 5.1 itself only exercise on Windows in an elevated session; off
-Windows the self-test prints `SKIP` and the engine mutation step is skipped. The
+All three run in `.github/workflows/arl-trace-win64.yml`, in its single
+windows-latest job `build-win64-sdl2` (`shell: pwsh`). **There is no CI job off
+Windows.** The engine controls (`C01`-`C08`, `C04b`, `C10`-`C12`, `C16`-`C21`,
+and the run-time half of `C09`) and the engine mutants need Windows and an
+elevated session. GitHub-hosted Windows runners run as an administrator with UAC
+off, and both steps check it: without elevation the step exits 1, and the gate
+fails the step on any `SKIP` or missing `PASS` instead of passing it green. The
 static checks (`C09`, `C13`-`C15`), the card mutants, the planner checks and the
-planner mutants run everywhere. There is no separate PS 5.1 job —
-the mutation test invokes `powershell.exe` (5.1) directly where it is present.
+gate's own checks need no Windows API: they run in that same job, and they are
+also what a developer machine off Windows can run (there the engine depths print
+`SKIP`). The two desktop steps run only when the diff touches `contrib/arl/` or
+the workflow; a step before them decides, and runs them whenever the diff cannot
+be computed. The workflow is one job, so a job-level `paths` filter would skip
+the build too. Timeouts: 30 minutes for the test step, 90 for the mutation step.
+There is no separate PS 5.1 job; the tests invoke `powershell.exe` (5.1) directly.
 
 ## Encoding
 
