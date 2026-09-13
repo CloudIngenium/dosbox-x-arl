@@ -70,24 +70,28 @@ Manual install fallback:
 
 1. Copy `arl-toolkit-simple386-matrix-20260708.zip` to the HP.
 2. Extract it over `C:\ARL\DOSBox-X-ARL`.
-3. From an elevated PowerShell window on the HP, review then apply the operator
-   desktop:
+3. From an elevated PowerShell window on the HP, **review** the operator desktop
+   (a dry run; it changes nothing):
 
 ```powershell
 C:\ARL\DOSBox-X-ARL\contrib\arl\Set-ArlOperatorDesktop.ps1          # revisar (dry run)
-C:\ARL\DOSBox-X-ARL\contrib\arl\Set-ArlOperatorDesktop.ps1 -Apply
 ```
 
-This lays down the three Spanish launchers, the guide card and the admin-only
-diagnostics groups under one undo manifest; see
-`docs/ARL-OPERATOR-DESKTOP.md`. `Create-ArlHpShortcuts.ps1` is retired
-(2026-09) and now throws pointing here. The old numbered-jargon desktop is still
-re-created by Chispa: `deploy/Install-DosboxArlArtifact.ps1` puts
+**Do not run `-Apply` yet.** The first `-Apply` on this host waits until the
+Chispa generators PR (branch `feat/operator-desktop-generators`) is merged
+**and** deployed. Until then Chispa's `deploy/Install-DosboxArlArtifact.ps1`
+deletes the public-desktop shortcuts on every DOSBox-X-ARL install and puts
 `00 DIRECTSERIAL BYPASS`, `01 OBSERVE ONLY`, `02 REACTIVE SAFE`, `90 EMULATOR`
-and `Diagnosticos ARL` back on every DOSBox-X-ARL install until the Chispa
-generators PR (branch `feat/operator-desktop-generators`) is merged and
-deployed. After each install run the review, then `-Apply -WhatIf`, then
-`-Apply` only when the host is idle (the rollout gate in that doc).
+and `Diagnosticos ARL` back, so an applied desktop is undone by the next install.
+After that PR is deployed, and after every install, follow the
+[rollout gate](ARL-OPERATOR-DESKTOP.md#rollout-gate) (revisar, `-Apply -WhatIf`,
+then `-Apply` only when the host is idle) and tick the
+[manual sign-off](ARL-OPERATOR-DESKTOP.md#manual-sign-off).
+
+`Set-ArlOperatorDesktop.ps1 -Apply` lays down the three Spanish launchers, the
+guide card and the admin-only diagnostics groups under one undo manifest; see
+`docs/ARL-OPERATOR-DESKTOP.md`. `Create-ArlHpShortcuts.ps1` is retired (2026-09)
+and now throws pointing here.
 
 Current status after repair:
 
@@ -114,9 +118,10 @@ Current status after repair:
 - `01 PRECHECK` and `03 APPROVE LAST REPORT` are no longer operator tools. Once
   the operator desktop is applied they live in
   `C:\ARL\Herramientas-Admin\Verificacion-y-aprobacion` (SYSTEM and
-  Administrators only). Ing. Serrano's spark check reads today's last colada
-  sheet or IMPACT's channel intensities and never burns a sample in
-  `Analizar colada` (see `docs/ARL-PASSIVE-WORKFLOWS.md`). No pre-analysis
+  Administrators only). Ing. Serrano's spark check reads IMPACT's channel
+  intensities in every session (stop below 10 kp, Chispa's floor), stops on a
+  `SIN CHISPA` sheet from today, and never burns a sample in `Analizar colada`
+  (see `docs/ARL-PASSIVE-WORKFLOWS.md`). No pre-analysis
   equipment check is left on the floor; that is pending JC's acceptance.
   - `01 PRECHECK` only reads PnP/SERIALCOMM, process, disk, Agent health and
     Epson state. It never opens COM5.
@@ -151,32 +156,37 @@ pwsh -NoProfile -File contrib/arl/Invoke-ArlHpRemoteScript.ps1 `
   -LocalScriptPath /tmp/my-arl-task.ps1
 ```
 
-## Shortcut Rules
+## Shortcut Rules (historical, before 2026-09)
 
-> As of 2026-09 the operator desktop is built declaratively by
-> `Set-ArlOperatorDesktop.ps1` (see `docs/ARL-OPERATOR-DESKTOP.md`); these rules
-> are the conventions it, and any manual shortcut, still follow.
+**Only `Set-ArlOperatorDesktop.ps1` writes the public desktop now.** Do not
+create shortcuts on `C:\Users\Public\Desktop` by hand: the next `-Apply` moves
+any shortcut it does not own to an admin folder or reports it as `DESCONOCIDO`,
+and the guide card tells operators to use no other icon. Its four shortcuts do
+not follow the rules below either: `Analizar colada` runs
+`C:\ARL\ChispaOperator\Chispa.Operator.exe` from that folder, `Ayuda - Que icono
+uso` runs Edge from `C:\ARL\Guia-Operador`, and the Ayuda and Ing. Serrano icons
+come from `shell32.dll` (23 and 314). The exact names, targets, working folders
+and icons are the final rows in the script and `docs/ARL-OPERATOR-DESKTOP.md`.
 
-- Create shortcuts as `.lnk` in `C:\Users\Public\Desktop`.
-- Point shortcuts to `.cmd` wrappers, not directly to `.ps1`, so they do not
-  show as raw PowerShell files and can leave a console open on failure.
-- Working directory should be `C:\ARL\DOSBox-X-ARL`.
-- Use the DOSBox-X executable icon when present:
+The conventions `Create-ArlHpShortcuts.ps1` followed, kept only to read the old
+`.lnk` files still on the host:
 
-```powershell
-C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe,0
-```
+- Shortcuts were `.lnk` files in `C:\Users\Public\Desktop`.
+- They pointed to `.cmd` wrappers, not directly to `.ps1`, so they did not show
+  as raw PowerShell files and could leave a console open on failure.
+- Their working directory was `C:\ARL\DOSBox-X-ARL`.
+- They used the DOSBox-X executable icon, `C:\ARL\DOSBox-X-ARL\dosbox-x-arl.exe,0`.
 
 ## Quick Verification
 
-Run remote script verification instead of inline one-liners when checking
-shortcuts:
+Check the public desktop with the script's own review mode, from an elevated
+PowerShell on the host. It reads the desktops and prints the plan without
+changing anything; `sin-cambios` means the desktop is exactly as it should be:
 
 ```powershell
-$wsh = New-Object -ComObject WScript.Shell
-Get-ChildItem 'C:\Users\Public\Desktop' -Filter 'ARL IMPACT+ *.lnk' |
-  ForEach-Object {
-    $s = $wsh.CreateShortcut($_.FullName)
-    [pscustomobject]@{ Name = $_.Name; Target = $s.TargetPath; Exists = Test-Path $s.TargetPath }
-  }
+C:\ARL\DOSBox-X-ARL\contrib\arl\Set-ArlOperatorDesktop.ps1
 ```
+
+Remotely, copy a script that runs that command and execute it with
+`Invoke-ArlHpRemoteScript.ps1` (above), never as an inline one-liner. The
+review is a read; `-Apply` and `-Undo` run only at the host console or over RDP.

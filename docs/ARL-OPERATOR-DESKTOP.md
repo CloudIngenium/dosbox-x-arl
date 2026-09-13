@@ -107,9 +107,12 @@ C:\ARL\DOSBox-X-ARL\contrib\arl\Set-ArlOperatorDesktop.ps1 -SelfTest
 C:\ARL\DOSBox-X-ARL\contrib\arl\Set-ArlOperatorDesktop.ps1 -SelfTest -Controls C13,C14,C15
 ```
 
-`-Apply` supports `-WhatIf`: it walks the apply path and reports what it would do
-without writing. A dry-run `revisar` that finds the desktop already correct
-reports `sin-cambios`.
+`-Apply` accepts `-WhatIf`, but it does **not** rehearse the moves: it runs the
+same checks as `revisar` plus the elevation check (`R1`), prints the same plan,
+and stops at the first write (creating the archive folder) with
+`cambios-pendientes`. Use it to prove the console is elevated before `-Apply`.
+A dry-run `revisar` that finds the desktop already correct reports
+`sin-cambios`.
 
 **Run `-Apply` and `-Undo` at the console of the host (or an RDP session), in
 an elevated PowerShell — never through the ~105 s synchronous SSH relay.** A run
@@ -149,8 +152,10 @@ this order:
    shortcut must show as `SE MUEVE` (to its admin group) or `SE ARCHIVA` (a
    duplicate of one already there); no old shortcut may show as `DESCONOCIDO`.
    `sin-cambios` means there is nothing to do: stop here.
-2. **`-Apply -WhatIf`.** Walks the apply path without writing; it must end in
-   `cambios-pendientes`, with no `RECHAZADO`.
+2. **`-Apply -WhatIf`**, in the elevated console you will apply from. It must end
+   in `cambios-pendientes`, with no `RECHAZADO`. It proves only that the console
+   is elevated (`R1`) and that the checks still pass: it stops before the first
+   write and does not rehearse the moves, so the plan to trust is step 1's.
 3. **`-Apply`, only when idle:** IMPACT and DOSBox-X-ARL closed, no burn or
    session in progress, nobody working at the Piso login. Elevated, at the host
    console or over RDP (see above). The script never looks at processes (control
@@ -187,10 +192,13 @@ The script cannot see or fix these. Tick each one before calling the rollout don
       (`PENDIENTE MANUAL ... desanclar a mano`); it never edits the taskbar.
 - [ ] The Piso desktop is not redirected (see "Not detected").
 - [ ] The Chispa agent version deployed on the host (read-only) matches the
-      card's `arl-card-chispa` meta tag. The card text (the `ARL 3460 - AVISO: SIN
-      CHISPA` steps, which sheets print for a standardization or normalization)
-      was written against that Chispa commit; on an older or newer build, check
-      the card against it first.
+      card's `arl-card-chispa` meta tag (`b9c5053`). The card text (the `ARL 3460
+      - AVISO: SIN CHISPA` steps, the launcher's error window `No se pudo iniciar
+      o completar el programa de analisis`, which sheets print for a
+      standardization or normalization, the 10 kp spark floor) was checked
+      against that Chispa commit; on an older or newer build, check the card
+      against it first. Merging the generators PR onto Chispa main brings
+      `b9c5053` with it.
 - [ ] The card, printed from Edge on the host (Ctrl+P, Letter), is exactly two
       pages, technicians first. A local Chrome render leaves about two lines free
       on page two, and Segoe UI on the host can wrap differently.
@@ -246,9 +254,16 @@ Undo is LIFO: `-Undo` reverses the newest reversible run (`applying`, `applied`,
   each to its group (table above). It then lays down the next installer's set:
   revisar must report `cambios-pendientes`, `-Apply` must clear it, and a last
   revisar must report `sin-cambios`. At every depth the file also runs the card
-  mutants `K01`-`K10` (`C15` must reject each; `K09` puts back the old "burn a
-  sample in Analizar colada" spark check, `K10` drops the 1 kp stop) and the
-  planner checks. The planner checks call the planner's own functions on
+  mutants `K01`-`K19` and the planner checks. `C15` must reject each card
+  mutant. It pins Ing. Serrano's spark box on page two word for word (accents
+  and tags dropped) and above the B/C rows, and rejects any page-two sentence
+  that pairs `Analizar colada` with a burn, a test, a sample or the spark other
+  than the prohibition itself. `K09`-`K19` each weaken that check and name the
+  `C15` rule that must catch them: the old "burn a sample in Analizar colada"
+  check, the stop removed, the prohibition removed or reworded into a test burn,
+  no stop on a `SIN CHISPA` sheet, a 1 kp floor instead of Chispa's 10 kp, the
+  screen check only on days with no colada, a sentence that accepts anyway, a
+  test burn outside the box, a B row above the box, a second weaker box. The planner checks call the planner's own functions on
   in-memory items and a temp folder: three items with the same name get three
   distinct destinations (also when an alternate name is already on disk), a
   launcher planned twice in one run goes once to `duplicados\`, a shortcut whose
@@ -257,15 +272,20 @@ Undo is LIFO: `-Undo` reverses the newest reversible run (`applying`, `applied`,
   item (`Microsoft Edge.lnk`) is left in place, and every shortcut Chispa's
   installers put back goes to its group (`generadores-chispa`). Planner mutants
   `P01`-`P06` plant the defects the reviewers reported; each must fail its named
-  check. The CI gate's log reader is checked there too, against a complete log
-  and logs with one planted gap each.
+  check. The CI gate's log reader is checked there too, against complete runs
+  and runs with one planted gap each (a non-zero exit, a `SKIP` or `FAIL` line,
+  a missing `PASS`, a mutant killed by another control, no `all passed`, a
+  control or mutant list too short), and gate mutants `G01`-`G10` each remove
+  one of its checks; the case named for each must fail. `-SkipEngine` leaves out
+  the engine self-test.
 - `contrib/arl/tests/Invoke-ArlOperatorDesktopCiGate.ps1` — the CI gate. It
   refuses to start off Windows or unelevated, runs the test above (`-Depth Motor`,
-  or `-Depth Mutantes` for `-Mutants`), streams its output, and fails on a
-  non-zero exit, on any `SKIP` or `FAIL` line, on any control without its
-  `PASS` line under both `powershell` (5.1) and `pwsh` (7), on any engine mutant
-  not killed by its named control, or without the final `all passed`. It reads
-  the control and mutant lists from the test file, so there is one list to keep.
+  or `-Depth Mutantes` for `-Mutants -SkipEngine`), streams its output, and
+  fails on a non-zero exit, on any `SKIP` or `FAIL` line, at `Motor` on any
+  control without its `PASS` line under both `powershell` (5.1) and `pwsh` (7),
+  at `Mutantes` on any engine mutant not killed by its named control, or without
+  the final `all passed`. It reads the control and mutant lists from the test
+  file, so there is one list to keep.
 - `contrib/arl/tests/Test-ArlOperatorPreflightCmd.ps1` — pins the preflight
   launcher's Spanish, jargon-free text and cross-checks the launcher names it
   points to against this script's final rows.
@@ -281,10 +301,13 @@ static checks (`C09`, `C13`-`C15`), the card mutants, the planner checks and the
 gate's own checks need no Windows API: they run in that same job, and they are
 also what a developer machine off Windows can run (there the engine depths print
 `SKIP`). The two desktop steps run only when the diff touches `contrib/arl/` or
-the workflow; a step before them decides, and runs them whenever the diff cannot
-be computed. The workflow is one job, so a job-level `paths` filter would skip
-the build too. Timeouts: 30 minutes for the test step, 90 for the mutation step.
-There is no separate PS 5.1 job; the tests invoke `powershell.exe` (5.1) directly.
+the workflow; a step before them decides (with `git diff --no-renames`, so a
+file moved out of `contrib/arl/` still counts), and runs them whenever the diff
+cannot be computed. The workflow is one job, so a job-level `paths` filter would
+skip the build too. The mutation step does not repeat the engine self-test the
+step before it ran (`-SkipEngine`). Timeouts: 30 minutes for the test step, 90
+for the mutation step, both still estimates until a first CI run. There is no
+separate PS 5.1 job; the tests invoke `powershell.exe` (5.1) directly.
 
 ## Encoding
 
