@@ -183,7 +183,14 @@ Undo is LIFO: `-Undo` reverses the newest reversible run (`applying`, `applied`,
   defect must be caught by a named control). `C20` kills the child inside an
   action (`ARL_DESKTOP_FAIL_INSIDE_ACTION`: after a move, after a backup, after a
   shortcut lands but before its ACL reset) and checks that `-Undo` restores both
-  desktops exactly.
+  desktops exactly. The planner checks call the planner's own functions on
+  in-memory items and a temp folder: three items with the same name get three
+  distinct destinations (also when an alternate name is already on disk), a
+  launcher planned twice in one run goes once to `duplicados\`, a shortcut whose
+  target (or whose `cmd.exe /c` / `powershell.exe -File` script) is an Emulator or
+  Bridge launcher goes to `Simuladores`, and a token-named folder that holds a
+  kept item (`Microsoft Edge.lnk`) is left in place. Planner mutants `P01`-`P05`
+  plant the defects the reviewers reported; each must fail its named check.
 - `contrib/arl/tests/Test-ArlOperatorPreflightCmd.ps1` — pins the preflight
   launcher's Spanish, jargon-free text and cross-checks the launcher names it
   points to against this script's final rows.
@@ -193,7 +200,8 @@ Both are wired into `.github/workflows/arl-trace-win64.yml` (the windows-latest
 `C04b`, `C10`-`C12`, `C16`-`C20`, and the run-time half of `C09`), the engine
 mutants and PS 5.1 itself only exercise on Windows in an elevated session; off
 Windows the self-test prints `SKIP` and the engine mutation step is skipped. The
-static checks (`C09`, `C13`-`C15`) and the card mutants run everywhere. There is no separate PS 5.1 job —
+static checks (`C09`, `C13`-`C15`), the card mutants, the planner checks and the
+planner mutants run everywhere. There is no separate PS 5.1 job —
 the mutation test invokes `powershell.exe` (5.1) directly where it is present.
 
 ## Encoding

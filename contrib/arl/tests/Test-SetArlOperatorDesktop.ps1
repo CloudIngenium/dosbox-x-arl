@@ -13,6 +13,12 @@
          names carry none of the old cleanup jargon, the card is a valid offline Spanish page whose
          icon references match the icon set, and every filesystem/ACL mutation lives inside the one
          Invoke-ArlAction chokepoint. These run everywhere, including on the CI runner off Windows.
+         So do the card mutants K01-K08 (C15 must reject each) and the planner checks: the planner's
+         own functions, called on in-memory items and a temp folder, must give three distinct names to
+         three same-name items, send a launcher planned twice in one run to duplicados once, route an
+         Emulator/Bridge target (directly or through cmd.exe / powershell.exe) to Simuladores, and leave
+         a folder in place when it holds an item that stays. Planner mutants P01-P05 plant the defects
+         the reviewers found; each must fail its named check.
 
       2. Engine (Windows + elevated): the script's own -SelfTest is run under each available engine
          (powershell.exe = Windows PowerShell 5.1, pwsh = 7). It must exit 0, report autoprueba-ok,
@@ -159,6 +165,147 @@ if (Test-Path -LiteralPath $cardPath -PathType Leaf) {
     } finally {
         Remove-Item -LiteralPath $cardDir -Recurse -Force -ErrorAction SilentlyContinue
     }
+}
+
+# ---- depth 1d: planner checks + planner mutants (any OS) -----------------------------------------
+# The planner decides where each old shortcut goes before anything is touched. These checks call its
+# functions directly on in-memory items and a private temp folder, with host-native paths, so they need
+# no Windows APIs and no elevation: a triple name collision, a duplicate planned twice in one run, the
+# Emulator/Bridge rule on the target name and on a cmd.exe / powershell.exe wrapper, and a folder that
+# holds an item that stays on the desktop. Each planner mutant plants the defect a reviewer found in a
+# private copy of the script, which is dot-sourced in place of the real one; its named check must fail.
+$plannerMutantSpecs = @(
+    @{ Id = 'P01'; Killer = 'carpeta-conserva'; Find = 'return @{ Cleared = (-not $unknown -and -not $kept); Unknown = $unknown; Kept = $kept; Moved = $moved }'; Replace = 'return @{ Cleared = (-not $unknown); Unknown = $unknown; Kept = $kept; Moved = $moved }' }
+    @{ Id = 'P02'; Killer = 'colision-triple'; Find = 'if (-not ((Test-Path -LiteralPath $alt) -or $script:ArlPlannedPaths.Contains($alt))) { break }'; Replace = 'break' }
+    @{ Id = 'P03'; Killer = 'duplicado-misma-corrida'; Find = 'if (-not $dup -and $script:ArlPlannedLaunchers.ContainsKey($dest)) {'; Replace = 'if ($false) {' }
+    @{ Id = 'P04'; Killer = 'regla-destino-emulator'; Find = ' -or ($tleaf -match ''(?i)Emulator|Bridge'')'; Replace = '' }
+    @{ Id = 'P05'; Killer = 'regla-cmd-bridge'; Find = 'if ($scriptArg) { $Target = $scriptArg }'; Replace = '' }
+)
+
+function New-PlItem([string]$Dir, [string]$Leaf, [string]$Target, [string]$Arguments = '', [string]$Icon = '') {
+    return @{ Path = (Join-Path $Dir $Leaf); Leaf = $Leaf; Rel = $Leaf; Depth = 1; Kind = 'file'
+        Ext = [System.IO.Path]::GetExtension($Leaf).ToLowerInvariant(); Target = $Target; Sha256 = 'AA'; Sddl = ''; OwnerSid = ''
+        Lnk = @{ Target = $Target; Arguments = $Arguments; WorkDir = ''; Icon = $Icon; Description = ''; WindowStyle = 1 }
+        Reparse = $false; Children = @(); Unreadable = $false }
+}
+
+function Reset-PlState {
+    $script:ArlPlannedPaths = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    $script:ArlGroupNeeded = @{}
+    $script:ArlPlannedLaunchers = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([System.StringComparer]::OrdinalIgnoreCase)
+    $report = @{}
+    foreach ($b in @('Crear', 'Reemplazar', 'Mover', 'Archivar', 'Conserva', 'Desconocido', 'Informe', 'Pendiente', 'Aviso')) { $report[$b] = New-Object System.Collections.Generic.List[string] }
+    return @{ Report = $report; Counts = (New-ArlCounts); Moves = (New-Object System.Collections.Generic.List[object]) }
+}
+
+# Returns one @{ Id; Name; Pass; Detail } per check. A check that throws counts as failed.
+function Invoke-PlannerChecks([string]$Root) {
+    $out = New-Object System.Collections.Generic.List[object]
+    $stamp = '20260101-000000'
+    $arl = Join-Path $Root 'ARL'
+    $away = Join-Path $Root 'fuera'
+    $P = @{ ArlRoot = $arl; Bridge = (Join-Path $arl 'ChispaBridge'); LegacyDailyTargets = @(); VerificationTargets = @()
+        VerificationLeaves = @(); FinalRows = @(); ArchiveDir = (Join-Path $Root 'archivo')
+        GroupPaths = @{ 'Simuladores' = (Join-Path $Root 'Simuladores'); 'Diagnostico' = (Join-Path $Root 'Diagnostico')
+            'Verificacion-y-aprobacion' = (Join-Path $Root 'Verificacion'); 'Accesos-anteriores' = (Join-Path $Root 'Accesos') } }
+    $emuCmd = Join-Path $away 'Launch-ArlImpactEmulatorFormatSafeLoopTrace.cmd'
+    $checks = @(
+        @{ Id = 'colision-triple'; Name = 'colision: tres elementos con el mismo nombre reciben tres destinos distintos'; Body = {
+            $null = Reset-PlState
+            $want = Join-Path $Root 'Repetido.lnk'
+            $got = @((Resolve-ArlCollision -Desired $want -Stamp $stamp), (Resolve-ArlCollision -Desired $want -Stamp $stamp), (Resolve-ArlCollision -Desired $want -Stamp $stamp))
+            $exp = @($want, (Join-Path $Root ('Repetido (' + $stamp + ').lnk')), (Join-Path $Root ('Repetido (' + $stamp + '-2).lnk')))
+            return @{ Pass = (($got -join '|') -eq ($exp -join '|')); Detail = ($got -join ' | ') } } }
+        @{ Id = 'colision-disco'; Name = 'colision: un nombre alterno ocupado en disco se salta'; Body = {
+            $null = Reset-PlState
+            $dir = Join-Path $Root 'ocupado'
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+            foreach ($f in @('Ocupado.lnk', ('Ocupado (' + $stamp + ').lnk'))) { [System.IO.File]::WriteAllText((Join-Path $dir $f), 'x') }
+            $got = Resolve-ArlCollision -Desired (Join-Path $dir 'Ocupado.lnk') -Stamp $stamp
+            return @{ Pass = ($got -eq (Join-Path $dir ('Ocupado (' + $stamp + '-2).lnk'))); Detail = $got } } }
+        @{ Id = 'duplicado-misma-corrida'; Name = 'duplicado: el mismo lanzador dos veces en una corrida va una vez a duplicados'; Body = {
+            $st = Reset-PlState
+            $a1 = New-PlItem -Dir (Join-Path $Root 'escritorio1') -Leaf 'Viejo.lnk' -Target $emuCmd
+            $a2 = New-PlItem -Dir (Join-Path $Root 'escritorio2') -Leaf 'Viejo.lnk' -Target $emuCmd
+            foreach ($it in @($a1, $a2)) { Add-ArlMove -P $P -Item $it -Group 'Simuladores' -Note '' -Stamp $stamp -Moves $st.Moves -Report $st.Report -Counts $st.Counts }
+            $dest = @($st.Moves | Where-Object { $_.kind -eq 'move' } | ForEach-Object { [string]$_.destination })
+            $ok = ($dest.Count -eq 2) -and ($dest[0] -eq (Join-Path $P.GroupPaths['Simuladores'] 'Viejo.lnk')) -and ($dest[1] -eq (Join-Path (Join-Path $P.ArchiveDir 'duplicados') 'Viejo.lnk')) -and ($st.Counts.mover -eq 1) -and ($st.Counts.archivar -eq 1)
+            return @{ Pass = $ok; Detail = ($dest -join ' | ') } } }
+        @{ Id = 'mismo-nombre-otro-lanzador'; Name = 'colision: tres lanzadores distintos con el mismo nombre en un grupo no chocan'; Body = {
+            $st = Reset-PlState
+            $i = 0
+            foreach ($icon in @('a.ico', 'b.ico', 'c.ico')) {
+                $i++
+                $it = New-PlItem -Dir (Join-Path $Root ('escritorio' + $i)) -Leaf 'Viejo.lnk' -Target $emuCmd -Icon $icon
+                Add-ArlMove -P $P -Item $it -Group 'Simuladores' -Note '' -Stamp $stamp -Moves $st.Moves -Report $st.Report -Counts $st.Counts
+            }
+            $g = $P.GroupPaths['Simuladores']
+            $dest = @($st.Moves | Where-Object { $_.kind -eq 'move' } | ForEach-Object { [string]$_.destination })
+            $exp = @((Join-Path $g 'Viejo.lnk'), (Join-Path $g ('Viejo (' + $stamp + ').lnk')), (Join-Path $g ('Viejo (' + $stamp + '-2).lnk')))
+            return @{ Pass = ((($dest -join '|') -eq ($exp -join '|')) -and ($st.Counts.mover -eq 3)); Detail = ($dest -join ' | ') } } }
+        @{ Id = 'regla-destino-emulator'; Name = 'regla: acceso con nombre neutro que abre un lanzador Emulator va a Simuladores'; Body = {
+            $r = Get-ArlTargetRule -P $P -Target $emuCmd -Leaf 'Prueba IMPACT.lnk'
+            return @{ Pass = ($null -ne $r -and $r.Group -eq 'Simuladores' -and $r.Tag -eq 'SIMULA VALORES'); Detail = $(if ($null -eq $r) { 'null' } else { $r.Group + ' / ' + $r.Tag }) } } }
+        @{ Id = 'regla-cmd-bridge'; Name = 'regla: cmd.exe /c con un lanzador Bridge va a Simuladores'; Body = {
+            $r = Get-ArlTargetRule -P $P -Target (Join-Path $away 'cmd.exe') -Leaf 'Puente.lnk' -Arguments ('/c "' + (Join-Path $away 'Launch-ArlBridgeSmoke.cmd') + '"')
+            return @{ Pass = ($null -ne $r -and $r.Group -eq 'Simuladores'); Detail = $(if ($null -eq $r) { 'null' } else { $r.Group }) } } }
+        @{ Id = 'regla-ps-emulator'; Name = 'regla: powershell.exe -File con un lanzador Emulator va a Simuladores'; Body = {
+            $r = Get-ArlTargetRule -P $P -Target (Join-Path $away 'powershell.exe') -Leaf 'Prueba.lnk' -Arguments ('-NoProfile -File "' + (Join-Path $away 'Start-ArlEmulator.ps1') + '"')
+            return @{ Pass = ($null -ne $r -and $r.Group -eq 'Simuladores'); Detail = $(if ($null -eq $r) { 'null' } else { $r.Group }) } } }
+        @{ Id = 'regla-cmd-sin-script'; Name = 'regla: cmd.exe sin lanzador en los argumentos no se clasifica'; Body = {
+            $r = Get-ArlTargetRule -P $P -Target (Join-Path $away 'cmd.exe') -Leaf 'Consola.lnk' -Arguments '/k echo hola'
+            return @{ Pass = ($null -eq $r); Detail = $(if ($null -eq $r) { 'null' } else { $r.Group }) } } }
+        @{ Id = 'carpeta-conserva'; Name = 'carpeta: con un elemento que se conserva no se archiva y el movible si se mueve'; Body = {
+            $st = Reset-PlState
+            $fdir = Join-Path $Root 'ARL Diagnostics'
+            $folder = @{ Path = $fdir; Leaf = 'ARL Diagnostics'; Rel = 'ARL Diagnostics'; Depth = 0; Kind = 'dir'; Ext = ''; Lnk = $null; Target = ''
+                Sha256 = ''; Sddl = ''; OwnerSid = ''; Reparse = $false; Unreadable = $false
+                Children = @((New-PlItem -Dir $fdir -Leaf 'Microsoft Edge.lnk' -Target (Join-Path $away 'msedge.exe')), (New-PlItem -Dir $fdir -Leaf 'Prueba IMPACT.lnk' -Target $emuCmd)) }
+            $res = Add-ArlFolderContents -P $P -Item $folder -Stamp $stamp -Moves $st.Moves -Report $st.Report -Counts $st.Counts
+            $ok = ($res.Kept -eq $true) -and ($res.Cleared -eq $false) -and ($res.Moved -eq 1) -and ($st.Report['Conserva'].Count -eq 1)
+            return @{ Pass = $ok; Detail = ('Kept=' + $res.Kept + ' Cleared=' + $res.Cleared + ' Moved=' + $res.Moved) } } }
+        @{ Id = 'carpeta-movible'; Name = 'carpeta: solo con elementos movibles queda vacia'; Body = {
+            $st = Reset-PlState
+            $fdir = Join-Path $Root 'ARL Viejos'
+            $folder = @{ Path = $fdir; Leaf = 'ARL Viejos'; Rel = 'ARL Viejos'; Depth = 0; Kind = 'dir'; Ext = ''; Lnk = $null; Target = ''
+                Sha256 = ''; Sddl = ''; OwnerSid = ''; Reparse = $false; Unreadable = $false
+                Children = @((New-PlItem -Dir $fdir -Leaf 'Prueba IMPACT.lnk' -Target $emuCmd)) }
+            $res = Add-ArlFolderContents -P $P -Item $folder -Stamp $stamp -Moves $st.Moves -Report $st.Report -Counts $st.Counts
+            return @{ Pass = (($res.Cleared -eq $true) -and ($res.Moved -eq 1)); Detail = ('Kept=' + $res.Kept + ' Cleared=' + $res.Cleared + ' Moved=' + $res.Moved) } } }
+    )
+    foreach ($c in $checks) {
+        try { $r = & $c.Body; $out.Add(@{ Id = $c.Id; Name = $c.Name; Pass = [bool]$r.Pass; Detail = [string]$r.Detail }) }
+        catch { $out.Add(@{ Id = $c.Id; Name = $c.Name; Pass = $false; Detail = ('excepcion: ' + $_.Exception.Message) }) }
+    }
+    return , $out
+}
+
+$plRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('arl-desktop-planner-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $plRoot -Force | Out-Null
+try {
+    foreach ($pc in (Invoke-PlannerChecks -Root $plRoot)) { Assert-True "planificador $($pc.Name)" $pc.Pass ('-- ' + $pc.Detail) }
+    foreach ($pm in $plannerMutantSpecs) {
+        $idx = $scriptText.IndexOf($pm.Find, [System.StringComparison]::Ordinal)
+        $last = $scriptText.LastIndexOf($pm.Find, [System.StringComparison]::Ordinal)
+        if ($idx -lt 0 -or $idx -ne $last) { Assert-True "mutante de planificador $($pm.Id): patron unico" $false "idx=$idx last=$last"; continue }
+        $pmDir = Join-Path $plRoot ('mutante-' + $pm.Id)
+        New-Item -ItemType Directory -Path $pmDir -Force | Out-Null
+        $pmPath = Join-Path $pmDir 'Set-ArlOperatorDesktop.ps1'
+        [System.IO.File]::WriteAllText($pmPath, ($scriptText.Substring(0, $idx) + $pm.Replace + $scriptText.Substring($idx + $pm.Find.Length)), (New-Object System.Text.UTF8Encoding($false)))
+        $pmResults = @()
+        try {
+            . $pmPath   # the mutant's functions replace the real ones for this run only
+            $pmResults = Invoke-PlannerChecks -Root $pmDir
+        } catch {
+            Write-Host "  (mutante de planificador $($pm.Id): $($_.Exception.Message))"
+        } finally {
+            . $scriptPath   # put the real functions back before anything else runs
+        }
+        $hit = @($pmResults | Where-Object { $_.Id -eq $pm.Killer })
+        Assert-True "mutante de planificador $($pm.Id) muere por $($pm.Killer)" (($hit.Count -eq 1) -and (-not $hit[0].Pass)) ($(if ($hit.Count -eq 1) { '-- ' + $hit[0].Detail } else { '-- la prueba no se ejecuto' }))
+    }
+} finally {
+    Remove-Item -LiteralPath $plRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # ---- depth 2: run the script's own -SelfTest under each engine (Windows + elevated) -------------
