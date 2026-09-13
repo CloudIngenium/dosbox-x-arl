@@ -14,8 +14,8 @@ Those old shortcuts are **not** gone just because this repo's
 the public desktop on **every DOSBox-X-ARL install**, and Chispa's
 `Install-ArlOperatorShortcuts.ps1`, `Reset-ArlDesktopShortcuts.ps1` and
 `Install-ArlOperatorExperience.ps1` (`ARL 3460 - Analizar`) put back their own
-sets. A Chispa PR (branch `feat/operator-desktop-generators`, link to be added)
-makes those scripts leave the desktop alone when `Set-ArlOperatorDesktop.ps1` is
+sets. [Chispa PR #237](https://github.com/CloudIngenium/Chispa/pull/237) (branch
+`feat/operator-desktop-generators`) makes those scripts leave the desktop alone when `Set-ArlOperatorDesktop.ps1` is
 present and only run its review mode. Until that PR is merged **and** deployed,
 follow the [rollout gate](#rollout-gate).
 
@@ -139,7 +139,7 @@ apply deadline scales with the plan (60 s plus 10 s per action).
 ### Rollout gate
 
 **The first `-Apply` on Laboratorio-ARL waits** until the Chispa PR that stops
-the generators (branch `feat/operator-desktop-generators`, link to be added) is
+the generators ([Chispa PR #237](https://github.com/CloudIngenium/Chispa/pull/237)) is
 **merged and deployed** on the host. Before that, the next DOSBox-X-ARL install
 (`Install-DosboxArlArtifact.ps1`) puts `00 DIRECTSERIAL BYPASS`, `01 OBSERVE
 ONLY`, `02 REACTIVE SAFE`, `90 EMULATOR` and `Diagnosticos ARL` straight back on
@@ -182,7 +182,7 @@ A shortcut whose launcher is already in its group goes to the run's
 
 The script cannot see or fix these. Tick each one before calling the rollout done:
 
-- [ ] The Chispa generators PR (`feat/operator-desktop-generators`) is merged
+- [ ] The Chispa generators PR ([#237](https://github.com/CloudIngenium/Chispa/pull/237)) is merged
       **and** deployed on Laboratorio-ARL (deployed version read, read-only).
 - [ ] Revisar, `-Apply -WhatIf` and `-Apply` ran in that order, when idle, and a
       last revisar reports `sin-cambios`.

@@ -78,7 +78,7 @@ C:\ARL\DOSBox-X-ARL\contrib\arl\Set-ArlOperatorDesktop.ps1          # revisar (d
 ```
 
 **Do not run `-Apply` yet.** The first `-Apply` on this host waits until the
-Chispa generators PR (branch `feat/operator-desktop-generators`) is merged
+Chispa generators PR ([#237](https://github.com/CloudIngenium/Chispa/pull/237)) is merged
 **and** deployed. Until then Chispa's `deploy/Install-DosboxArlArtifact.ps1`
 deletes the public-desktop shortcuts on every DOSBox-X-ARL install and puts
 `00 DIRECTSERIAL BYPASS`, `01 OBSERVE ONLY`, `02 REACTIVE SAFE`, `90 EMULATOR`
