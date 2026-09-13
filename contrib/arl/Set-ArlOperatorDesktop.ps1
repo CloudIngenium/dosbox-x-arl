@@ -1240,6 +1240,8 @@ function Get-ArlIconBitmap {
 
 # A hash of the raw ARGB pixels (not the file bytes), so two visually identical PNGs compare equal.
 # The byte copy is reached by reflection to keep the array-copy token out of everything but the chokepoint.
+# The buffer comes from Array.CreateInstance, not New-Object: New-Object output is PSObject-wrapped, and
+# MethodInfo.Invoke does not unwrap it (both engines refuse: PSObject cannot be converted to Byte[]).
 function Get-ArlPixelHash($Bitmap) {
     if ($null -eq $Bitmap) { return '' }
     Add-Type -AssemblyName System.Drawing
@@ -1247,7 +1249,7 @@ function Get-ArlPixelHash($Bitmap) {
     $data = $Bitmap.LockBits($rect, [System.Drawing.Imaging.ImageLockMode]::ReadOnly, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
     try {
         $len = [Math]::Abs($data.Stride) * $Bitmap.Height
-        $buf = New-Object byte[] $len
+        $buf = [System.Array]::CreateInstance([byte], $len)
         $m = [System.Runtime.InteropServices.Marshal].GetMethod('Copy', [type[]]@([IntPtr], [byte[]], [int], [int]))
         [void]$m.Invoke($null, @($data.Scan0, $buf, 0, $len))
         return ($Bitmap.Width.ToString() + 'x' + $Bitmap.Height.ToString() + ':' + (Get-ArlBytesSha256 $buf))

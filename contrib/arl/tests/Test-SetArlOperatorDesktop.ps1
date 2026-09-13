@@ -498,6 +498,8 @@ if ($SkipEngine) {
         $out = & $e.Path -NoProfile -ExecutionPolicy Bypass -File $scriptPath -SelfTest 2>&1
         $code = $LASTEXITCODE
         $outText = ($out | Out-String)
+        # The self-test's own lines, prefixed so the CI gate never reads them as this harness's PASS/FAIL/SKIP.
+        foreach ($ln in @($out)) { Write-Host ('    motor ' + $e.Name + '> ' + [string]$ln) }
         Assert-True "motor $($e.Name): autoprueba exit 0" ($code -eq 0) "-- exit=$code"
         Assert-True "motor $($e.Name): status autoprueba-ok" ($outText -match 'autoprueba-ok')
         foreach ($id in $allControls) {
