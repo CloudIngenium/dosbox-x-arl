@@ -10,13 +10,17 @@
     the test output to the log, and then reads it back. It fails when
       - the test exits non-zero;
       - any line is a SKIP or a FAIL;
-      - a PASS line is missing for any self-test control under either engine (powershell = Windows
-        PowerShell 5.1, pwsh = 7);
+      - with -Depth Motor, a PASS line is missing for any self-test control under either engine
+        (powershell = Windows PowerShell 5.1, pwsh = 7);
       - with -Depth Mutantes, a PASS line is missing for any engine mutant killed by its named control;
       - the final 'all passed' line is missing.
+    -Depth Mutantes runs the test with -Mutants -SkipEngine: the workflow's step before it already ran the
+    engine self-test under both engines through -Depth Motor, so the mutation step does not repeat it.
     The control list and the engine mutant list are read from the test file itself ($allControls and the
     M-mutant specs), so a new control or mutant there is required here with no second edit. A list shorter
     than the floors in Get-ArlCiGateProblems fails too, so an emptied list cannot pass by saying nothing.
+    Test-SetArlOperatorDesktop.ps1 feeds this reader good and broken logs, and plants gate mutants G01-G10
+    in a copy of this file; each must be caught by the log case named for it.
 
     Run by .github/workflows/arl-trace-win64.yml:
       pwsh -NoProfile -File contrib/arl/tests/Invoke-ArlOperatorDesktopCiGate.ps1 -Depth Motor
@@ -31,14 +35,16 @@ param(
     [string]$TestPath = ''
 )
 
-# Returns one line per problem found in the test output (nothing when the log proves a full engine run).
+# Returns one line per problem found in the test run (nothing when its exit code and log prove a full run at
+# that depth). Each check is its own statement so a gate mutant can remove exactly one.
 function Get-ArlCiGateProblems {
-    param([string[]]$Lines, [string]$Depth, [string]$TestText)
+    param([string[]]$Lines, [string]$Depth, [string]$TestText, [int]$ExitCode = 0)
     $minControls = 22
     $minMutants = 23
     $engines = @('powershell', 'pwsh')
     $out = New-Object System.Collections.Generic.List[string]
 
+    if ($ExitCode -ne 0) { $out.Add('la prueba termino con codigo ' + $ExitCode) }
     $controls = @()
     $cm = [regex]::Match($TestText, '(?s)\$allControls\s*=\s*@\((.*?)\)')
     if ($cm.Success) { $controls = @([regex]::Matches($cm.Groups[1].Value, '''(C\d{2}b?)''') | ForEach-Object { $_.Groups[1].Value }) }
@@ -48,14 +54,16 @@ function Get-ArlCiGateProblems {
 
     foreach ($ln in @($Lines)) {
         if ($ln -match '^\s*SKIP\b') { $out.Add('SKIP: ' + $ln.Trim()) }
-        elseif ($ln -match '^\s*FAIL\b') { $out.Add('FAIL: ' + $ln.Trim()) }
+        if ($ln -match '^\s*FAIL\b') { $out.Add('FAIL: ' + $ln.Trim()) }
     }
     $text = (@($Lines) -join "`n")
-    foreach ($engine in $engines) {
-        $need = @('autoprueba exit 0', 'status autoprueba-ok') + @($controls | ForEach-Object { 'PASS ' + $_ })
-        foreach ($n in $need) {
-            $pattern = '(?m)^\s*PASS\s+motor ' + [regex]::Escape($engine) + ': ' + [regex]::Escape($n) + '\s*$'
-            if ($text -notmatch $pattern) { $out.Add('falta PASS motor ' + $engine + ': ' + $n) }
+    if ($Depth -eq 'Motor') {
+        foreach ($engine in $engines) {
+            $need = @('autoprueba exit 0', 'status autoprueba-ok') + @($controls | ForEach-Object { 'PASS ' + $_ })
+            foreach ($n in $need) {
+                $pattern = '(?m)^\s*PASS\s+motor ' + [regex]::Escape($engine) + ': ' + [regex]::Escape($n) + '\s*$'
+                if ($text -notmatch $pattern) { $out.Add('falta PASS motor ' + $engine + ': ' + $n) }
+            }
         }
     }
     if ($Depth -eq 'Mutantes') {
@@ -94,19 +102,16 @@ function Invoke-ArlCiGate([string]$Depth, [string]$TestPath) {
     $exe = Join-Path $PSHOME 'powershell.exe'
     if ($PSVersionTable.PSEdition -eq 'Core') { $exe = Join-Path $PSHOME 'pwsh.exe' }
     $argv = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $TestPath)
-    if ($Depth -eq 'Mutantes') { $argv += '-Mutants' }
+    if ('Mutantes' -eq $Depth) { $argv += @('-Mutants', '-SkipEngine') }
 
     $lines = New-Object System.Collections.Generic.List[string]
     & $exe @argv | ForEach-Object { $s = [string]$_; Write-ArlCiLine $s; [void]$lines.Add($s) }
     $code = $LASTEXITCODE
-    if ($code -ne 0) {
-        Write-ArlCiLine ('::error::PUERTA CI: la prueba termino con codigo ' + $code)
-        return $code
-    }
-    $problems = @(Get-ArlCiGateProblems -Lines $lines.ToArray() -Depth $Depth -TestText ([System.IO.File]::ReadAllText($TestPath)))
+    $problems = @(Get-ArlCiGateProblems -Lines $lines.ToArray() -Depth $Depth -TestText ([System.IO.File]::ReadAllText($TestPath)) -ExitCode $code)
     if ($problems.Count -gt 0) {
         foreach ($p in $problems) { Write-ArlCiLine ('::error::PUERTA CI: ' + $p) }
         Write-ArlCiLine ('PUERTA CI: FALLA, ' + $problems.Count + ' problema(s) en ' + $Depth)
+        if ($code -ne 0) { return $code }
         return 1
     }
     Write-ArlCiLine ('PUERTA CI: OK ' + $Depth + ', todas las pruebas de motor corrieron y pasaron')

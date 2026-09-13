@@ -22,7 +22,8 @@
          holds an item that stays, and send every shortcut Chispa's installers put back (00 DIRECTSERIAL
          BYPASS ... ARL 3460 - Analizar) to its admin group. Planner mutants P01-P06 plant the defects
          the reviewers found; each must fail its named check. The CI gate's log reader
-         (Invoke-ArlOperatorDesktopCiGate.ps1) is checked here too, against good and broken logs.
+         (Invoke-ArlOperatorDesktopCiGate.ps1) is checked here too, against good and broken runs, and
+         gate mutants G01-G10 each remove one of its checks; the case named for each must fail.
 
       2. Engine (Windows + elevated): the script's own -SelfTest is run under each available engine
          (powershell.exe = Windows PowerShell 5.1, pwsh = 7). It must exit 0, report autoprueba-ok,
@@ -36,6 +37,8 @@
     Run from anywhere:
       pwsh -NoProfile -File contrib/arl/tests/Test-SetArlOperatorDesktop.ps1
       pwsh -NoProfile -File contrib/arl/tests/Test-SetArlOperatorDesktop.ps1 -Mutants
+      pwsh -NoProfile -File contrib/arl/tests/Test-SetArlOperatorDesktop.ps1 -Mutants -SkipEngine
+    -SkipEngine leaves out depth 2 (CI's mutation step, after the engine step already ran it).
     Exits non-zero on any failure. Off Windows, or unelevated, the engine and mutant depths print SKIP
     and do not fail on their own (a developer laptop); with $env:CI set they fail. CI does not rely on
     that: it runs this file through Invoke-ArlOperatorDesktopCiGate.ps1, which fails the step on any SKIP
@@ -46,7 +49,10 @@ param(
     # Directory holding Set-ArlOperatorDesktop.ps1. Defaults to contrib/arl next to this tests/ folder.
     [string]$ToolkitDir = '',
     # Also run the mutation suite (Windows + elevated only).
-    [switch]$Mutants
+    [switch]$Mutants,
+    # Do not run the engine self-test (depth 2). CI's mutation step passes it: the step before already ran
+    # the engine self-test under both engines, and every mutant still runs its own filtered self-test.
+    [switch]$SkipEngine
 )
 
 $ErrorActionPreference = 'Stop'
@@ -373,43 +379,108 @@ try {
     Remove-Item -LiteralPath $plRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# ---- depth 1e: the CI gate's log reader (any OS) ---------------------------------------------------
+# ---- depth 1e: the CI gate's log reader + gate mutants (any OS) -------------------------------------
 # CI runs this file through Invoke-ArlOperatorDesktopCiGate.ps1, which must fail the step whenever an
-# engine control or engine mutant did not really run. Its reader is fed a complete log built from this
-# file's own control and mutant lists, then logs with one planted gap each; only the complete log passes.
+# engine control or engine mutant did not really run. Its reader is fed complete logs built from this
+# file's own control and mutant lists, then runs with one planted gap each (a non-zero exit, a SKIP or FAIL
+# line, a missing PASS, a mutant killed by another control, no 'all passed', a control list or mutant list
+# too short); only the complete ones pass. Gate mutants G01-G10 each remove one of the reader's checks in a
+# private copy of the gate, which is dot-sourced in place of the real one; the case named for it must fail.
 $gatePath = Join-Path $PSScriptRoot 'Invoke-ArlOperatorDesktopCiGate.ps1'
-if (-not (Test-Path -LiteralPath $gatePath -PathType Leaf)) {
-    Assert-True 'la puerta de CI Invoke-ArlOperatorDesktopCiGate.ps1 existe' $false "-- $gatePath"
-} else {
-    . $gatePath   # dot-source: defines Get-ArlCiGateProblems and runs nothing
-    $selfText = [System.IO.File]::ReadAllText($PSCommandPath)
+$gateMutantSpecs = @(
+    @{ Id = 'G01'; Killer = 'codigo de salida distinto de cero falla'; Find = 'if ($ExitCode -ne 0) { $out.Add(''la prueba termino con codigo '' + $ExitCode) }'; Replace = '' }
+    @{ Id = 'G02'; Killer = 'un SKIP de motor falla'; Find = 'if ($ln -match ''^\s*SKIP\b'') { $out.Add(''SKIP: '' + $ln.Trim()) }'; Replace = '' }
+    @{ Id = 'G03'; Killer = 'una linea FAIL falla'; Find = 'if ($ln -match ''^\s*FAIL\b'') { $out.Add(''FAIL: '' + $ln.Trim()) }'; Replace = '' }
+    @{ Id = 'G04'; Killer = 'una lista de controles corta falla'; Find = 'if ($controls.Count -lt $minControls) {'; Replace = 'if ($false) {' }
+    @{ Id = 'G05'; Killer = 'sin mutantes declarados falla (mutantes)'; Find = 'if ($Depth -eq ''Mutantes'' -and $mutants.Count -lt $minMutants) {'; Replace = 'if ($false) {' }
+    @{ Id = 'G06'; Killer = 'un mutante muerto por otro control falla'; Find = ''' muere por '' + [regex]::Escape($m.Killer) + ''\s*$'''; Replace = ''' muere por ''' }
+    @{ Id = 'G07'; Killer = 'sin all passed falla'; Find = 'if ($text -notmatch ''(?m)^all passed\s*$'') {'; Replace = 'if ($false) {' }
+    @{ Id = 'G08'; Killer = 'sin PASS C21 en pwsh falla'; Find = 'if ($Depth -eq ''Motor'') {'; Replace = 'if ($false) {' }
+    @{ Id = 'G09'; Killer = 'PASS C04b no cuenta como PASS C04'; Find = '[regex]::Escape($n) + ''\s*$'''; Replace = '[regex]::Escape($n)' }
+    @{ Id = 'G10'; Killer = 'sin la linea de un mutante falla'; Find = 'if ($Depth -eq ''Mutantes'') {'; Replace = 'if ($false) {' }
+)
+
+# Returns one @{ Name; Pass; Detail } per log case, run against whichever Get-ArlCiGateProblems is loaded.
+function Invoke-GateCases([string]$SelfText) {
     $goodLog = New-Object System.Collections.Generic.List[string]
     foreach ($eng in @('powershell', 'pwsh')) {
         $goodLog.Add("  PASS  motor ${eng}: autoprueba exit 0")
         $goodLog.Add("  PASS  motor ${eng}: status autoprueba-ok")
         foreach ($id in $allControls) { $goodLog.Add("  PASS  motor ${eng}: PASS $id") }
     }
-    foreach ($ms in $mutantSpecs) { $goodLog.Add("  PASS  mutante $($ms.Id) muere por $($ms.Killer)") }
+    $mutantLines = @($mutantSpecs | ForEach-Object { "  PASS  mutante $($_.Id) muere por $($_.Killer)" })
+    foreach ($l in $mutantLines) { $goodLog.Add($l) }
     $goodLog.Add('all passed')
     $good = @($goodLog)
-    $gateCases = @(
+    $shortControls = (New-Object System.Text.RegularExpressions.Regex('(?s)\$allControls\s*=\s*@\(.*?\)')).Replace($SelfText, '$$allControls = @(''C01'')', 1)
+    $noMutants = $SelfText.Replace('@{ Id = ''M', '@{ Id = ''N')
+    $cases = @(
         @{ Name = 'un registro completo pasa (motor)'; Lines = $good; Depth = 'Motor'; WantOk = $true },
         @{ Name = 'un registro completo pasa (mutantes)'; Lines = $good; Depth = 'Mutantes'; WantOk = $true },
+        @{ Name = 'mutantes con -SkipEngine sin lineas de motor pasa'; Lines = @($mutantLines + '  OMITIDO  autoprueba por motor (-SkipEngine)' + 'all passed'); Depth = 'Mutantes'; WantOk = $true },
+        @{ Name = 'codigo de salida distinto de cero falla'; Lines = $good; Depth = 'Motor'; ExitCode = 1; WantOk = $false },
         @{ Name = 'un SKIP de motor falla'; Lines = ($good + '  SKIP  autoprueba por motor (requiere elevacion)'); Depth = 'Motor'; WantOk = $false },
+        @{ Name = 'una linea FAIL falla'; Lines = ($good + '  FAIL  mutante de tarjeta K01 muere por C15'); Depth = 'Motor'; WantOk = $false },
         @{ Name = 'sin PASS C21 en pwsh falla'; Lines = @($good | Where-Object { $_ -ne '  PASS  motor pwsh: PASS C21' }); Depth = 'Motor'; WantOk = $false },
         @{ Name = 'PASS C04b no cuenta como PASS C04'; Lines = @($good | Where-Object { $_ -ne '  PASS  motor powershell: PASS C04' }); Depth = 'Motor'; WantOk = $false },
         @{ Name = 'sin la linea de un mutante falla'; Lines = @($good | Where-Object { $_ -notlike '*mutante M23 *' }); Depth = 'Mutantes'; WantOk = $false },
+        @{ Name = 'un mutante muerto por otro control falla'; Lines = @($good | ForEach-Object { if ($_ -like '*mutante M23 muere por C21') { '  PASS  mutante M23 muere por C20' } else { $_ } }); Depth = 'Mutantes'; WantOk = $false },
+        @{ Name = 'sin all passed falla'; Lines = @($good | Where-Object { $_ -ne 'all passed' }); Depth = 'Motor'; WantOk = $false },
+        @{ Name = 'una lista de controles corta falla'; Lines = $good; Depth = 'Motor'; Text = $shortControls; WantOk = $false },
+        @{ Name = 'sin mutantes declarados falla (mutantes)'; Lines = $good; Depth = 'Mutantes'; Text = $noMutants; WantOk = $false },
         @{ Name = 'un registro de laptop (estatico + SKIP) falla'; Lines = @('  PASS  estatico C15  tarjeta cual-uso.html valida', '  SKIP  autoprueba por motor (requiere Windows)', 'all passed'); Depth = 'Motor'; WantOk = $false }
     )
-    foreach ($gc in $gateCases) {
-        $probs = @(Get-ArlCiGateProblems -Lines $gc.Lines -Depth $gc.Depth -TestText $selfText)
-        $gateOk = ($probs.Count -eq 0)
-        Assert-True "puerta CI: $($gc.Name)" ($gateOk -eq $gc.WantOk) ('-- problemas=' + $probs.Count + ' ' + (@($probs | Select-Object -First 2) -join ' | '))
+    $out = New-Object System.Collections.Generic.List[object]
+    foreach ($gc in $cases) {
+        $text = if ($gc.ContainsKey('Text')) { $gc.Text } else { $SelfText }
+        $code = if ($gc.ContainsKey('ExitCode')) { $gc.ExitCode } else { 0 }
+        try {
+            $probs = @(Get-ArlCiGateProblems -Lines $gc.Lines -Depth $gc.Depth -TestText $text -ExitCode $code)
+            $out.Add(@{ Name = $gc.Name; Pass = (($probs.Count -eq 0) -eq $gc.WantOk); Detail = ('problemas=' + $probs.Count + ' ' + (@($probs | Select-Object -First 2) -join ' | ')) })
+        } catch {
+            $out.Add(@{ Name = $gc.Name; Pass = $false; Detail = ('excepcion: ' + $_.Exception.Message) })
+        }
+    }
+    return , $out
+}
+
+if (-not (Test-Path -LiteralPath $gatePath -PathType Leaf)) {
+    Assert-True 'la puerta de CI Invoke-ArlOperatorDesktopCiGate.ps1 existe' $false "-- $gatePath"
+} else {
+    . $gatePath   # dot-source: defines Get-ArlCiGateProblems and runs nothing
+    $selfText = [System.IO.File]::ReadAllText($PSCommandPath)
+    foreach ($gc in (Invoke-GateCases -SelfText $selfText)) { Assert-True "puerta CI: $($gc.Name)" $gc.Pass ('-- ' + $gc.Detail) }
+    $gateText = [System.IO.File]::ReadAllText($gatePath)
+    $gmDir = Join-Path ([System.IO.Path]::GetTempPath()) ('arl-desktop-gate-mutants-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $gmDir -Force | Out-Null
+    try {
+        foreach ($gm in $gateMutantSpecs) {
+            $idx = $gateText.IndexOf($gm.Find, [System.StringComparison]::Ordinal)
+            $last = $gateText.LastIndexOf($gm.Find, [System.StringComparison]::Ordinal)
+            if ($idx -lt 0 -or $idx -ne $last) { Assert-True "mutante de puerta $($gm.Id): patron unico" $false "idx=$idx last=$last"; continue }
+            $gmPath = Join-Path $gmDir ($gm.Id + '.ps1')
+            [System.IO.File]::WriteAllText($gmPath, ($gateText.Substring(0, $idx) + $gm.Replace + $gateText.Substring($idx + $gm.Find.Length)), (New-Object System.Text.UTF8Encoding($false)))
+            $gmResults = @()
+            try {
+                . $gmPath   # the mutant's reader replaces the real one for this run only
+                $gmResults = Invoke-GateCases -SelfText $selfText
+            } catch {
+                Write-Host "  (mutante de puerta $($gm.Id): $($_.Exception.Message))"
+            } finally {
+                . $gatePath   # put the real reader back
+            }
+            $hit = @($gmResults | Where-Object { $_.Name -eq $gm.Killer })
+            Assert-True "mutante de puerta $($gm.Id) muere por '$($gm.Killer)'" (($hit.Count -eq 1) -and (-not $hit[0].Pass)) ($(if ($hit.Count -eq 1) { '-- ' + $hit[0].Detail } else { '-- el caso no se ejecuto' }))
+        }
+    } finally {
+        Remove-Item -LiteralPath $gmDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
 # ---- depth 2: run the script's own -SelfTest under each engine (Windows + elevated) -------------
-if (-not (Test-OnWindows)) {
+if ($SkipEngine) {
+    Write-Host '  OMITIDO  autoprueba por motor (-SkipEngine)'
+} elseif (-not (Test-OnWindows)) {
     Write-Host '  SKIP  autoprueba por motor (requiere Windows)'
     if ($inCI) { Assert-True 'CI no debe alcanzar la autoprueba por motor fuera de Windows' $false }
 } elseif (-not (Test-Elevated)) {

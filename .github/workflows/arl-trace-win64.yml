@@ -113,7 +113,8 @@ jobs:
           elif [ "$EVENT_NAME" = "push" ] && [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
             base="$BEFORE_SHA"
           fi
-          if [ -n "$base" ] && changed="$(git diff --name-only "$base...HEAD" 2>/dev/null)"; then
+          # --no-renames: a rename lists both paths, so moving a file out of contrib/arl/ still runs the suites.
+          if [ -n "$base" ] && changed="$(git diff --no-renames --name-only "$base...HEAD" 2>/dev/null)"; then
             # A here-string, not a pipe: with pipefail, grep -q closing the pipe early could read as "no match".
             if grep -qE '^(contrib/arl/|\.github/workflows/arl-trace-win64\.yml$)' <<< "$changed"; then
               reason="changes under contrib/arl/ or in this workflow (vs $base)"
@@ -145,7 +146,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # Each engine mutant (M01-M23) runs its self-test with -Controls set to the control that owns it,
-      # and must be killed by that control; the gate fails on any SKIP or missing PASS line here too.
+      # and must be killed by that control; the gate fails on any SKIP or missing PASS line here too. The
+      # gate passes -SkipEngine at this depth: the step above already ran the full engine self-test.
       - name: Mutation-test ARL operator desktop script
         if: steps.arl-desktop-scope.outputs.run == 'true'
         shell: pwsh
