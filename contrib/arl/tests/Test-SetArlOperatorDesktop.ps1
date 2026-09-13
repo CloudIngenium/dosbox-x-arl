@@ -105,7 +105,7 @@ $mutantSpecs = @(
     @{ Id = 'M14'; Killer = 'C18'; Find = 'Invoke-ArlAction -P $P -Op ''move-file'' -Path $Path -Destination $Backup'; Replace = 'Invoke-ArlAction -P $P -Op ''delete-file'' -Path $Path' }
     @{ Id = 'M15'; Killer = 'C17'; Find = 'if (Test-Path -LiteralPath $P.OperatorDesktop -PathType Container) {'; Replace = 'if ($false) {' }
     @{ Id = 'M16'; Killer = 'C19'; Find = 'function Assert-ArlPathParameters([hashtable]$Bound) {'; Replace = ('function Assert-ArlPathParameters([hashtable]$Bound) {' + "`n" + '    return') }
-    @{ Id = 'M17'; Killer = 'C12'; Find = 'if ((Get-ArlWriters $node).Count -gt 0) {'; Replace = 'if ($false) {' }
+    @{ Id = 'M17'; Killer = 'C12'; Find = 'if (@(Get-ArlWriters $node).Count -gt 0) {'; Replace = 'if ($false) {' }
     @{ Id = 'M18'; Killer = 'C10'; Find = '(A;OICI;FA;;;BA)'''; Replace = '(A;OICI;FA;;;BU)''' }
     @{ Id = 'M19'; Killer = 'C04b'; Find = 'if (-not (Test-ArlLnkMatchesAction -Path $created -Action $a)) { Set-ArlUndoSkipped -Action $a -Reason ''modificado despues de aplicar''; return }'; Replace = '' }
     @{ Id = 'M20'; Killer = 'C15'; Find = 'Png = ''serrano.png''; Source = $P.ShellDll; Index = 314'; Replace = 'Png = ''ingeniero.png''; Source = $P.ShellDll; Index = 314' }
@@ -135,7 +135,7 @@ foreach ($m in $mutantSpecs) {
 
 # ---- depth 1b: static controls via the script's own source-level checks -------------------------
 . $scriptPath   # dot-source: defines the functions and (per the guard) runs nothing; sets StrictMode Latest here on
-$script:ArlStResults = New-Object System.Collections.Generic.List[object]
+$script:ArlStResults = [System.Collections.Generic.List[object]]::new()
 Invoke-ArlStStatic
 $staticIds = @('C13', 'C14', 'C15', 'C09')
 foreach ($id in $staticIds) {
@@ -190,7 +190,7 @@ if (Test-Path -LiteralPath $cardPath -PathType Leaf) {
             if ($idx -lt 0 -or $idx -ne $last) { Assert-True "mutante de tarjeta $($k.Id): patron unico" $false "idx=$idx last=$last"; continue }
             $mutCard = Join-Path $cardDir ($k.Id + '.html')
             [System.IO.File]::WriteAllText($mutCard, ($cardText.Substring(0, $idx) + $k.Replace + $cardText.Substring($idx + $k.Find.Length)), (New-Object System.Text.UTF8Encoding($false)))
-            $script:ArlStResults = New-Object System.Collections.Generic.List[object]
+            $script:ArlStResults = [System.Collections.Generic.List[object]]::new()
             $consoleOut = [Console]::Out
             [Console]::SetOut([System.IO.TextWriter]::Null)   # the expected FAIL line of the planted defect is noise here
             try { Invoke-ArlStCardStatic -CardPath $mutCard | Out-Null } finally { [Console]::SetOut($consoleOut) }
@@ -234,17 +234,17 @@ function New-PlItem([string]$Dir, [string]$Leaf, [string]$Target, [string]$Argum
 }
 
 function Reset-PlState {
-    $script:ArlPlannedPaths = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    $script:ArlPlannedPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     $script:ArlGroupNeeded = @{}
-    $script:ArlPlannedLaunchers = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([System.StringComparer]::OrdinalIgnoreCase)
+    $script:ArlPlannedLaunchers = [System.Collections.Generic.Dictionary[string,object]]::new([System.StringComparer]::OrdinalIgnoreCase)
     $report = @{}
-    foreach ($b in @('Crear', 'Reemplazar', 'Mover', 'Archivar', 'Conserva', 'Desconocido', 'Informe', 'Pendiente', 'Aviso')) { $report[$b] = New-Object System.Collections.Generic.List[string] }
-    return @{ Report = $report; Counts = (New-ArlCounts); Moves = (New-Object System.Collections.Generic.List[object]) }
+    foreach ($b in @('Crear', 'Reemplazar', 'Mover', 'Archivar', 'Conserva', 'Desconocido', 'Informe', 'Pendiente', 'Aviso')) { $report[$b] = [System.Collections.Generic.List[string]]::new() }
+    return @{ Report = $report; Counts = (New-ArlCounts); Moves = ([System.Collections.Generic.List[object]]::new()) }
 }
 
 # Returns one @{ Id; Name; Pass; Detail } per check. A check that throws counts as failed.
 function Invoke-PlannerChecks([string]$Root) {
-    $out = New-Object System.Collections.Generic.List[object]
+    $out = [System.Collections.Generic.List[object]]::new()
     $stamp = '20260101-000000'
     $arl = Join-Path $Root 'ARL'
     $away = Join-Path $Root 'fuera'
@@ -335,7 +335,7 @@ function Invoke-PlannerChecks([string]$Root) {
                 @{ Leaf = 'Diagnostics - Serial Traces.lnk'; Target = ($arl + '\diagnostics'); Group = 'Diagnostico' },
                 @{ Leaf = 'ARL 3460 - Analizar.lnk'; Target = ($arl + '\ChispaOperator\Chispa.Operator.exe'); Group = 'Accesos-anteriores' }
             )
-            $bad = New-Object System.Collections.Generic.List[string]
+            $bad = [System.Collections.Generic.List[string]]::new()
             foreach ($l in $legacy) {
                 $it = New-PlItem -Dir (Join-Path $Root 'escritorio') -Leaf $l.Leaf -Target $l.Target
                 $it.Depth = 0
@@ -402,7 +402,7 @@ $gateMutantSpecs = @(
 
 # Returns one @{ Name; Pass; Detail } per log case, run against whichever Get-ArlCiGateProblems is loaded.
 function Invoke-GateCases([string]$SelfText) {
-    $goodLog = New-Object System.Collections.Generic.List[string]
+    $goodLog = [System.Collections.Generic.List[string]]::new()
     foreach ($eng in @('powershell', 'pwsh')) {
         $goodLog.Add("  PASS  motor ${eng}: autoprueba exit 0")
         $goodLog.Add("  PASS  motor ${eng}: status autoprueba-ok")
@@ -430,7 +430,7 @@ function Invoke-GateCases([string]$SelfText) {
         @{ Name = 'sin mutantes declarados falla (mutantes)'; Lines = $good; Depth = 'Mutantes'; Text = $noMutants; WantOk = $false },
         @{ Name = 'un registro de laptop (estatico + SKIP) falla'; Lines = @('  PASS  estatico C15  tarjeta cual-uso.html valida', '  SKIP  autoprueba por motor (requiere Windows)', 'all passed'); Depth = 'Motor'; WantOk = $false }
     )
-    $out = New-Object System.Collections.Generic.List[object]
+    $out = [System.Collections.Generic.List[object]]::new()
     foreach ($gc in $cases) {
         $text = if ($gc.ContainsKey('Text')) { $gc.Text } else { $SelfText }
         $code = if ($gc.ContainsKey('ExitCode')) { $gc.ExitCode } else { 0 }

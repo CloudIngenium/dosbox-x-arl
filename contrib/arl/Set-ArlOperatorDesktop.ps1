@@ -134,17 +134,17 @@ function ConvertTo-ArlJson($Value) {
         return [string]::Format([System.Globalization.CultureInfo]::InvariantCulture, '{0}', $Value)
     }
     if ($Value -is [System.Collections.IDictionary]) {
-        $parts = New-Object System.Collections.Generic.List[string]
+        $parts = [System.Collections.Generic.List[string]]::new()
         foreach ($k in $Value.Keys) { $parts.Add((ConvertTo-ArlJsonString ([string]$k)) + ':' + (ConvertTo-ArlJson $Value[$k])) }
         return '{' + ($parts -join ',') + '}'
     }
     if ($Value.GetType().FullName -eq 'System.Management.Automation.PSCustomObject') {
-        $parts = New-Object System.Collections.Generic.List[string]
+        $parts = [System.Collections.Generic.List[string]]::new()
         foreach ($p in $Value.PSObject.Properties) { $parts.Add((ConvertTo-ArlJsonString $p.Name) + ':' + (ConvertTo-ArlJson $p.Value)) }
         return '{' + ($parts -join ',') + '}'
     }
     if ($Value -is [System.Collections.IEnumerable]) {
-        $parts = New-Object System.Collections.Generic.List[string]
+        $parts = [System.Collections.Generic.List[string]]::new()
         foreach ($v in $Value) { $parts.Add((ConvertTo-ArlJson $v)) }
         return '[' + ($parts -join ',') + ']'
     }
@@ -232,7 +232,7 @@ function ConvertTo-ArlSddlKey([string]$Sddl) {
         if ($null -ne $rsd.Owner) { $rowner = $rsd.Owner.Value }
         $rprot = ''
         if (($rsd.ControlFlags -band [System.Security.AccessControl.ControlFlags]::DiscretionaryAclProtected) -ne 0) { $rprot = 'P' }
-        $rlist = New-Object System.Collections.Generic.List[string]
+        $rlist = [System.Collections.Generic.List[string]]::new()
         if ($null -ne $rsd.DiscretionaryAcl) {
             foreach ($ace in $rsd.DiscretionaryAcl) {
                 [void]$rlist.Add('(' + [int]$ace.AceType + ';' + [int]$ace.AceFlags + ';' + [string]$ace.AccessMask + ';' + $ace.SecurityIdentifier.Value + ')')
@@ -254,7 +254,7 @@ function ConvertTo-ArlSddlKey([string]$Sddl) {
 }
 
 function Get-ArlSddlAces([string]$Sddl) {
-    $out = New-Object System.Collections.Generic.List[object]
+    $out = [System.Collections.Generic.List[object]]::new()
     $idx = $Sddl.IndexOf('D:')
     if ($idx -lt 0) { return $out }
     $dacl = $Sddl.Substring($idx + 2)
@@ -288,7 +288,7 @@ function Get-ArlOwnerSid([string]$Path) {
 # SIDs (other than SY, BA and TrustedInstaller) holding an allow ACE with a write-class right on the object.
 function Get-ArlWriters([string]$Path) {
     $acl = Get-Acl -LiteralPath $Path
-    $out = New-Object System.Collections.Generic.List[string]
+    $out = [System.Collections.Generic.List[string]]::new()
     foreach ($r in $acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])) {
         if ($r.AccessControlType -ne 'Allow') { continue }
         if (($r.PropagationFlags -band [System.Security.AccessControl.PropagationFlags]::InheritOnly) -ne 0) { continue }
@@ -376,7 +376,7 @@ function Resolve-ArlPaths([hashtable]$Values) {
     $P.Accesos = Join-Path $P.ArlRoot 'Administradores\Accesos'
     $P.GroupPaths = @{}
     foreach ($g in $script:ArlGroups) { $P.GroupPaths[$g] = Join-Path $P.Tools $g }
-    $rows = New-Object System.Collections.Generic.List[object]
+    $rows = [System.Collections.Generic.List[object]]::new()
     foreach ($r in (Get-ArlFinalRows)) {
         $e = @{}
         foreach ($k in $r.Keys) {
@@ -440,7 +440,7 @@ function Assert-ArlPathParameters([hashtable]$Bound) {
     if ($given.Count -eq 0) { return }
     $defaults = Resolve-ArlPaths @{}
     $temp = Get-ArlLongPath ([System.IO.Path]::GetTempPath())
-    $underTemp = New-Object System.Collections.Generic.List[string]
+    $underTemp = [System.Collections.Generic.List[string]]::new()
     foreach ($n in $given) {
         try { $value = [System.IO.Path]::GetFullPath([string]$Bound[$n]).TrimEnd('\') }
         catch { throw (New-ArlRefusal 'R2' ('ruta no valida: -' + $n + ' ' + [string]$Bound[$n])) }
@@ -470,7 +470,7 @@ function Assert-ArlElevated {
 }
 
 function Assert-ArlTargetsPresent($P) {
-    $missing = New-Object System.Collections.Generic.List[string]
+    $missing = [System.Collections.Generic.List[string]]::new()
     # EdgePath too: the Ayuda shortcut targets it, and a missing Edge would leave a dead help icon.
     foreach ($f in @($P.ChispaExe, $P.OperatorSettings, $P.PassiveStd, $P.PassiveNorm, $P.PassiveWorkflow, $P.DosboxExe, $P.ShellDll, $P.CardSource, $P.EdgePath)) {
         if (-not (Test-Path -LiteralPath $f -PathType Leaf)) { $missing.Add($f) }
@@ -494,7 +494,7 @@ function Assert-ArlTargetsPresent($P) {
 }
 
 function Assert-ArlIconsExtract($P) {
-    $bad = New-Object System.Collections.Generic.List[string]
+    $bad = [System.Collections.Generic.List[string]]::new()
     foreach ($i in (Get-ArlIconSet $P)) {
         $bmp = Get-ArlIconBitmap -File $i.Source -Index $i.Index
         if ($null -eq $bmp) { $bad.Add($i.Source + ',' + $i.Index) } else { $bmp.Dispose() }
@@ -651,7 +651,7 @@ function Read-ArlItem($P, [string]$Path, [string]$Rel, [int]$Depth, [switch]$NoC
             if ($null -ne $item.Lnk) { $item.Target = $item.Lnk.Target }
         }
     } elseif (-not $NoChildren -and -not $item.Reparse) {
-        $kids = New-Object System.Collections.Generic.List[object]
+        $kids = [System.Collections.Generic.List[object]]::new()
         foreach ($c in @(Get-ChildItem -LiteralPath $Path -Force -ErrorAction SilentlyContinue)) {
             $kids.Add((Read-ArlItem -P $P -Path $c.FullName -Rel ($Rel + '\' + $c.Name) -Depth ($Depth + 1)))
         }
@@ -661,7 +661,7 @@ function Read-ArlItem($P, [string]$Path, [string]$Rel, [int]$Depth, [switch]$NoC
 }
 
 function Get-ArlTopItems($P, [string]$Root, [switch]$FilesOnly) {
-    $out = New-Object System.Collections.Generic.List[object]
+    $out = [System.Collections.Generic.List[object]]::new()
     if (-not (Test-Path -LiteralPath $Root -PathType Container)) { return $out }
     foreach ($c in @(Get-ChildItem -LiteralPath $Root -Force -ErrorAction SilentlyContinue)) {
         if ($FilesOnly -and $c.PSIsContainer) {
@@ -810,7 +810,7 @@ function Add-ArlMove($P, $Item, [string]$Group, [string]$Note, [string]$Stamp, $
             foreach ($planned in $script:ArlPlannedLaunchers[$dest]) { if (Test-ArlSameLauncher $planned $Item.Lnk) { $dup = $true } }
         }
         if (-not $dup) {
-            if (-not $script:ArlPlannedLaunchers.ContainsKey($dest)) { $script:ArlPlannedLaunchers[$dest] = New-Object System.Collections.Generic.List[object] }
+            if (-not $script:ArlPlannedLaunchers.ContainsKey($dest)) { $script:ArlPlannedLaunchers[$dest] = [System.Collections.Generic.List[object]]::new() }
             [void]$script:ArlPlannedLaunchers[$dest].Add($Item.Lnk)
         }
     }
@@ -833,7 +833,7 @@ function Add-ArlMove($P, $Item, [string]$Group, [string]$Note, [string]$Stamp, $
         $Counts.mover++
         Add-ArlReport $Report 'Mover' ($Item.Rel + ' -> ' + $Group + '\  ' + $Note)
     }
-    if ($Item.Target -and (Test-Path -LiteralPath $Item.Target) -and (Get-ArlWriters $Item.Target).Count -gt 0) {
+    if ($Item.Target -and (Test-Path -LiteralPath $Item.Target) -and @(Get-ArlWriters $Item.Target).Count -gt 0) {
         $Counts.avisos++
         Add-ArlReport $Report 'Aviso' ('destino modificable por usuarios no administradores: ' + $Item.Target)
     }
@@ -886,18 +886,18 @@ function Add-ArlDirPlan($P, $DirActions, [string]$Path, $Sddl, [string]$Scope) {
 
 function New-ArlPlan($P, $Inv, [string]$Stamp) {
     $P.ArchiveDir = Join-Path $P.ArchiveRoot $Stamp
-    $script:ArlPlannedPaths = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    $script:ArlPlannedPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     $script:ArlGroupNeeded = @{}
-    $script:ArlPlannedLaunchers = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([System.StringComparer]::OrdinalIgnoreCase)
+    $script:ArlPlannedLaunchers = [System.Collections.Generic.Dictionary[string,object]]::new([System.StringComparer]::OrdinalIgnoreCase)
     $Counts = New-ArlCounts
     $buckets = @('Crear', 'Reemplazar', 'Mover', 'Archivar', 'Conserva', 'Desconocido', 'Informe', 'Pendiente', 'Aviso')
-    $Report = @{}; foreach ($b in $buckets) { $Report[$b] = New-Object System.Collections.Generic.List[string] }
+    $Report = @{}; foreach ($b in $buckets) { $Report[$b] = [System.Collections.Generic.List[string]]::new() }
 
-    $dirActions = New-Object System.Collections.Generic.List[object]
-    $cardActions = New-Object System.Collections.Generic.List[object]
-    $shortcutActions = New-Object System.Collections.Generic.List[object]
-    $moveActions = New-Object System.Collections.Generic.List[object]
-    $archiveFolderActions = New-Object System.Collections.Generic.List[object]
+    $dirActions = [System.Collections.Generic.List[object]]::new()
+    $cardActions = [System.Collections.Generic.List[object]]::new()
+    $shortcutActions = [System.Collections.Generic.List[object]]::new()
+    $moveActions = [System.Collections.Generic.List[object]]::new()
+    $archiveFolderActions = [System.Collections.Generic.List[object]]::new()
 
     # 1. Card and icons (write only when content differs). The guide folder is needed if any of these run.
     $guideNeeded = $false
@@ -1026,7 +1026,7 @@ function New-ArlPlan($P, $Inv, [string]$Stamp) {
     }
 
     # 6. Assemble in contract order and number the sequence.
-    $ordered = New-Object System.Collections.Generic.List[object]
+    $ordered = [System.Collections.Generic.List[object]]::new()
     foreach ($a in $dirActions) { [void]$ordered.Add($a) }
     foreach ($a in $cardActions) { [void]$ordered.Add($a) }
     foreach ($a in $shortcutActions) { [void]$ordered.Add($a) }
@@ -1064,7 +1064,7 @@ function Invoke-ArlAction {
     if (-not $PSCmdlet.ShouldProcess($Path, $Op)) { return $false }
 
     # Guard every path we are about to WRITE (a copy reads its source, so only its destination is guarded).
-    $targets = New-Object System.Collections.Generic.List[string]
+    $targets = [System.Collections.Generic.List[string]]::new()
     if ($Op -eq 'copy-file') { [void]$targets.Add($Destination) }
     elseif ($Op -like 'move-*') { [void]$targets.Add($Path); [void]$targets.Add($Destination) }
     else { [void]$targets.Add($Path); if ($TempPath) { [void]$targets.Add($TempPath) } }
@@ -1469,7 +1469,7 @@ $script:ArlKnownKinds = @('mkdir', 'acl-set', 'acl-reset', 'copy-card', 'write-i
 
 # Every applied manifest under the archive root, oldest first: @{ Ts; Path; State }.
 function Get-ArlManifests($P) {
-    $out = New-Object System.Collections.Generic.List[object]
+    $out = [System.Collections.Generic.List[object]]::new()
     if (-not (Test-Path -LiteralPath $P.ArchiveRoot -PathType Container)) { return @($out) }
     foreach ($d in @(Get-ChildItem -LiteralPath $P.ArchiveRoot -Force -Directory -ErrorAction SilentlyContinue)) {
         if ($d.Name -notmatch '^\d{8}-\d{6}$') { continue }
@@ -1520,7 +1520,7 @@ function Assert-ArlManifestTrusted($P, [string]$ManifestPath, $Manifest) {
         if (@($script:SidBA, $script:SidSY) -notcontains $o) { throw (New-ArlRefusal 'R11' ('dueno no administrador en el respaldo: ' + $node)) }
     }
     foreach ($node in @($archiveParent, $tsDir, $ManifestPath)) {
-        if ((Get-ArlWriters $node).Count -gt 0) { throw (New-ArlRefusal 'R11' ('permisos de escritura no administrativos en el respaldo: ' + $node)) }
+        if (@(Get-ArlWriters $node).Count -gt 0) { throw (New-ArlRefusal 'R11' ('permisos de escritura no administrativos en el respaldo: ' + $node)) }
     }
     if ([string]$Manifest.schema -ne 'arl-operator-desktop-manifest-v1') { throw (New-ArlRefusal 'R11' 'esquema de manifiesto desconocido') }
     if ([string]$Manifest.computer -ne [string]$env:COMPUTERNAME) { throw (New-ArlRefusal 'R11' ('el manifiesto es de otro equipo: ' + $Manifest.computer)) }
@@ -1836,7 +1836,7 @@ function Get-ArlStSnapshot([string]$Root) {
 
 # Compares two snapshots. Returns a list of human-readable differences (empty = identical).
 function Compare-ArlStSnapshot($Before, $After, [switch]$IgnoreSddl) {
-    $diffs = New-Object System.Collections.Generic.List[string]
+    $diffs = [System.Collections.Generic.List[string]]::new()
     foreach ($k in $Before.Keys) {
         if (-not $After.ContainsKey($k)) { [void]$diffs.Add('falta: ' + $k); continue }
         $b = $Before[$k]; $a = $After[$k]
@@ -2184,7 +2184,7 @@ function Invoke-ArlStGroup4([string]$T) {
     $dupOk = $a2 -and (Test-Path -LiteralPath (Join-Path $a2 'duplicados\ARL 3460 - Analizar.lnk'))
     $emuOk = Test-Path -LiteralPath (Join-Path $SP.Tools 'Simuladores\90 EMULATOR.lnk')
     $chispaOnD = @(Get-ChildItem -LiteralPath $SP.PublicDesktop -Filter *.lnk -Force -ErrorAction SilentlyContinue | Where-Object {
-        $t = (Read-ArlShortcut $_.FullName); $t -and ([System.IO.Path]::GetFileName($t.Target) -eq 'Chispa.Operator.exe') }).Count
+        $lnk = (Read-ArlShortcut $_.FullName); $lnk -and ([System.IO.Path]::GetFileName($lnk.Target) -eq 'Chispa.Operator.exe') }).Count
     $c07 = ($ap2.Exit -eq 0) -and $dupOk -and $emuOk -and ($chispaOnD -eq 1)
     Add-ArlStResult 'C07' 'duplicado a duplicados; emulador a Simuladores' $c07 ('dup=' + $dupOk + ' emu=' + $emuOk + ' chispaEnD=' + $chispaOnD)
 }
@@ -2210,8 +2210,8 @@ function Invoke-ArlStGroup5([string]$T) {
     Add-ArlStResult 'C08' 'colision conserva el archivo previo' $c08 ('intacto=' + $sameHash + ' sufijo=' + $suffixed)
 }
 # --- result accounting + raw child + junction primitive ------------------------------------------------
-$script:ArlStResults = New-Object System.Collections.Generic.List[object]
-$script:ArlStJunctions = New-Object System.Collections.Generic.List[string]
+$script:ArlStResults = [System.Collections.Generic.List[object]]::new()
+$script:ArlStJunctions = [System.Collections.Generic.List[string]]::new()
 
 function Add-ArlStResult([string]$Id, [string]$Name, [bool]$Pass, [string]$Detail) {
     [void]$script:ArlStResults.Add(@{ Id = $Id; Name = $Name; Pass = $Pass; Detail = $Detail })
@@ -2357,8 +2357,8 @@ function Invoke-ArlStGroup8([string]$T) {
     $backupOk = $backup -and (Test-Path -LiteralPath $backup -PathType Leaf) -and ((Get-FileHash -LiteralPath $backup -Algorithm SHA256).Hash.ToLowerInvariant() -eq $coladaShaOrig)
     $coladaFixed = $false
     if (Test-Path -LiteralPath $colada -PathType Leaf) {
-        $t = Read-ArlShortcut $colada
-        $coladaFixed = $t -and ([System.IO.Path]::GetFileName($t.Target) -eq 'Chispa.Operator.exe')
+        $lnk = Read-ArlShortcut $colada
+        $coladaFixed = $lnk -and ([System.IO.Path]::GetFileName($lnk.Target) -eq 'Chispa.Operator.exe')
     }
     $undo = Invoke-ArlStChild $T @('-Undo')
     $coladaBack = (Test-Path -LiteralPath $colada -PathType Leaf) -and ((Get-FileHash -LiteralPath $colada -Algorithm SHA256).Hash.ToLowerInvariant() -eq $coladaShaOrig)
@@ -2633,7 +2633,7 @@ function Invoke-ArlStSourceStatic {
     $mut = @(('New' + '-Item'), ('Set' + '-Acl'), ('Remove' + '-Item'), ('Copy' + '-Item'), ('Move' + '-Item'),
         ('Set' + '-Content'), ('Rename' + '-Item'), ('ic' + 'acls'), ('SetAccess' + 'Control'),
         (']::' + 'Move('), (']::' + 'Delete('), (']::' + 'Copy('), (']::' + 'Replace('), ('Create' + 'Directory'), ('.Save' + '()'))
-    $violations = New-Object System.Collections.Generic.List[string]
+    $violations = [System.Collections.Generic.List[string]]::new()
     foreach ($tok in $mut) {
         $from = 0
         while ($true) {
@@ -2674,13 +2674,13 @@ function Invoke-ArlSelfTest([string[]]$Controls) {
         Write-ArlResult 'autoprueba' 'autoprueba-ok' $null $null (New-ArlCounts) @()
         return 0
     }
-    $want = New-Object System.Collections.Generic.List[string]
-    foreach ($c in @($Controls)) { foreach ($p in ([string]$c).Split(',')) { $t = $p.Trim(); if ($t) { [void]$want.Add($t) } } }
+    $want = [System.Collections.Generic.List[string]]::new()
+    foreach ($c in @($Controls)) { foreach ($p in ([string]$c).Split(',')) { $tok = $p.Trim(); if ($tok) { [void]$want.Add($tok) } } }
     $filter = @($want)
     $wanted = { param($ids) if ($filter.Count -eq 0) { return $true } foreach ($id in $ids) { if ($filter -contains $id) { return $true } } return $false }
 
-    $script:ArlStResults = New-Object System.Collections.Generic.List[object]
-    $script:ArlStJunctions = New-Object System.Collections.Generic.List[string]
+    $script:ArlStResults = [System.Collections.Generic.List[object]]::new()
+    $script:ArlStJunctions = [System.Collections.Generic.List[string]]::new()
     $T = Join-Path (Get-ArlLongPath ([IO.Path]::GetTempPath())) ('arl-desktop-autoprueba-' + [guid]::NewGuid().ToString('N'))
 
     $groups = @(
@@ -2712,7 +2712,7 @@ function Invoke-ArlSelfTest([string[]]$Controls) {
         }
     } finally {
         foreach ($j in @($script:ArlStJunctions)) { try { [IO.Directory]::Delete($j, $false) } catch { } }
-        $script:ArlStJunctions = New-Object System.Collections.Generic.List[string]
+        $script:ArlStJunctions = [System.Collections.Generic.List[string]]::new()
         $tmpRoot = Get-ArlLongPath ([IO.Path]::GetTempPath())
         if ((Test-ArlUnder -Path $T -Root $tmpRoot) -and $T.Contains('arl-desktop-autoprueba-') -and (Test-Path -LiteralPath $T)) {
             & icacls $T /reset /T /C /Q | Out-Null
@@ -2720,7 +2720,7 @@ function Invoke-ArlSelfTest([string[]]$Controls) {
         }
     }
 
-    $failedIds = New-Object System.Collections.Generic.List[string]
+    $failedIds = [System.Collections.Generic.List[string]]::new()
     foreach ($r in $script:ArlStResults) {
         if ($r.Pass) { continue }
         if (($filter.Count -gt 0) -and (-not ($filter -contains $r.Id))) { continue }

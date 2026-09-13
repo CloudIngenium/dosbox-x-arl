@@ -42,7 +42,7 @@ function Get-ArlCiGateProblems {
     $minControls = 22
     $minMutants = 23
     $engines = @('powershell', 'pwsh')
-    $out = New-Object System.Collections.Generic.List[string]
+    $out = [System.Collections.Generic.List[string]]::new()
 
     if ($ExitCode -ne 0) { $out.Add('la prueba termino con codigo ' + $ExitCode) }
     $controls = @()
@@ -104,7 +104,7 @@ function Invoke-ArlCiGate([string]$Depth, [string]$TestPath) {
     $argv = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $TestPath)
     if ('Mutantes' -eq $Depth) { $argv += @('-Mutants', '-SkipEngine') }
 
-    $lines = New-Object System.Collections.Generic.List[string]
+    $lines = [System.Collections.Generic.List[string]]::new()
     & $exe @argv | ForEach-Object { $s = [string]$_; Write-ArlCiLine $s; [void]$lines.Add($s) }
     $code = $LASTEXITCODE
     $problems = @(Get-ArlCiGateProblems -Lines $lines.ToArray() -Depth $Depth -TestText ([System.IO.File]::ReadAllText($TestPath)) -ExitCode $code)
