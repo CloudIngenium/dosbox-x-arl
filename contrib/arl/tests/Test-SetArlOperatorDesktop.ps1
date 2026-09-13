@@ -16,9 +16,9 @@
 
       2. Engine (Windows + elevated): the script's own -SelfTest is run under each available engine
          (powershell.exe = Windows PowerShell 5.1, pwsh = 7). It must exit 0, report autoprueba-ok,
-         and print a PASS line for each of the 20 controls C01-C19 + C04b.
+         and print a PASS line for each of the 21 controls C01-C20 + C04b.
 
-      3. Mutation (-Mutants, Windows + elevated): each of the 20 seeded mutants is applied to a
+      3. Mutation (-Mutants, Windows + elevated): each of the 22 seeded mutants is applied to a
          private copy of the script and its self-test is run under Windows PowerShell 5.1; each must
          be caught (exit 1 with a FAIL line for the control that owns it).
 
@@ -61,9 +61,9 @@ function Test-Elevated {
 }
 $inCI = -not [string]::IsNullOrEmpty($env:CI)
 
-# The 20 controls the self-test prints a PASS line for on a healthy tree (C04b is distinct from C04).
+# The 21 controls the self-test prints a PASS line for on a healthy tree (C04b is distinct from C04).
 $allControls = @('C01', 'C02', 'C03', 'C04', 'C04b', 'C05', 'C06', 'C07', 'C08', 'C09',
-    'C10', 'C11', 'C12', 'C13', 'C14', 'C15', 'C16', 'C17', 'C18', 'C19')
+    'C10', 'C11', 'C12', 'C13', 'C14', 'C15', 'C16', 'C17', 'C18', 'C19', 'C20')
 
 # The seeded mutants. Find must occur exactly once in the script; Replace is spliced in with LF
 # newlines; Killer is the control whose FAIL line must appear when the mutant's self-test runs.
@@ -88,6 +88,8 @@ $mutantSpecs = @(
     @{ Id = 'M18'; Killer = 'C10'; Find = '(A;OICI;FA;;;BA)'''; Replace = '(A;OICI;FA;;;BU)''' }
     @{ Id = 'M19'; Killer = 'C04b'; Find = 'if (-not (Test-ArlLnkMatchesAction -Path $created -Action $a)) { Set-ArlUndoSkipped -Action $a -Reason ''modificado despues de aplicar''; return }'; Replace = '' }
     @{ Id = 'M20'; Killer = 'C15'; Find = 'Png = ''serrano.png''; Source = $P.ShellDll; Index = 314'; Replace = 'Png = ''ingeniero.png''; Source = $P.ShellDll; Index = 314' }
+    @{ Id = 'M21'; Killer = 'C20'; Find = '$script:ArlReversibleStates = @(''applying'', ''applied'', ''failed-partial'', ''undoing'', ''undone-partial'')'; Replace = '$script:ArlReversibleStates = @(''applied'', ''failed-partial'', ''undone-partial'')' }
+    @{ Id = 'M22'; Killer = 'C20'; Find = 'return (Test-ArlFieldsEqual -Actual (Read-ArlShortcut $Path) -Expected $want)'; Replace = 'return $false' }
 )
 
 # ---- depth 1: files exist + parse + one occurrence of every mutant find -------------------------

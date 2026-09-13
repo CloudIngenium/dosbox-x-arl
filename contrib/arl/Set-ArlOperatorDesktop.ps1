@@ -15,7 +15,9 @@
       Ing. Serrano - Normalizacion
     Everything else that launches ARL tooling goes to C:\ARL\Herramientas-Admin\<grupo> (SY/BA only).
     Nothing is deleted: replaced and emptied items go to C:\ARL\_staging\desktop-archive\<ts>, next to a
-    crash-safe manifest that -Undo reverses (last applied first).
+    crash-safe manifest that -Undo reverses (last applied first). -Undo also recovers a run that was cut
+    off (manifest left at applying or undoing), retries what an earlier -Undo skipped, and moves what apply
+    put down into <ts>\deshecho instead of deleting it; only empty folders apply created are removed.
 
     Modes
       (no switch) or -Apply -WhatIf   revisar: validate, inventory, print the plan. Writes nothing.
@@ -23,7 +25,7 @@
       -Undo [-Manifest <path>]        deshacer (elevated). Prefer fixing forward: an exact undo puts the
                                       simulator icons back on the public desktop.
       -SelfTest [-Controls C02,C10]   autoprueba (elevated): builds a fake tree under %TEMP% and runs the
-                                      contract controls C01-C19 against child runs of this same file.
+                                      contract controls C01-C20 against child runs of this same file.
 
     Exit codes: 0 sin-cambios|cambios-pendientes|aplicado|deshecho|autoprueba-ok, 1 error|autoprueba-fallo,
     2 rechazado (nothing written), 3 deshecho-parcial. The last stdout line is always
@@ -187,8 +189,11 @@ function Get-ArlLongPath([string]$Path) {
 
 function Test-ArlUnder([string]$Path, [string]$Root, [switch]$AllowEqual) {
     if ([string]::IsNullOrEmpty($Path) -or [string]::IsNullOrEmpty($Root)) { return $false }
-    $p = [System.IO.Path]::GetFullPath($Path).TrimEnd('\')
-    $r = [System.IO.Path]::GetFullPath($Root).TrimEnd('\')
+    # A path 5.1 cannot parse (invalid characters, an alternate-stream colon) is never under anything.
+    try {
+        $p = [System.IO.Path]::GetFullPath($Path).TrimEnd('\')
+        $r = [System.IO.Path]::GetFullPath($Root).TrimEnd('\')
+    } catch { return $false }
     if ($AllowEqual -and [string]::Equals($p, $r, [System.StringComparison]::OrdinalIgnoreCase)) { return $true }
     return $p.StartsWith($r + '\', [System.StringComparison]::OrdinalIgnoreCase)
 }
@@ -210,12 +215,40 @@ function Resolve-ArlTargetPath([string]$Raw) {
     return $x
 }
 
-# SDDL comparison key: the primary group is not security relevant and cannot be set without extra privileges,
-# and Windows adds AR/AI auto-inherit flags on its own.
+# SDDL comparison key. Only what decides access counts: the owner, whether the DACL is protected, and the
+# set of ACEs in any order. The primary group is not security relevant and cannot be set without extra
+# privileges, Windows adds the AR/AI auto-inherit flags on its own, and an ACL reset rebuilds inherited ACEs
+# in its own order (on Laboratorio-ARL the public desktop hands down IU,SY,BA while its older .lnk files
+# hold BA,IU,SY), so an order-sensitive string compare would call a correct restore a failure.
+# The key is built from the parsed descriptor (SIDs as S-1-..., rights as numbers), so FA and 0x1f01ff or BA
+# and S-1-5-32-544 compare equal; the text parser below is only the fallback where Windows cannot parse it.
 function ConvertTo-ArlSddlKey([string]$Sddl) {
-    if ($null -eq $Sddl) { return '' }
-    $s = $Sddl -replace 'G:(?:S-1-[0-9-]+|[A-Z]{2})', ''
-    return ($s -replace 'D:(P?)(?:AR)?(?:AI)?', 'D:$1')
+    if ([string]::IsNullOrEmpty($Sddl)) { return '' }
+    try {
+        $rsd = New-Object System.Security.AccessControl.RawSecurityDescriptor $Sddl
+        $rowner = ''
+        if ($null -ne $rsd.Owner) { $rowner = $rsd.Owner.Value }
+        $rprot = ''
+        if (($rsd.ControlFlags -band [System.Security.AccessControl.ControlFlags]::DiscretionaryAclProtected) -ne 0) { $rprot = 'P' }
+        $rlist = New-Object System.Collections.Generic.List[string]
+        if ($null -ne $rsd.DiscretionaryAcl) {
+            foreach ($ace in $rsd.DiscretionaryAcl) {
+                [void]$rlist.Add('(' + [int]$ace.AceType + ';' + [int]$ace.AceFlags + ';' + [string]$ace.AccessMask + ';' + $ace.SecurityIdentifier.Value + ')')
+            }
+        }
+        [string[]]$races = $rlist.ToArray()
+        [Array]::Sort($races, [System.StringComparer]::Ordinal)
+        return ('O:' + $rowner + 'D:' + $rprot + ($races -join ''))
+    } catch { }
+    $owner = ''
+    $m = [regex]::Match($Sddl, '^O:(S-1-[0-9-]+|[A-Z]{2})')
+    if ($m.Success) { $owner = $m.Groups[1].Value }
+    $prot = ''
+    $d = [regex]::Match($Sddl, 'D:(P?)')
+    if ($d.Success) { $prot = $d.Groups[1].Value }
+    [string[]]$aces = @(Get-ArlSddlAces $Sddl | ForEach-Object { [string]$_.Raw })
+    [Array]::Sort($aces, [System.StringComparer]::Ordinal)
+    return ('O:' + $owner + 'D:' + $prot + ($aces -join ''))
 }
 
 function Get-ArlSddlAces([string]$Sddl) {
@@ -405,14 +438,24 @@ function Assert-ArlPathParameters([hashtable]$Bound) {
     if ($given.Count -eq 0) { return }
     $defaults = Resolve-ArlPaths @{}
     $temp = Get-ArlLongPath ([System.IO.Path]::GetTempPath())
+    $underTemp = New-Object System.Collections.Generic.List[string]
     foreach ($n in $given) {
-        $value = [System.IO.Path]::GetFullPath([string]$Bound[$n]).TrimEnd('\')
+        try { $value = [System.IO.Path]::GetFullPath([string]$Bound[$n]).TrimEnd('\') }
+        catch { throw (New-ArlRefusal 'R2' ('ruta no valida: -' + $n + ' ' + [string]$Bound[$n])) }
         if ([string]::Equals($value, $defaults[$n], [System.StringComparison]::OrdinalIgnoreCase)) { continue }
         $long = Get-ArlLongPath $value
         if (-not (Test-ArlUnder -Path $long -Root $temp)) {
             throw (New-ArlRefusal 'R2' ('ruta fuera de la carpeta temporal: -' + $n + ' ' + $value + '. En el equipo real use los valores de fabrica.'))
         }
         if (Test-ArlReparseChain $long) { throw (New-ArlRefusal 'R2' ('ruta con enlace (junction): -' + $n + ' ' + $value)) }
+        $underTemp.Add($n)
+    }
+    # All or nothing: a test -ArlRoot next to the real desktops would plan against the real desktops.
+    if ($underTemp.Count -gt 0) {
+        $rest = @($names | Where-Object { -not $underTemp.Contains($_) })
+        if ($rest.Count -gt 0) {
+            throw (New-ArlRefusal 'R2' ('rutas de prueba mezcladas con las del equipo real; pase tambien bajo la carpeta temporal: -' + ($rest -join ', -')))
+        }
     }
 }
 
@@ -426,7 +469,8 @@ function Assert-ArlElevated {
 
 function Assert-ArlTargetsPresent($P) {
     $missing = New-Object System.Collections.Generic.List[string]
-    foreach ($f in @($P.ChispaExe, $P.OperatorSettings, $P.PassiveStd, $P.PassiveNorm, $P.PassiveWorkflow, $P.DosboxExe, $P.ShellDll, $P.CardSource)) {
+    # EdgePath too: the Ayuda shortcut targets it, and a missing Edge would leave a dead help icon.
+    foreach ($f in @($P.ChispaExe, $P.OperatorSettings, $P.PassiveStd, $P.PassiveNorm, $P.PassiveWorkflow, $P.DosboxExe, $P.ShellDll, $P.CardSource, $P.EdgePath)) {
         if (-not (Test-Path -LiteralPath $f -PathType Leaf)) { $missing.Add($f) }
     }
     if (Test-Path -LiteralPath $P.OperatorSettings -PathType Leaf) {
@@ -480,13 +524,20 @@ function Assert-ArlFolderOwnership($P, [string]$ArchiveDir) {
             if (@($script:SidBA, $script:SidSY) -notcontains $owner) {
                 throw (New-ArlRefusal 'R7' ('carpeta existente con dueno no administrador: ' + $f + '; revisela y quitela a mano'))
             }
+            # An admin-owned folder that still lets users write is not the protected folder the plan assumes.
+            $w = @(Get-ArlWriters $f)
+            if ($w.Count -gt 0) {
+                throw (New-ArlRefusal 'R7' ('carpeta existente que otros usuarios pueden modificar: ' + $f + ' (' + ($w -join ', ') + '); revisela y quitela a mano'))
+            }
         }
     }
     if ($ArchiveDir -and (Test-Path -LiteralPath $ArchiveDir)) { throw (New-ArlRefusal 'R7' ('ya existe ' + $ArchiveDir + '; espere un segundo y repita')) }
 }
 
 function Assert-ArlNoReparse($P) {
-    foreach ($f in @($P.Staging, $P.ArchiveRoot, $P.Tools, $P.Guide)) {
+    # _staging holds other tools' data (its own links are not ours to judge): only its chain counts.
+    if (Test-ArlReparseChain $P.Staging) { throw (New-ArlRefusal 'R6' ('enlace (junction o symlink) en ' + $P.Staging)) }
+    foreach ($f in @($P.ArchiveRoot, $P.Tools, $P.Guide)) {
         if (Test-ArlReparseTree $f) { throw (New-ArlRefusal 'R6' ('enlace (junction o symlink) en ' + $f)) }
     }
     foreach ($f in @($P.PublicDesktop, $P.OperatorDesktop)) {
@@ -644,12 +695,31 @@ function Get-ArlDesktopInventory($P) {
 
 function New-ArlClass([string]$Action, [string]$Group, [string]$Note) { return @{ Action = $Action; Group = $Group; Note = $Note } }
 
+function Get-ArlSafeLeaf([string]$Path) {
+    try { return [System.IO.Path]::GetFileName($Path) } catch { return '' }
+}
+
+# A shortcut that runs a script host (cmd.exe /c x.cmd, powershell.exe -File x.ps1) is routed by the
+# first .cmd/.bat/.ps1 path in its arguments; '' when there is none.
+function Get-ArlScriptFromArguments([string]$Arguments) {
+    if ([string]::IsNullOrWhiteSpace($Arguments)) { return '' }
+    $m = [regex]::Match($Arguments, '(?i)"([^"]+\.(?:cmd|bat|ps1))"|((?:[A-Za-z]:|%[A-Za-z_]+%)[^\s"]*\.(?:cmd|bat|ps1))(?=\s|$)')
+    if (-not $m.Success) { return '' }
+    if ($m.Groups[1].Success) { return (Resolve-ArlTargetPath $m.Groups[1].Value) }
+    return (Resolve-ArlTargetPath $m.Groups[2].Value)
+}
+
 # Target-based routing for .lnk / file:.url items (rules 3a-3e). Returns @{ Group; Tag }.
-function Get-ArlTargetRule($P, [string]$Target, [string]$Leaf) {
-    if ((Test-ArlUnder -Path $Target -Root $P.Bridge) -or ($Leaf -match '(?i)Emulator')) { return @{ Group = 'Simuladores'; Tag = 'SIMULA VALORES' } }
+function Get-ArlTargetRule($P, [string]$Target, [string]$Leaf, [string]$Arguments = '') {
+    if (@('cmd.exe', 'powershell.exe', 'pwsh.exe') -contains (Get-ArlSafeLeaf $Target)) {
+        $scriptArg = Get-ArlScriptFromArguments $Arguments
+        if ($scriptArg) { $Target = $scriptArg }
+    }
+    $tleaf = Get-ArlSafeLeaf $Target
+    # Emulator in either name, or anything named or placed like the bridge, simulates values.
+    if ((Test-ArlUnder -Path $Target -Root $P.Bridge) -or ($Leaf -match '(?i)Emulator') -or ($tleaf -match '(?i)Emulator|Bridge')) { return @{ Group = 'Simuladores'; Tag = 'SIMULA VALORES' } }
     if ($P.LegacyDailyTargets -contains $Target) { return @{ Group = 'Accesos-anteriores'; Tag = '' } }
-    if (($P.VerificationTargets -contains $Target) -or ($P.VerificationLeaves -contains [System.IO.Path]::GetFileName($Target))) { return @{ Group = 'Verificacion-y-aprobacion'; Tag = '' } }
-    $tleaf = [System.IO.Path]::GetFileName($Target)
+    if (($P.VerificationTargets -contains $Target) -or ($P.VerificationLeaves -contains $tleaf)) { return @{ Group = 'Verificacion-y-aprobacion'; Tag = '' } }
     if (@('dosbox-x-arl.exe', 'dosbox-x.exe', 'IMPACT.EXE') -contains $tleaf) { return @{ Group = 'Diagnostico'; Tag = 'IMPACT SIN REGISTRO DE CHISPA' } }
     if (Test-ArlUnder -Path $Target -Root $P.ArlRoot) {
         $tag = ''
@@ -678,7 +748,7 @@ function Get-ArlItemClass($P, $Item, [string]$Scope) {
         return (New-ArlClass 'carpeta' '' '')
     }
     if (@('.lnk', '.url') -contains $Item.Ext -and $Item.Target) {
-        $rule = Get-ArlTargetRule -P $P -Target $Item.Target -Leaf $leaf
+        $rule = Get-ArlTargetRule -P $P -Target $Item.Target -Leaf $leaf -Arguments ([string]$Item.Lnk.Arguments)
         if ($null -ne $rule) { return (New-ArlClass 'mover' $rule.Group $rule.Tag) }
     }
     if ($Item.Depth -eq 0 -and (@('.cmd', '.bat', '.ps1') -contains $Item.Ext)) {
@@ -708,7 +778,15 @@ function Resolve-ArlCollision([string]$Desired, [string]$Stamp) {
     $dir = Split-Path -Parent $Desired
     $base = [System.IO.Path]::GetFileNameWithoutExtension($Desired)
     $ext = [System.IO.Path]::GetExtension($Desired)
-    $alt = Join-Path $dir ($base + ' (' + $Stamp + ')' + $ext)
+    # ' (stamp)', then ' (stamp-2)', ' (stamp-3)' ... until the name is free on disk and in the plan.
+    $n = 1
+    while ($true) {
+        $suffix = $Stamp
+        if ($n -gt 1) { $suffix = $Stamp + '-' + $n }
+        $alt = Join-Path $dir ($base + ' (' + $suffix + ')' + $ext)
+        if (-not ((Test-Path -LiteralPath $alt) -or $script:ArlPlannedPaths.Contains($alt))) { break }
+        $n++
+    }
     [void]$script:ArlPlannedPaths.Add($alt)
     return $alt
 }
@@ -720,15 +798,27 @@ function Add-ArlMove($P, $Item, [string]$Group, [string]$Note, [string]$Stamp, $
     $groupDir = $P.GroupPaths[$Group]
     $dest = Join-Path $groupDir $Item.Leaf
     $dup = $false
-    if ((Test-Path -LiteralPath $dest -PathType Leaf) -and $null -ne $Item.Lnk) {
-        $existing = Read-ArlShortcut $dest
-        if (Test-ArlSameLauncher $existing $Item.Lnk) { $dup = $true }
+    if ($null -ne $Item.Lnk) {
+        # Same launcher already in the group folder, or already planned into it earlier in this run.
+        if (Test-Path -LiteralPath $dest -PathType Leaf) {
+            $existing = Read-ArlShortcut $dest
+            if (Test-ArlSameLauncher $existing $Item.Lnk) { $dup = $true }
+        }
+        if (-not $dup -and $script:ArlPlannedLaunchers.ContainsKey($dest)) {
+            foreach ($planned in $script:ArlPlannedLaunchers[$dest]) { if (Test-ArlSameLauncher $planned $Item.Lnk) { $dup = $true } }
+        }
+        if (-not $dup) {
+            if (-not $script:ArlPlannedLaunchers.ContainsKey($dest)) { $script:ArlPlannedLaunchers[$dest] = New-Object System.Collections.Generic.List[object] }
+            [void]$script:ArlPlannedLaunchers[$dest].Add($Item.Lnk)
+        }
     }
     if ($dup) {
         $dest = Resolve-ArlCollision -Desired (Join-Path (Join-Path $P.ArchiveDir 'duplicados') $Item.Leaf) -Stamp $Stamp
         $a = New-ArlAction 'move'; $a.source = $Item.Path; $a.destination = $dest; $a.target = $Item.Target
         $a.group = $Group; $a.note = 'duplicado'; $a.source_owner_sid = $Item.OwnerSid; $a.source_sddl = $Item.Sddl; $a.sha256 = $Item.Sha256
         [void]$Moves.Add($a)
+        # The archive is admin-only too: the moved duplicate must not keep its desktop ACL.
+        $r = New-ArlAction 'acl-reset'; $r.path = $dest; [void]$Moves.Add($r)
         $Counts.archivar++
         Add-ArlReport $Report 'Archivar' ($Item.Rel + ' -> duplicados\ (' + $Note + ')')
     } else {
@@ -747,13 +837,15 @@ function Add-ArlMove($P, $Item, [string]$Group, [string]$Note, [string]$Stamp, $
     }
 }
 
-# Recurses a desktop folder's movable descendants. Returns @{ Cleared; Unknown; Moved }.
+# Recurses a desktop folder's movable descendants. Returns @{ Cleared; Unknown; Kept; Moved }.
+# A folder holding a kept item is never archived, so SE CONSERVA stays true.
 function Add-ArlFolderContents($P, $Item, [string]$Stamp, $Moves, $Report, $Counts) {
-    $unknown = $false; $moved = 0
+    $unknown = $false; $kept = $false; $moved = 0
     foreach ($c in $Item.Children) {
         if ([string]::Equals($c.Leaf, 'desktop.ini', [System.StringComparison]::OrdinalIgnoreCase)) { continue }
         if ($c.Kind -eq 'dir') {
             $sub = Add-ArlFolderContents -P $P -Item $c -Stamp $Stamp -Moves $Moves -Report $Report -Counts $Counts
+            if ($sub.Kept) { $kept = $true }
             if ($sub.Unknown) { $unknown = $true } else { $moved += $sub.Moved }
             continue
         }
@@ -762,6 +854,7 @@ function Add-ArlFolderContents($P, $Item, [string]$Stamp, $Moves, $Report, $Coun
             Add-ArlMove -P $P -Item $c -Group $cls.Group -Note $cls.Note -Stamp $Stamp -Moves $Moves -Report $Report -Counts $Counts
             $moved++
         } elseif ($cls.Action -eq 'conserva') {
+            $kept = $true
             Add-ArlReport $Report 'Conserva' $c.Rel
         } else {
             $unknown = $true; $Counts.desconocidos++
@@ -769,7 +862,7 @@ function Add-ArlFolderContents($P, $Item, [string]$Stamp, $Moves, $Report, $Coun
             Add-ArlReport $Report 'Desconocido' ($c.Rel + ' -> ' + $c.Target + '  ' + $cls.Note)
         }
     }
-    return @{ Cleared = (-not $unknown); Unknown = $unknown; Moved = $moved }
+    return @{ Cleared = (-not $unknown -and -not $kept); Unknown = $unknown; Kept = $kept; Moved = $moved }
 }
 
 # Emits directory actions (mkdir / acl-set / acl-reset) for one protected or plain directory.
@@ -793,6 +886,7 @@ function New-ArlPlan($P, $Inv, [string]$Stamp) {
     $P.ArchiveDir = Join-Path $P.ArchiveRoot $Stamp
     $script:ArlPlannedPaths = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
     $script:ArlGroupNeeded = @{}
+    $script:ArlPlannedLaunchers = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([System.StringComparer]::OrdinalIgnoreCase)
     $Counts = New-ArlCounts
     $buckets = @('Crear', 'Reemplazar', 'Mover', 'Archivar', 'Conserva', 'Desconocido', 'Informe', 'Pendiente', 'Aviso')
     $Report = @{}; foreach ($b in $buckets) { $Report[$b] = New-Object System.Collections.Generic.List[string] }
@@ -873,6 +967,9 @@ function New-ArlPlan($P, $Inv, [string]$Stamp) {
                 } elseif ($res.Unknown) {
                     $Counts.avisos++
                     Add-ArlReport $Report 'Aviso' ('carpeta con elementos desconocidos, se deja: ' + $it.Leaf)
+                } elseif ($res.Kept) {
+                    $Counts.avisos++
+                    Add-ArlReport $Report 'Aviso' ('carpeta con elementos que se conservan, se deja: ' + $it.Leaf)
                 } elseif ($res.Moved -eq 0) {
                     $Counts.desconocidos++
                     Add-ArlReport $Report 'Desconocido' ($it.Leaf + '\ (carpeta)')
@@ -895,13 +992,13 @@ function New-ArlPlan($P, $Inv, [string]$Stamp) {
     # 4. Report-only scopes (never mutated).
     foreach ($od in $Inv.Others) {
         foreach ($it in $od.Items) {
-            if (@('.lnk', '.url') -contains $it.Ext -and $it.Target -and ($null -ne (Get-ArlTargetRule -P $P -Target $it.Target -Leaf $it.Leaf))) {
+            if (@('.lnk', '.url') -contains $it.Ext -and $it.Target -and ($null -ne (Get-ArlTargetRule -P $P -Target $it.Target -Leaf $it.Leaf -Arguments ([string]$it.Lnk.Arguments)))) {
                 Add-ArlReport $Report 'Informe' ($od.User + ': ' + $it.Leaf + ' -> ' + $it.Target)
             }
         }
     }
     foreach ($it in $Inv.Pins) {
-        if (@('.lnk', '.url') -contains $it.Ext -and $it.Target -and ($null -ne (Get-ArlTargetRule -P $P -Target $it.Target -Leaf $it.Leaf))) {
+        if (@('.lnk', '.url') -contains $it.Ext -and $it.Target -and ($null -ne (Get-ArlTargetRule -P $P -Target $it.Target -Leaf $it.Leaf -Arguments ([string]$it.Lnk.Arguments)))) {
             $Counts.pendientes_manuales++
             Add-ArlReport $Report 'Pendiente' ('Barra de tareas de Piso: ' + $it.Leaf + ' -> ' + $it.Target + ' (desanclar a mano)')
         }
@@ -982,12 +1079,16 @@ function Invoke-ArlAction {
 
     switch ($Op) {
         'mkdir-protected' {
+            # CreateDirectory silently returns an existing folder with its old ACL; a folder that appeared
+            # between plan and apply (a race) must stop the run instead of being trusted as protected.
+            if (Test-Path -LiteralPath $Path) { throw ('ya existe la carpeta: ' + $Path) }
             $ds = New-Object System.Security.AccessControl.DirectorySecurity
             $ds.SetSecurityDescriptorSddlForm($Sddl)
             if ($PSVersionTable.PSEdition -eq 'Core') { [void][System.IO.FileSystemAclExtensions]::CreateDirectory($ds, $Path) }
             else { [void][System.IO.Directory]::CreateDirectory($Path, $ds) }
             & icacls $Path /setowner '*S-1-5-32-544' /C /Q | Out-Null
             if ($LASTEXITCODE -ne 0) { throw ('icacls setowner fallo (' + $LASTEXITCODE + '): ' + $Path) }
+            if ((ConvertTo-ArlSddlKey (Get-Acl -LiteralPath $Path).Sddl) -ne (ConvertTo-ArlSddlKey $Sddl)) { throw ('la carpeta no quedo con los permisos pedidos: ' + $Path) }
         }
         'mkdir-plain' { [void][System.IO.Directory]::CreateDirectory($Path) }
         'move-file' {
@@ -1017,9 +1118,21 @@ function Invoke-ArlAction {
         }
         'write-replace' {
             if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw ('write-replace requiere un archivo existente: ' + $Path) }
-            $fs = [System.IO.File]::Open($TempPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write)
-            try { $fs.Write($Bytes, 0, $Bytes.Length) } finally { $fs.Dispose() }
-            [System.IO.File]::Replace($TempPath, $Path, $null)
+            try {
+                $fs = [System.IO.File]::Open($TempPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write)
+                try { $fs.Write($Bytes, 0, $Bytes.Length) } finally { $fs.Dispose() }
+                # A scanner or indexer holding the manifest for a moment is a sharing/lock violation, not a failure.
+                $a = 0
+                while ($true) {
+                    try { [System.IO.File]::Replace($TempPath, $Path, $null); break }
+                    catch [System.IO.IOException] {
+                        if ((@(-2147024864, -2147024863) -contains $_.Exception.HResult) -and $a -lt 5) { $a++; Start-Sleep -Milliseconds 200; continue }
+                        throw
+                    }
+                }
+            } finally {
+                if (Test-Path -LiteralPath $TempPath -PathType Leaf) { [System.IO.File]::Delete($TempPath) }
+            }
         }
         'delete-file' { [System.IO.File]::Delete($Path) }
         'delete-dir' { [System.IO.Directory]::Delete($Path, $false) }
@@ -1036,13 +1149,24 @@ function Invoke-ArlAction {
             if ($PSVersionTable.PSEdition -eq 'Core') { [System.IO.FileSystemAclExtensions]::SetAccessControl($di, $ds) }
             else { $di.SetAccessControl($ds) }
         }
+        'set-dacl' {
+            # Undo of acl-set: only the DACL (and its protection flag) goes back; the owner is a separate
+            # set-owner step, because writing an owner we do not hold as a privilege fails on some hosts.
+            $ds = New-Object System.Security.AccessControl.DirectorySecurity
+            $ds.SetSecurityDescriptorSddlForm($Sddl, [System.Security.AccessControl.AccessControlSections]::Access)
+            $di = Get-Item -LiteralPath $Path -Force
+            if ($PSVersionTable.PSEdition -eq 'Core') { [System.IO.FileSystemAclExtensions]::SetAccessControl($di, $ds) }
+            else { $di.SetAccessControl($ds) }
+        }
         'set-owner' {
-            & icacls $Path /setowner '*S-1-5-32-544' /C /Q | Out-Null
+            $sid = if ($OwnerSid) { $OwnerSid } else { 'S-1-5-32-544' }
+            & icacls $Path /setowner ('*' + $sid) /C /Q | Out-Null
             if ($LASTEXITCODE -ne 0) { throw ('icacls /setowner fallo (' + $LASTEXITCODE + '): ' + $Path) }
         }
         'restore-acl' {
             # Undo of a move: re-inherit from the destination desktop and hand ownership back to the SID the
-            # item had before it was moved (not BA like acl-reset), so the restored item is byte-for-ACL exact.
+            # item had before it was moved (not BA like acl-reset). The caller then compares the result with
+            # the recorded SDDL by semantic key (ConvertTo-ArlSddlKey), not byte for byte.
             & icacls $Path /reset /C /Q | Out-Null
             if ($LASTEXITCODE -ne 0) { throw ('icacls /reset fallo (' + $LASTEXITCODE + '): ' + $Path) }
             $sid = if ($OwnerSid) { $OwnerSid } else { 'S-1-5-32-544' }
@@ -1173,8 +1297,25 @@ function New-ArlManifest($P, $Actions, [string]$CardSha) {
 function Write-ArlManifest($P, $Manifest, [string]$Path, [switch]$Initial) {
     $bytes = [System.Text.Encoding]::UTF8.GetBytes((ConvertTo-ArlJson $Manifest))
     if ($Initial) { Invoke-ArlAction -P $P -Op 'write-new' -Path $Path -Bytes $bytes | Out-Null }
-    else { Invoke-ArlAction -P $P -Op 'write-replace' -Path $Path -TempPath ($Path + '.tmp') -Bytes $bytes | Out-Null }
+    else {
+        # A per-write temp name: a .tmp left behind by a killed run can never block the next write.
+        $tmp = $Path + '.' + [guid]::NewGuid().ToString('N') + '.tmp'
+        Invoke-ArlAction -P $P -Op 'write-replace' -Path $Path -TempPath $tmp -Bytes $bytes | Out-Null
+    }
     Invoke-ArlAction -P $P -Op 'set-owner' -Path $Path | Out-Null
+}
+
+# The write on a path that is already failing (error, time limit, undo step). A second exception here must
+# not hide the first one or leave the loop without a result line; the last good manifest stays on disk.
+function Write-ArlManifestSafe($P, $Manifest, [string]$Path) {
+    try { Write-ArlManifest -P $P -Manifest $Manifest -Path $Path }
+    catch { Write-ArlLine ('AVISO  no se pudo guardar el manifiesto: ' + [string]$_.Exception.Message) }
+}
+
+# Self-test only: ends the process at a named point inside an action, to prove -Undo recovers a run that
+# died between two steps of one action. Inert unless the self-test root is set.
+function Invoke-ArlTestKill([string]$Point) {
+    if ($env:ARL_DESKTOP_SELFTEST_ROOT -and $env:ARL_DESKTOP_FAIL_INSIDE_ACTION -eq $Point) { [Environment]::Exit(9) }
 }
 
 function Confirm-ArlParent($P, [string]$ChildPath) {
@@ -1198,7 +1339,10 @@ function Set-ArlCreateShortcut($P, $Action) {
     Invoke-ArlAction -P $P -Op 'save-shortcut' -Path $nuevo -Fields $Action.fields | Out-Null
     $back = Read-ArlShortcut $nuevo
     if (-not (Test-ArlFieldsEqual -Actual $back -Expected $Action.fields)) { throw ('el acceso directo no coincide tras crearlo: ' + $finalLeaf) }
+    # Recorded before the move so a run that dies after it still lets -Undo recognise its own file.
+    $Action.sha256_new = Get-ArlFileSha256 $nuevo
     Invoke-ArlAction -P $P -Op 'move-file' -Path $nuevo -Destination $Action.path | Out-Null
+    Invoke-ArlTestKill 'creado-sin-acl'
     Reset-ArlChildAcl -P $P -Parent $P.PublicDesktop -Leaf $finalLeaf | Out-Null
     $Action.sha256_new = Get-ArlFileSha256 $Action.path
 }
@@ -1236,11 +1380,13 @@ function Invoke-ArlExecuteAction($P, $Action) {
             # replace: keep the drifted original in the archive, then write the correct shortcut in its place
             $prev = $Action.backup
             Move-ArlExistingToBackup -P $P -Path $Action.path -Backup $prev | Out-Null
+            Invoke-ArlTestKill 'respaldado'
             Set-ArlCreateShortcut -P $P -Action $Action
         }
         'move' {
             Confirm-ArlParent -P $P -ChildPath $Action.destination
             Invoke-ArlAction -P $P -Op 'move-file' -Path $Action.source -Destination $Action.destination | Out-Null
+            Invoke-ArlTestKill 'movido'
             $Action.sha256 = Get-ArlFileSha256 $Action.destination
         }
         'archive-folder' {
@@ -1277,32 +1423,37 @@ function Invoke-ArlApply($P, $Plan, [string]$CardSha) {
     $manifestPath = Join-Path $P.ArchiveDir 'move-manifest.json'
     Write-ArlManifest -P $P -Manifest $manifest -Path $manifestPath -Initial
 
-    $deadline = (Get-Date).AddSeconds(60)
+    # The time limit scales with the plan (each action is a manifest write plus one or two file operations,
+    # so a large desktop on a slow disk is not cut off halfway); it only stops between actions.
+    $deadline = (Get-Date).AddSeconds(60 + 10 * $actions.Count)
     $failAfter = 0
     if ($env:ARL_DESKTOP_SELFTEST_ROOT -and $env:ARL_DESKTOP_FAIL_AFTER_ACTION) { $failAfter = [int]$env:ARL_DESKTOP_FAIL_AFTER_ACTION }
     $done = 0
     foreach ($a in $actions) {
         if ((Get-Date) -gt $deadline) {
             $manifest.stop_reason = 'tiempo'; $manifest.state = 'failed-partial'
-            Write-ArlManifest -P $P -Manifest $manifest -Path $manifestPath
+            Write-ArlManifestSafe -P $P -Manifest $manifest -Path $manifestPath
             return @{ Status = 'error'; Manifest = $manifestPath; Partial = $true }
         }
-        $a.status = 'in-progress'
-        Write-ArlManifest -P $P -Manifest $manifest -Path $manifestPath
+        # Both manifest writes sit inside the try: a write that fails after the action ran still ends in a
+        # failed-partial manifest and a result line, never in an uncaught error with the state left at applying.
         try {
-            Invoke-ArlExecuteAction -P $P -Action $a
-        } catch {
-            $a.status = 'failed'; $a.undo_reason = [string]$_.Exception.Message
-            $manifest.stop_reason = 'error'; $manifest.state = 'failed-partial'
+            $a.status = 'in-progress'
             Write-ArlManifest -P $P -Manifest $manifest -Path $manifestPath
+            Invoke-ArlExecuteAction -P $P -Action $a
+            $a.status = 'done'
+            Write-ArlManifest -P $P -Manifest $manifest -Path $manifestPath
+        } catch {
+            if ([string]$a.status -ne 'done') { $a.status = 'failed'; $a.undo_reason = [string]$_.Exception.Message }
+            $manifest.stop_reason = 'error'; $manifest.state = 'failed-partial'
+            Write-ArlLine ('ERROR  ' + [string]$a.seq + ' ' + [string]$a.kind + ': ' + [string]$_.Exception.Message)
+            Write-ArlManifestSafe -P $P -Manifest $manifest -Path $manifestPath
             return @{ Status = 'error'; Manifest = $manifestPath; Partial = $true }
         }
-        $a.status = 'done'
-        Write-ArlManifest -P $P -Manifest $manifest -Path $manifestPath
         $done++
         if ($failAfter -gt 0 -and $done -ge $failAfter) {
             $manifest.stop_reason = 'prueba'; $manifest.state = 'failed-partial'
-            Write-ArlManifest -P $P -Manifest $manifest -Path $manifestPath
+            Write-ArlManifestSafe -P $P -Manifest $manifest -Path $manifestPath
             return @{ Status = 'error'; Manifest = $manifestPath; Partial = $true }
         }
     }
@@ -1327,17 +1478,21 @@ function Get-ArlManifests($P) {
     return @($out | Sort-Object -Property Ts)
 }
 
+# A run killed mid-apply or mid-undo leaves its manifest at applying or undoing; those stay reversible, and
+# a repeat -Undo on undone-partial retries what was skipped. (M21: dropping applying strands a killed run.)
+$script:ArlReversibleStates = @('applying', 'applied', 'failed-partial', 'undoing', 'undone-partial')
+
 # Chooses the manifest to reverse. -Manifest must name the newest eligible one (LIFO, R10); with no
 # parameter the newest eligible is taken. Returns @{ None; Path }.
 function Select-ArlManifest($P, [string]$ManifestParam) {
     $all = @(Get-ArlManifests $P)
-    $eligible = @($all | Where-Object { @('applied', 'failed-partial', 'undone-partial') -contains $_.State })
+    $eligible = @($all | Where-Object { $script:ArlReversibleStates -contains $_.State })
     if ($ManifestParam) {
         $mp = Get-ArlLongPath $ManifestParam
         $match = $null
         foreach ($e in $all) { if ([string]::Equals((Get-ArlLongPath $e.Path), $mp, [System.StringComparison]::OrdinalIgnoreCase)) { $match = $e } }
         if ($null -eq $match) { throw (New-ArlRefusal 'R11' ('el manifiesto indicado no existe en ' + $P.ArchiveRoot)) }
-        if (@('applied', 'failed-partial', 'undone-partial') -notcontains $match.State) { throw (New-ArlRefusal 'R11' ('el manifiesto indicado no es reversible (estado ' + $match.State + ')')) }
+        if ($script:ArlReversibleStates -notcontains $match.State) { throw (New-ArlRefusal 'R11' ('el manifiesto indicado no es reversible (estado ' + $match.State + ')')) }
         if ($eligible.Count -gt 0 -and $match.Ts -ne $eligible[-1].Ts) { throw (New-ArlRefusal 'R10' ('hay un respaldo mas reciente sin deshacer; deshaga primero ' + $eligible[-1].Ts)) }
         return @{ None = $false; Path = $match.Path }
     }
@@ -1377,8 +1532,12 @@ function Assert-ArlManifestTrusted($P, [string]$ManifestPath, $Manifest) {
         foreach ($fld in @('path', 'source', 'destination', 'backup', 'temp_path')) {
             $val = [string]$a.$fld
             if ([string]::IsNullOrEmpty($val)) { continue }
+            # Only a move or an archived folder is written back to its source. The card and icon sources
+            # (the shipped card, shell32.dll, dosbox-x-arl.exe) are read-only inputs that undo never writes.
+            if ($fld -eq 'source' -and @('move', 'archive-folder') -notcontains [string]$a.kind) { continue }
             if (Test-ArlDotDot $val) { throw (New-ArlRefusal 'R11' ('ruta con .. en el manifiesto: ' + $val)) }
-            $candidate = [System.IO.Path]::GetFullPath($val).TrimEnd('\')
+            try { $candidate = [System.IO.Path]::GetFullPath($val).TrimEnd('\') }
+            catch { throw (New-ArlRefusal 'R11' ('ruta invalida en el manifiesto: ' + $val)) }
             if (-not (Test-ArlUnderAny -Path $candidate -Roots $trustRoots)) { throw (New-ArlRefusal 'R11' ('ruta fuera de las carpetas confiables: ' + $val)) }
         }
         if ($script:ArlKnownKinds -notcontains [string]$a.kind) { throw (New-ArlRefusal 'R11' ('accion desconocida en el manifiesto: ' + [string]$a.kind)) }
@@ -1387,13 +1546,64 @@ function Assert-ArlManifestTrusted($P, [string]$ManifestPath, $Manifest) {
 
 function Set-ArlUndoSkipped($Action, [string]$Reason) { $Action.status = 'undo-skipped'; $Action.undo_reason = $Reason }
 
-# Undo deletes a created/replaced/copied file only when it is byte-identical to what apply wrote. (M19: a
-# create-shortcut undo that deletes without this check destroys an operator's later edit; C04b catches it.)
+# Undo moves a created/replaced/copied file aside only when it is still what apply wrote. (M19: a
+# create-shortcut undo without this check removes an operator's later edit; C04b catches it.)
+# The recorded hash decides when the manifest has one. A run killed inside the action never saved that hash,
+# so the file is then compared with what the action would have written: the shortcut fields, the card
+# source bytes, or the icon pixels extracted again from its source.
 function Test-ArlLnkMatchesAction([string]$Path, $Action) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
     $expected = [string]$Action.sha256_new
-    if (-not $expected) { return $false }
-    return [string]::Equals((Get-ArlFileSha256 $Path), $expected, [System.StringComparison]::OrdinalIgnoreCase)
+    if ($expected) { return [string]::Equals((Get-ArlFileSha256 $Path), $expected, [System.StringComparison]::OrdinalIgnoreCase) }
+    switch ([string]$Action.kind) {
+        { $_ -eq 'create-shortcut' -or $_ -eq 'replace-shortcut' } {
+            if ($null -eq $Action.fields) { return $false }
+            $want = @{}
+            foreach ($k in @('Target', 'Arguments', 'WorkDir', 'Icon', 'Description', 'WindowStyle')) { $want[$k] = $Action.fields.$k }
+            return (Test-ArlFieldsEqual -Actual (Read-ArlShortcut $Path) -Expected $want)
+        }
+        'copy-card' {
+            $src = [string]$Action.source
+            if (-not $src -or -not (Test-Path -LiteralPath $src -PathType Leaf)) { return $false }
+            return [string]::Equals((Get-ArlFileSha256 $Path), (Get-ArlFileSha256 $src), [System.StringComparison]::OrdinalIgnoreCase)
+        }
+        'write-icon' {
+            $bmp = Get-ArlIconBitmap -File ([string]$Action.source) -Index ([int]$Action.arguments)
+            if ($null -eq $bmp) { return $false }
+            try { $fresh = Get-ArlPixelHash $bmp } finally { $bmp.Dispose() }
+            return ($fresh -and ($fresh -eq (Get-ArlPngPixelHash $Path)))
+        }
+    }
+    return $false
+}
+
+# The owner SID recorded inside an SDDL string, or '' when there is none.
+function Get-ArlSddlOwnerSid([string]$Sddl) {
+    if (-not $Sddl) { return '' }
+    try {
+        $raw = New-Object System.Security.AccessControl.RawSecurityDescriptor $Sddl
+        if ($null -eq $raw.Owner) { return '' }
+        return $raw.Owner.Value
+    } catch { return '' }
+}
+
+# Undo never deletes a file it put down: it moves it into the run's archive folder (deshecho\<seq>-<name>),
+# admin-only like the rest of the archive, so a wrong guess about what apply wrote is still recoverable.
+function Move-ArlAsideForUndo($P, [string]$ArchiveDir, $Action, [string]$Path) {
+    $leafName = Split-Path -Leaf $Path
+    $aside = Join-Path (Join-Path $ArchiveDir 'deshecho') ([string]$Action.seq + '-' + $leafName)
+    if (Test-Path -LiteralPath $aside) {
+        $aside = Join-Path (Join-Path $ArchiveDir 'deshecho') ([string]$Action.seq + '-' + (Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmssfff') + '-' + $leafName)
+    }
+    Confirm-ArlParent -P $P -ChildPath $aside
+    Invoke-ArlAction -P $P -Op 'move-file' -Path $Path -Destination $aside | Out-Null
+    Reset-ArlChildAcl -P $P -Parent (Split-Path -Parent $aside) -Leaf (Split-Path -Leaf $aside) | Out-Null
+}
+
+# Puts a backed-up original back at its path and lets it inherit from its folder again.
+function Restore-ArlBackup($P, [string]$Backup, [string]$Path) {
+    Invoke-ArlAction -P $P -Op 'move-file' -Path $Backup -Destination $Path | Out-Null
+    Reset-ArlChildAcl -P $P -Parent (Split-Path -Parent $Path) -Leaf (Split-Path -Leaf $Path) | Out-Null
 }
 
 # Re-inherit the moved-back item's ACL and give it back its original owner. (M13: skipping this leaves the
@@ -1402,59 +1612,94 @@ function Restore-ArlSourceAcl($P, [string]$Path, [string]$OwnerSid, [string]$Sou
     return (Invoke-ArlAction -P $P -Op 'restore-acl' -Path $Path -OwnerSid $OwnerSid)
 }
 
-function Invoke-ArlUndoAction($P, $Action) {
+# True when the moved-back item carries the ACL it had before apply (semantic SDDL key, not byte for byte).
+function Test-ArlSourceAclRestored($Action) {
+    return ((ConvertTo-ArlSddlKey (Get-Acl -LiteralPath $Action.source).Sddl) -eq (ConvertTo-ArlSddlKey ([string]$Action.source_sddl)))
+}
+
+# Undo of acl-set and of a directory acl-reset: the DACL goes back first, then the owner as a separate step,
+# because writing an owner inside the same security descriptor fails on hosts where we do not hold it.
+function Restore-ArlDirAcl($P, $Action) {
+    $before = [string]$Action.sddl_before
+    if (-not $before) { return }
+    Invoke-ArlAction -P $P -Op 'set-dacl' -Path $Action.path -Sddl $before | Out-Null
+    $wantOwner = Get-ArlSddlOwnerSid $before
+    if ($wantOwner -and ($wantOwner -ne (Get-ArlOwnerSid $Action.path))) { Invoke-ArlAction -P $P -Op 'set-owner' -Path $Action.path -OwnerSid $wantOwner | Out-Null }
+}
+
+# Each branch looks at what is on disk before it acts, so it is safe on a done, in-progress, failed or
+# undo-skipped action and on a second -Undo after a first one was cut off. Undo never deletes a file: what
+# apply put down is moved aside into the run's archive (deshecho\); only an empty folder apply created is removed.
+function Invoke-ArlUndoAction($P, $Action, [string]$ArchiveDir) {
     $a = $Action
     switch ([string]$a.kind) {
         'archive-folder' {
-            if ((Test-Path -LiteralPath $a.destination -PathType Container) -and -not (Test-Path -LiteralPath $a.source)) {
+            $srcThere = Test-Path -LiteralPath $a.source
+            if ((Test-Path -LiteralPath $a.destination -PathType Container) -and -not $srcThere) {
                 Invoke-ArlAction -P $P -Op 'move-dir' -Path $a.destination -Destination $a.source | Out-Null
                 $a.status = 'undone'
-            } else { Set-ArlUndoSkipped -Action $a -Reason 'origen ocupado o destino ausente' }
+            } elseif ($srcThere -and -not (Test-Path -LiteralPath $a.destination)) { $a.status = 'undone' }
+            else { Set-ArlUndoSkipped -Action $a -Reason 'origen ocupado o destino ausente' }
         }
         'move' {
-            if ((Test-Path -LiteralPath $a.destination -PathType Leaf) -and -not (Test-Path -LiteralPath $a.source) -and [string]::Equals((Get-ArlFileSha256 $a.destination), [string]$a.sha256, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $srcThere = Test-Path -LiteralPath $a.source
+            $recorded = [string]$a.sha256
+            if ((Test-Path -LiteralPath $a.destination -PathType Leaf) -and -not $srcThere -and $recorded -and [string]::Equals((Get-ArlFileSha256 $a.destination), $recorded, [System.StringComparison]::OrdinalIgnoreCase)) {
                 Invoke-ArlAction -P $P -Op 'move-file' -Path $a.destination -Destination $a.source | Out-Null
                 Restore-ArlSourceAcl -P $P -Path $a.source -OwnerSid $a.source_owner_sid -SourceSddl $a.source_sddl | Out-Null
-                if ((ConvertTo-ArlSddlKey (Get-Acl -LiteralPath $a.source).Sddl) -ne (ConvertTo-ArlSddlKey ([string]$a.source_sddl))) {
-                    Set-ArlUndoSkipped -Action $a -Reason 'acl'
-                } else { $a.status = 'undone' }
+                if (-not (Test-ArlSourceAclRestored $a)) { Set-ArlUndoSkipped -Action $a -Reason 'acl' } else { $a.status = 'undone' }
+            } elseif ($srcThere -and -not (Test-Path -LiteralPath $a.destination)) {
+                # The move never happened (failed or cut off before it) or an earlier -Undo already put it back.
+                if ([string]$a.source_sddl -and -not (Test-ArlSourceAclRestored $a)) { Set-ArlUndoSkipped -Action $a -Reason 'acl' } else { $a.status = 'undone' }
             } else { Set-ArlUndoSkipped -Action $a -Reason 'movido o modificado despues de aplicar' }
         }
         'create-shortcut' {
             $created = $a.path
+            if (-not (Test-Path -LiteralPath $created -PathType Leaf)) { $a.status = 'undone'; return }
             if (-not (Test-ArlLnkMatchesAction -Path $created -Action $a)) { Set-ArlUndoSkipped -Action $a -Reason 'modificado despues de aplicar'; return }
-            Invoke-ArlAction -P $P -Op 'delete-file' -Path $created | Out-Null
+            Move-ArlAsideForUndo -P $P -ArchiveDir $ArchiveDir -Action $a -Path $created
             $a.status = 'undone'
         }
-        'replace-shortcut' {
-            if (-not (Test-ArlLnkMatchesAction -Path $a.path -Action $a)) { Set-ArlUndoSkipped -Action $a -Reason 'modificado despues de aplicar'; return }
-            Invoke-ArlAction -P $P -Op 'delete-file' -Path $a.path | Out-Null
-            if ($a.backup -and (Test-Path -LiteralPath $a.backup -PathType Leaf)) {
-                Invoke-ArlAction -P $P -Op 'move-file' -Path $a.backup -Destination $a.path | Out-Null
-                Reset-ArlChildAcl -P $P -Parent (Split-Path -Parent $a.path) -Leaf (Split-Path -Leaf $a.path) | Out-Null
+        { @('replace-shortcut', 'copy-card', 'write-icon') -contains $_ } {
+            $current = [string]$a.path
+            $backup = [string]$a.backup
+            $expectBackup = [bool]$backup
+            # The backup is checked against the hash recorded at plan time BEFORE anything moves, so a missing
+            # or changed backup never costs the file that is in place now.
+            $backupOk = $expectBackup -and (Test-Path -LiteralPath $backup -PathType Leaf) -and [string]::Equals((Get-ArlFileSha256 $backup), [string]$a.sha256_old, [System.StringComparison]::OrdinalIgnoreCase)
+            if (-not (Test-Path -LiteralPath $current -PathType Leaf)) {
+                # Cut off between the backup and the new file (or the operator removed the new one).
+                if ($backupOk) { Restore-ArlBackup -P $P -Backup $backup -Path $current; $a.status = 'undone' }
+                elseif ($expectBackup) { Set-ArlUndoSkipped -Action $a -Reason 'respaldo ausente o cambiado' }
+                else { $a.status = 'undone' }
+                return
             }
-            $a.status = 'undone'
-        }
-        { $_ -eq 'copy-card' -or $_ -eq 'write-icon' } {
-            if (-not (Test-ArlLnkMatchesAction -Path $a.path -Action $a)) { Set-ArlUndoSkipped -Action $a -Reason 'modificado despues de aplicar'; return }
-            Invoke-ArlAction -P $P -Op 'delete-file' -Path $a.path | Out-Null
-            if ($a.backup -and (Test-Path -LiteralPath $a.backup -PathType Leaf)) {
-                Invoke-ArlAction -P $P -Op 'move-file' -Path $a.backup -Destination $a.path | Out-Null
-                Reset-ArlChildAcl -P $P -Parent (Split-Path -Parent $a.path) -Leaf (Split-Path -Leaf $a.path) | Out-Null
-            }
+            # An earlier -Undo already put the original back but could not save the manifest.
+            if ($expectBackup -and -not (Test-Path -LiteralPath $backup) -and [string]::Equals((Get-ArlFileSha256 $current), [string]$a.sha256_old, [System.StringComparison]::OrdinalIgnoreCase)) { $a.status = 'undone'; return }
+            if (-not (Test-ArlLnkMatchesAction -Path $current -Action $a)) { Set-ArlUndoSkipped -Action $a -Reason 'modificado despues de aplicar'; return }
+            if ($expectBackup -and -not $backupOk) { Set-ArlUndoSkipped -Action $a -Reason 'respaldo ausente o cambiado'; return }
+            Move-ArlAsideForUndo -P $P -ArchiveDir $ArchiveDir -Action $a -Path $current
+            if ($backupOk) { Restore-ArlBackup -P $P -Backup $backup -Path $current }
             $a.status = 'undone'
         }
         'acl-set' {
-            if ($a.sddl_before) { Invoke-ArlAction -P $P -Op 'set-sd' -Path $a.path -Sddl ([string]$a.sddl_before) | Out-Null }
+            if (-not (Test-Path -LiteralPath $a.path -PathType Container)) { Set-ArlUndoSkipped -Action $a -Reason 'carpeta ausente'; return }
+            Restore-ArlDirAcl -P $P -Action $a
             $a.status = 'undone'
         }
-        'acl-reset' { $a.status = 'undone' }
+        'acl-reset' {
+            # A moved or created item's reset is undone by that item's own undo; a folder that existed before
+            # apply gets its recorded DACL and owner back.
+            if ($a.existed -eq $true -and [string]$a.sddl_before -and (Test-Path -LiteralPath $a.path -PathType Container)) { Restore-ArlDirAcl -P $P -Action $a }
+            $a.status = 'undone'
+        }
         'mkdir' {
-            if ($a.existed -eq $false) {
-                $empty = @(Get-ChildItem -LiteralPath $a.path -Force -ErrorAction SilentlyContinue).Count -eq 0
-                if ($empty) { Invoke-ArlAction -P $P -Op 'delete-dir' -Path $a.path | Out-Null; $a.status = 'undone' }
-                else { Set-ArlUndoSkipped -Action $a -Reason 'no vacia' }
-            } else { $a.status = 'undone' }
+            if ($a.existed -ne $false) { $a.status = 'undone'; return }
+            if (-not (Test-Path -LiteralPath $a.path -PathType Container)) { $a.status = 'undone'; return }
+            if (@(Get-ChildItem -LiteralPath $a.path -Force -ErrorAction SilentlyContinue).Count -eq 0) {
+                Invoke-ArlAction -P $P -Op 'delete-dir' -Path $a.path | Out-Null
+                $a.status = 'undone'
+            } else { Set-ArlUndoSkipped -Action $a -Reason 'no vacia' }
         }
         default { Set-ArlUndoSkipped -Action $a -Reason ('accion desconocida: ' + [string]$a.kind) }
     }
@@ -1466,7 +1711,10 @@ function Invoke-ArlUndo($P, [string]$ManifestParam, [switch]$WhatIf) {
     $manifestPath = $sel.Path
     $manifest = [System.IO.File]::ReadAllText($manifestPath) | ConvertFrom-Json
     Assert-ArlManifestTrusted -P $P -ManifestPath $manifestPath -Manifest $manifest
-    $acts = @($manifest.actions | Where-Object { @('done', 'in-progress') -contains [string]$_.status } | Sort-Object -Property seq -Descending)
+    $archiveDir = Split-Path -Parent $manifestPath
+    # in-progress: a run killed inside that action; failed: an action that threw part way; undo-skipped: what an
+    # earlier -Undo could not do, retried now. planned actions never ran and are left alone.
+    $acts = @($manifest.actions | Where-Object { @('done', 'in-progress', 'failed', 'undo-skipped') -contains [string]$_.status } | Sort-Object -Property seq -Descending)
     if ($WhatIf) {
         Write-ArlLine ('DESHACER (revision): ' + $manifestPath)
         foreach ($a in $acts) { Write-ArlLine ('  ' + [string]$a.seq + '  ' + [string]$a.kind + '  ' + [string]$a.path) }
@@ -1475,22 +1723,19 @@ function Invoke-ArlUndo($P, [string]$ManifestParam, [switch]$WhatIf) {
     }
     $manifest.state = 'undoing'
     Write-ArlManifest -P $P -Manifest $manifest -Path $manifestPath
-    $skipped = New-Object System.Collections.Generic.List[string]
     foreach ($a in $acts) {
-        try {
-            Invoke-ArlUndoAction -P $P -Action $a
-            if ([string]$a.status -eq 'undo-skipped') { [void]$skipped.Add([string]$a.seq + ':' + [string]$a.kind + ' (' + [string]$a.undo_reason + ')') }
-        } catch {
-            $a.status = 'undo-skipped'; $a.undo_reason = [string]$_.Exception.Message
-            [void]$skipped.Add([string]$a.seq + ':' + [string]$a.kind + ' (' + [string]$a.undo_reason + ')')
-        }
-        Write-ArlManifest -P $P -Manifest $manifest -Path $manifestPath
+        try { Invoke-ArlUndoAction -P $P -Action $a -ArchiveDir $archiveDir }
+        catch { Set-ArlUndoSkipped -Action $a -Reason ([string]$_.Exception.Message) }
+        Write-ArlManifestSafe -P $P -Manifest $manifest -Path $manifestPath
     }
-    if ($skipped.Count -gt 0) { $manifest.state = 'undone-partial' } else { $manifest.state = 'undone' }
-    Write-ArlManifest -P $P -Manifest $manifest -Path $manifestPath
+    # The run counts as undone only when every action that ran is undone.
+    $pending = @($manifest.actions | Where-Object { @('planned', 'undone') -notcontains [string]$_.status } | Sort-Object -Property seq -Descending)
+    $skipped = @($pending | ForEach-Object { [string]$_.seq + ':' + [string]$_.kind + ' (' + [string]$_.undo_reason + ')' })
+    if ($pending.Count -gt 0) { $manifest.state = 'undone-partial' } else { $manifest.state = 'undone' }
+    Write-ArlManifestSafe -P $P -Manifest $manifest -Path $manifestPath
     foreach ($s in $skipped) { Write-ArlLine ('NO SE DESHIZO  ' + $s) }
     $colada = if (Test-Path -LiteralPath $P.ColadaPath) { $P.ColadaPath } else { $null }
-    if ($skipped.Count -gt 0) { return @{ Status = 'deshecho-parcial'; Manifest = $manifestPath; Skipped = @($skipped); Colada = $colada } }
+    if ($pending.Count -gt 0) { return @{ Status = 'deshecho-parcial'; Manifest = $manifestPath; Skipped = $skipped; Colada = $colada } }
     return @{ Status = 'deshecho'; Manifest = $manifestPath; Skipped = @(); Colada = $colada }
 }
 #endregion implementacion
@@ -1546,14 +1791,17 @@ function Invoke-ArlStChild([string]$T, [string[]]$Mode, [hashtable]$Extra) {
     $exe = if ($PSVersionTable.PSEdition -eq 'Core') { Join-Path $PSHOME 'pwsh.exe' } else { Join-Path $PSHOME 'powershell.exe' }
     $argv = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath) + $Mode + (Get-ArlStChildArgs $SP)
     $savedRoot = $env:ARL_DESKTOP_SELFTEST_ROOT; $savedDepth = $env:ARL_DESKTOP_SELFTEST_DEPTH; $savedFail = $env:ARL_DESKTOP_FAIL_AFTER_ACTION
+    $savedInside = $env:ARL_DESKTOP_FAIL_INSIDE_ACTION
     $env:ARL_DESKTOP_SELFTEST_ROOT = $T
     $env:ARL_DESKTOP_SELFTEST_DEPTH = '1'
     if ($null -ne $Extra -and $Extra.ContainsKey('FailAfter')) { $env:ARL_DESKTOP_FAIL_AFTER_ACTION = [string]$Extra.FailAfter } else { $env:ARL_DESKTOP_FAIL_AFTER_ACTION = $null }
+    if ($null -ne $Extra -and $Extra.ContainsKey('FailInside')) { $env:ARL_DESKTOP_FAIL_INSIDE_ACTION = [string]$Extra.FailInside } else { $env:ARL_DESKTOP_FAIL_INSIDE_ACTION = $null }
     try {
         $lines = & $exe @argv 2>&1 | ForEach-Object { [string]$_ }
         $code = $LASTEXITCODE
     } finally {
         $env:ARL_DESKTOP_SELFTEST_ROOT = $savedRoot; $env:ARL_DESKTOP_SELFTEST_DEPTH = $savedDepth; $env:ARL_DESKTOP_FAIL_AFTER_ACTION = $savedFail
+        $env:ARL_DESKTOP_FAIL_INSIDE_ACTION = $savedInside
     }
     $result = $null
     foreach ($ln in @($lines)) {
@@ -1876,7 +2124,7 @@ function Invoke-ArlStGroup2([string]$T) {
 # C05: any missing required input (R3), an unreadable icon source (R4) or a card missing an icon
 # reference (R5) refuses with exit 2 and writes no archive. M01 (R3 never fires) is caught here.
 function Invoke-ArlStGroup3([string]$T) {
-    $required = @('ChispaExe', 'OperatorSettings', 'PassiveStd', 'PassiveNorm', 'PassiveWorkflow', 'DosboxExe', 'ShellDll', 'CardSource')
+    $required = @('ChispaExe', 'OperatorSettings', 'PassiveStd', 'PassiveNorm', 'PassiveWorkflow', 'DosboxExe', 'ShellDll', 'CardSource', 'EdgePath')
     $ok = $true; $detail = ''
     foreach ($key in $required) {
         $sub = Join-Path $T ('r3-' + $key)
@@ -2115,18 +2363,73 @@ function Invoke-ArlStGroup8([string]$T) {
 }
 
 # C19: a path parameter outside the temp tree (or with -SelfTest, or -SelfTest -WhatIf) is refused (R2 on a
-# direct call; inside this harness the depth guard makes the -SelfTest cases refuse with R9). M16 (R2 falls
-# through) is caught because the -Apply case then reaches R3 instead of failing_controls carrying 'R2'.
+# direct call; inside this harness the depth guard makes the -SelfTest cases refuse with R9). The outside-temp
+# case passes every other path under the temp tree, so only the -ArlRoot check can refuse it; a second -Apply
+# passes only -ArlRoot under the temp tree and must be refused as mixed paths. M16 (R2 falls through) is
+# caught because the -Apply cases then reach R3 or the real desktops instead of failed_controls carrying 'R2'.
 function Invoke-ArlStGroup9([string]$T) {
     New-ArlStDir $T
-    $r1 = Invoke-ArlStRaw $T @('-Apply', '-ArlRoot', 'C:\ARL-fuera-de-temp')
+    $SP = Get-ArlStPaths $T
+    $r1 = Invoke-ArlStRaw $T @('-Apply', '-PublicDesktop', $SP.PublicDesktop, '-OperatorDesktop', $SP.OperatorDesktop, '-UsersRoot', $SP.UsersRoot,
+        '-EdgePath', $SP.EdgePath, '-SystemRoot', $SP.SystemRoot, '-CardSource', $SP.CardSource, '-ArlRoot', 'C:\ARL-fuera-de-temp')
     $r1ok = ($r1.Exit -eq 2) -and ($null -ne $r1.Result) -and (@($r1.Result.failed_controls) -contains 'R2')
     $r2 = Invoke-ArlStRaw $T @('-SelfTest', '-PublicDesktop', (Join-Path $T 'x'))
     $r2ok = ($r2.Exit -eq 2)
     $r3 = Invoke-ArlStRaw $T @('-SelfTest', '-WhatIf')
     $r3ok = ($r3.Exit -eq 2)
-    $c19 = $r1ok -and $r2ok -and $r3ok
-    Add-ArlStResult 'C19' 'rutas fuera de la temporal y autoprueba con rutas rechazadas' $c19 ('arl=' + $r1.Exit + '/R2=' + (@($r1.Result.failed_controls) -contains 'R2') + ' ruta=' + $r2.Exit + ' whatif=' + $r3.Exit)
+    # Only -ArlRoot under the temp folder, every other path left at the real machine's value: all or nothing.
+    $r4 = Invoke-ArlStRaw $T @('-Apply', '-ArlRoot', (Join-Path $T 'ARL'))
+    $r4ok = ($r4.Exit -eq 2) -and ($null -ne $r4.Result) -and (@($r4.Result.failed_controls) -contains 'R2')
+    $c19 = $r1ok -and $r2ok -and $r3ok -and $r4ok
+    Add-ArlStResult 'C19' 'rutas fuera de la temporal y autoprueba con rutas rechazadas' $c19 ('arl=' + $r1.Exit + '/R2=' + $r1ok + ' ruta=' + $r2.Exit + ' whatif=' + $r3.Exit + ' mezcla=' + $r4.Exit + '/R2=' + $r4ok)
+}
+
+# C20: a run killed INSIDE one action (ARL_DESKTOP_FAIL_INSIDE_ACTION ends the process between two steps of
+# that action) leaves the manifest at applying with that action in-progress, and -Undo still puts both
+# desktops back. Three cut points: a move done but not recorded, a drifted shortcut already in the backup
+# with nothing in its place, and a new shortcut on the desktop before its ACL reset. M21 (applying not
+# reversible) and M22 (an unrecorded shortcut never recognised) are caught here.
+function Invoke-ArlStGroup10([string]$T) {
+    $ok = $true; $detail = ''
+    $cases = @(
+        @{ Name = 'a'; Point = 'movido'; MoveMap = $true; Colada = $false },
+        @{ Name = 'b'; Point = 'respaldado'; MoveMap = $false; Colada = $true },
+        @{ Name = 'c'; Point = 'creado-sin-acl'; MoveMap = $false; Colada = $false }
+    )
+    foreach ($c in $cases) {
+        $sub = Join-Path $T $c.Name
+        $SP = New-ArlStBaseTree $sub
+        if ($c.MoveMap) { New-ArlStMoveMap $sub | Out-Null }
+        $colada = Join-Path $SP.PublicDesktop ((Get-ArlFinalRows)[0].Name + '.lnk')
+        $coladaSha = ''
+        if ($c.Colada) {
+            New-ArlStLnk $colada (Join-Path $SP.Bridge 'Launch-ArlBridgeSmoke.cmd') '' '' '' 'colada a la deriva'
+            $coladaSha = (Get-FileHash -LiteralPath $colada -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+        $prePub = Get-ArlStSnapshot $SP.PublicDesktop
+        $preOp = Get-ArlStSnapshot $SP.OperatorDesktop
+        $ap = Invoke-ArlStChild $sub @('-Apply') @{ FailInside = $c.Point }
+        $killed = ($ap.Exit -eq 9)
+        $man = Get-ArlStManifestPath $SP
+        $state = 'sin-manifiesto'; $inProgress = 0
+        if ($man -and (Test-Path -LiteralPath $man -PathType Leaf)) {
+            $obj = [System.IO.File]::ReadAllText($man) | ConvertFrom-Json
+            $state = [string]$obj.state
+            $inProgress = @($obj.actions | Where-Object { [string]$_.status -eq 'in-progress' }).Count
+        }
+        $undo = Invoke-ArlStChild $sub @('-Undo')
+        $undoOk = ($undo.Exit -eq 0) -and ($null -ne $undo.Result) -and ([string]$undo.Result.status -eq 'deshecho')
+        # A restored backup inherits its ACL from the desktop again, so the drifted case compares bytes only.
+        $diffs = @(Compare-ArlStSnapshot $prePub (Get-ArlStSnapshot $SP.PublicDesktop) -IgnoreSddl:$c.Colada) + @(Compare-ArlStSnapshot $preOp (Get-ArlStSnapshot $SP.OperatorDesktop))
+        $same = ($diffs.Count -eq 0)
+        if ($c.Colada) { $same = $same -and (Test-Path -LiteralPath $colada -PathType Leaf) -and ((Get-FileHash -LiteralPath $colada -Algorithm SHA256).Hash.ToLowerInvariant() -eq $coladaSha) }
+        $caseOk = $killed -and ($state -eq 'applying') -and ($inProgress -eq 1) -and $undoOk -and $same
+        if (-not $caseOk) {
+            $ok = $false
+            $detail += ($c.Name + '(corte=' + $c.Point + ' exit=' + $ap.Exit + ' estado=' + $state + ' en-curso=' + $inProgress + ' deshacer=' + $undo.Exit + '/' + $(if ($undo.Result) { [string]$undo.Result.status } else { '?' }) + ' igual=' + $same + ' ' + (($diffs | Select-Object -First 3) -join '; ') + ') ')
+        }
+    }
+    Add-ArlStResult 'C20' 'aplicacion cortada dentro de una accion se deshace' $ok $detail
 }
 # --- static (source-level) controls ---------------------------------------------------------------------
 # These read the shipped .ps1 and card and need no Windows APIs, so they run on any engine (the CI test
@@ -2278,7 +2581,8 @@ function Invoke-ArlSelfTest([string[]]$Controls) {
         @{ Name = 'g6'; Controls = @('C11'); Run = { param($d) Invoke-ArlStGroup6 $d } },
         @{ Name = 'g7'; Controls = @('C16'); Run = { param($d) Invoke-ArlStGroup7 $d } },
         @{ Name = 'g8'; Controls = @('C17', 'C18'); Run = { param($d) Invoke-ArlStGroup8 $d } },
-        @{ Name = 'g9'; Controls = @('C19'); Run = { param($d) Invoke-ArlStGroup9 $d } }
+        @{ Name = 'g9'; Controls = @('C19'); Run = { param($d) Invoke-ArlStGroup9 $d } },
+        @{ Name = 'g10'; Controls = @('C20'); Run = { param($d) Invoke-ArlStGroup10 $d } }
     )
     try {
         foreach ($g in $groups) {
@@ -2349,7 +2653,8 @@ function Invoke-ArlMain([hashtable]$Bound, [bool]$WhatIf) {
         Assert-ArlTargetsPresent $P                                    # R3
         Assert-ArlIconsExtract $P                                      # R4
         Assert-ArlCardValid $P                                         # R5
-        $stamp = (Get-Date).ToString('yyyyMMdd-HHmmss')
+        # UTC, so the newest-first order of the archive folders survives a clock or time-zone change.
+        $stamp = (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss')
         $P.ArchiveDir = Join-Path $P.ArchiveRoot $stamp
         Assert-ArlNoReparse $P                                         # R6
         Assert-ArlFolderOwnership $P $P.ArchiveDir                     # R7
@@ -2374,7 +2679,7 @@ function Invoke-ArlMain([hashtable]$Bound, [bool]$WhatIf) {
         $status = $res.Status
         if ($status -eq 'aplicado' -and -not $whatIf) {
             $inv2 = Get-ArlDesktopInventory $P
-            $plan2 = New-ArlPlan -P $P -Inv $inv2 -Stamp ((Get-Date).ToString('yyyyMMdd-HHmmss'))
+            $plan2 = New-ArlPlan -P $P -Inv $inv2 -Stamp ((Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss'))
             if (@($plan2.Actions).Count -ne 0) { $status = 'error' }
         }
         $colada = $plan.Colada
@@ -2389,6 +2694,16 @@ function Invoke-ArlMain([hashtable]$Bound, [bool]$WhatIf) {
         if ($m.Success) {
             Write-ArlLine ('RECHAZADO ' + $m.Groups[1].Value + ': ' + $m.Groups[2].Value)
             Write-ArlResult $mode 'rechazado' $null $null (New-ArlCounts) @($m.Groups[1].Value)
+            return 2
+        }
+        # A folder or file the account cannot open is a permissions refusal (R1), not a crash. Errors inside
+        # the apply loop never reach here (they end in a failed-partial manifest), so this is a pre-apply or
+        # pre-undo read; the fix is an elevated console with the right account, not a retry.
+        $inner = $_.Exception
+        while ($null -ne $inner.InnerException) { $inner = $inner.InnerException }
+        if (($_.Exception -is [System.UnauthorizedAccessException]) -or ($inner -is [System.UnauthorizedAccessException]) -or ($msg -match '(?i)access (to the path .* )?is denied|acceso denegado')) {
+            Write-ArlLine ('RECHAZADO R1: sin permiso para una carpeta o archivo (' + $msg + ')')
+            Write-ArlResult $mode 'rechazado' $null $null (New-ArlCounts) @('R1')
             return 2
         }
         Write-ArlLine ('ERROR: ' + $msg)
