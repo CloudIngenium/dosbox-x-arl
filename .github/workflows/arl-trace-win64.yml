@@ -1,378 +1,49 @@
 name: ARL trace Windows x64
 
 on:
-  push:
-    branches:
-      - arl-trace
-  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
-env:
-  UPSTREAM_TAG: dosbox-x-v2026.07.02
-
 jobs:
-  build-win64-sdl2:
-    name: Build ARL trace Win64 SDL2 with Visual Studio
+  motor:
+    name: DEBUG desktop gate Motor
     runs-on: windows-latest
-
     steps:
-      - name: Check out source
-        # actions/checkout v7
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Set up MSBuild
-        # microsoft/setup-msbuild v3
-        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57
-
-      - name: Verify upstream base
-        shell: bash
-        run: |
-          git rev-parse "$UPSTREAM_TAG"
-          git log --oneline --decorate -5
-
-      - name: Prepare build info
-        shell: bash
-        run: |
-          shortsha="$(git rev-parse --short=7 HEAD)"
-          copyrightyear="$(git show -s --format=%at | xargs -I# date -d @# +'%Y')"
-          updatestr="$(git show -s --format=%at | xargs -I# date -d @# +'%b %d, %Y %I:%M:%S%P')"
-          echo '/* auto generated */' > include/build_timestamp.h
-          echo "#define UPDATED_STR \"${updatestr}\"" >> include/build_timestamp.h
-          echo "#define GIT_COMMIT_HASH \"${shortsha}\"" >> include/build_timestamp.h
-          echo "#define COPYRIGHT_END_YEAR \"${copyrightyear}\"" >> include/build_timestamp.h
-          cat include/build_timestamp.h
-
-      - name: Build DOSBox-X ARL SDL2
-        shell: pwsh
-        run: |
-          msbuild -m vs/dosbox-x.sln -t:dosbox-x:Rebuild -p:Configuration="Release SDL2" -p:Platform=x64
-          $exe = 'bin\x64\Release SDL2\dosbox-x.exe'
-          if (-not (Test-Path -Path $exe -PathType Leaf)) { exit 1 }
-          contrib\windows\installer\PatchPE.exe $exe
-
-      - name: Smoke test DOSBox-X binary
-        shell: pwsh
-        run: |
-          $exe = Resolve-Path 'bin\x64\Release SDL2\dosbox-x.exe'
-          & $exe -tests -set waitonerror=false -set logfile=tests.log
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Get-Content tests.log
-
-      - name: Test reactive ARL result corrector
-        shell: pwsh
-        run: |
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $vs = & $vswhere -latest -property installationPath
-          if (-not $vs) { throw 'Visual Studio installation not found' }
-          $command = "`"$vs\Common7\Tools\VsDevCmd.bat`" -arch=x64 && cl /nologo /EHsc /std:c++14 /I src\hardware\serialport contrib\arl\tests\arl_result_corrector_test.cpp /Fe:arl-result-corrector-test.exe && arl-result-corrector-test.exe"
-          cmd.exe /d /s /c $command
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      # Behavioural contract of the finalizer's wait: the run survives whatever DOSBox does
-      # (timeout-finalize + re-finalize at the true exit). This suite existed but was wired to no
-      # workflow — a green test nobody runs is worth zero.
-      - name: Test ARL directserial finalizer wait contract
-        shell: pwsh
-        run: |
-          pwsh -NoProfile -File contrib\arl\tests\Test-FinalizeArlDirectSerialRun.ps1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      # The preflight launcher's text is the operator's only instruction after the gate: Spanish,
-      # plain words with no English jargon, ASCII, and naming only launchers the desktop creates.
-      - name: Test ARL operator preflight launcher text
-        shell: pwsh
-        run: |
-          pwsh -NoProfile -File contrib\arl\tests\Test-ArlOperatorPreflightCmd.ps1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      # The two operator desktop suites take long (child PowerShell runs under both engines, one
-      # self-test per mutant), and this workflow is a single job, so a job-level paths filter would
-      # also skip the build. Instead this step decides from the diff whether anything under
-      # contrib/arl/ or this workflow changed. It fails open: when the diff cannot be computed
-      # (workflow_dispatch, a new or force-pushed branch, a missing base) both suites run. The parse
-      # check of Set-ArlOperatorDesktop.ps1 in "Validate ARL toolkit scripts" runs on every change.
-      - name: Decide whether the operator desktop suites run
-        id: arl-desktop-scope
-        shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_REF: ${{ github.base_ref }}
-          BEFORE_SHA: ${{ github.event.before }}
-        run: |
-          run=true
-          reason="diff not computable; running by default"
-          base=""
-          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$BASE_REF" ]; then
-            base="origin/$BASE_REF"
-          elif [ "$EVENT_NAME" = "push" ] && [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
-            base="$BEFORE_SHA"
-          fi
-          # --no-renames: a rename lists both paths, so moving a file out of contrib/arl/ still runs the suites.
-          if [ -n "$base" ] && changed="$(git diff --no-renames --name-only "$base...HEAD" 2>/dev/null)"; then
-            # A here-string, not a pipe: with pipefail, grep -q closing the pipe early could read as "no match".
-            if grep -qE '^(contrib/arl/|\.github/workflows/arl-trace-win64\.yml$)' <<< "$changed"; then
-              reason="changes under contrib/arl/ or in this workflow (vs $base)"
-            else
-              run=false
-              reason="no change under contrib/arl/ nor in this workflow (vs $base)"
-            fi
-          fi
-          echo "run=$run" >> "$GITHUB_OUTPUT"
-          echo "operator desktop suites: run=$run ($reason)"
-
-      # The operator desktop decides which run-id prefix a burn gets. The final icon set, the move
-      # map, the manifest/undo contract and the ACLs are proven in a temp tree under both engines.
-      # The engine checks need an elevated Windows session (GitHub-hosted Windows runners run as an
-      # administrator with UAC off). If they cannot run, the step FAILS instead of printing SKIP and
-      # passing: the elevation check below exits 1, and the gate fails on any SKIP line or on any
-      # engine control (C01-C21, C04b) without its PASS line under powershell 5.1 and pwsh 7.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - name: Test ARL operator desktop script
-        if: steps.arl-desktop-scope.outputs.run == 'true'
         shell: pwsh
         timeout-minutes: 30
         run: |
-          $principal = New-Object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
-          if (-not $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
-            Write-Output '::error::Runner session is not elevated: the operator desktop engine checks cannot run, so this step fails.'
-            exit 1
-          }
           pwsh -NoProfile -File contrib\arl\tests\Invoke-ArlOperatorDesktopCiGate.ps1 -Depth Motor
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      # Each engine mutant (M01-M24) runs its self-test with -Controls set to the control that owns it,
-      # and must be killed by that control; the gate fails on any SKIP or missing PASS line here too. The
-      # gate passes -SkipEngine at this depth: the step above already ran the full engine self-test.
+  mutantes:
+    name: DEBUG desktop gate Mutantes
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - name: Mutation-test ARL operator desktop script
-        if: steps.arl-desktop-scope.outputs.run == 'true'
         shell: pwsh
         timeout-minutes: 90
         run: |
-          $principal = New-Object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
-          if (-not $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
-            Write-Output '::error::Runner session is not elevated: the operator desktop engine mutants cannot run, so this step fails.'
-            exit 1
-          }
           pwsh -NoProfile -File contrib\arl\tests\Invoke-ArlOperatorDesktopCiGate.ps1 -Depth Mutantes
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Validate ARL toolkit scripts
+  diag:
+    name: DEBUG desktop selftest instrumented ${{ matrix.engine }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [powershell, pwsh]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - name: Self-test with child output
         shell: pwsh
+        timeout-minutes: 30
+        env:
+          ARL_DEBUG_CHILD: '1'
         run: |
-          $ErrorActionPreference = 'Stop'
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Capture-ArlWorkflowSnapshot.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlPassiveWorkflowTrace.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Analyze-ArlTrace.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Start-ArlTraceRun.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Finalize-ArlDirectSerialRun.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Start-ArlEmulator.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Analyze-LatestArlTrace.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactStabilityTrace.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactCycles6000Trace.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactCycles10000Trace.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactSafeSerialTrace.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Launch-ArlImpactUartDataTrace.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Preserve-ArlTraceRun.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Print-ArlLptCapture.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Watch-ArlLptCapture.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Compare-ArlResultTransactions.ps1)) | Out-Null
-          [scriptblock]::Create((Get-Content -Raw contrib\arl\Set-ArlOperatorDesktop.ps1)) | Out-Null
-          pwsh -NoProfile -File contrib\arl\Analyze-ArlTrace.ps1 `
-            -TracePath contrib\arl\fixtures\sample-trace.ndjson `
-            -OutDir arl-toolkit-test
-          Get-Content arl-toolkit-test\summary.md
-          if (-not (Test-Path arl-toolkit-test\protocol-candidates.json)) { throw 'protocol-candidates.json missing' }
-          New-Item -ItemType Directory -Force arl-curve-finalizer-test\run, arl-curve-finalizer-test\IMPLUS | Out-Null
-          Set-Content -LiteralPath arl-curve-finalizer-test\IMPLUS\AL.CAL -Value 'fixture' -NoNewline
-          Set-Content -LiteralPath arl-curve-finalizer-test\IMPLUS\JUL-26.RES -Value 'before' -NoNewline
-          Set-Content -LiteralPath arl-curve-finalizer-test\IMPLUS\DECOY.RES -Value 'before' -NoNewline
-          @([ordered]@{ name = 'JUL-26.RES'; length = 6; last_write_utc = (Get-Item arl-curve-finalizer-test\IMPLUS\JUL-26.RES).LastWriteTimeUtc.ToString('o') }) | ConvertTo-Json | Set-Content -LiteralPath arl-curve-finalizer-test\run\result-files-before.json
-          Add-Content -LiteralPath arl-curve-finalizer-test\IMPLUS\JUL-26.RES -Value 'after' -NoNewline
-          Add-Content -LiteralPath arl-curve-finalizer-test\IMPLUS\DECOY.RES -Value 'changed but not opened' -NoNewline
-          @(
-            '{"epoch_ms":1,"event":"guest_impact_file_open","kind":"calibration","drive":"C:","path":"AL.CAL","access_mode":0}',
-            '{"epoch_ms":2,"event":"guest_impact_file_open","kind":"result","drive":"C:","path":"JUL-26.RES","access_mode":2}'
-          ) | Set-Content -LiteralPath arl-curve-finalizer-test\run\calibration-access.ndjson
-          pwsh -NoProfile -File contrib\arl\Finalize-ArlDirectSerialRun.ps1 `
-            -ParentPid 999999 `
-            -ParentStartTime ([datetime]::UtcNow) `
-            -RunDirectory "$PWD\arl-curve-finalizer-test\run" `
-            -ImplusPath "$PWD\arl-curve-finalizer-test\IMPLUS" `
-            -ResultFilesBeforePath "$PWD\arl-curve-finalizer-test\run\result-files-before.json"
-          $curveMarker = Get-Content -Raw arl-curve-finalizer-test\run\directserial-finalized.json | ConvertFrom-Json
-          if ($curveMarker.metadata.curve_file -ne 'AL.CAL') { throw 'Finalizer did not resolve the unambiguous CAL file' }
-          if (-not (Test-Path arl-curve-finalizer-test\run\accessed-AL.CAL)) { throw 'Finalizer did not preserve the accessed CAL file' }
-          if ($curveMarker.metadata.result_file -ne 'JUL-26.RES') { throw 'Finalizer did not resolve the active monthly RES file' }
-          if (-not (Test-Path arl-curve-finalizer-test\run\result-JUL-26.RES)) { throw 'Finalizer did not preserve the active monthly RES file' }
-          if (Test-Path arl-curve-finalizer-test\run\result-DECOY.RES) { throw 'Explicit guest open must take priority over changed-file fallback' }
-          if ($curveMarker.metadata.calibration_candidates -ne 'AL.CAL') { throw 'Finalizer metadata must remain scalar' }
-          pwsh -NoProfile -File contrib\arl\Analyze-ArlTrace.ps1 `
-            -TracePath contrib\arl\fixtures\sample-protocol-trace.ndjson `
-            -OutDir arl-toolkit-protocol-test
-          Get-Content arl-toolkit-protocol-test\protocol-candidates.md
-          pwsh -NoProfile -File contrib\arl\Analyze-ArlTrace.ps1 `
-            -TracePath contrib\arl\fixtures\post-result-poll-loop.ndjson `
-            -OutDir arl-toolkit-post-loop-test
-          Get-Content arl-toolkit-post-loop-test\summary.md
-          if ((Get-Content arl-toolkit-post-loop-test\summary.md -Raw) -notmatch 'post_result_poll_loop') {
-            throw 'post_result_poll_loop classification missing'
-          }
-          pwsh -NoProfile -File contrib\arl\Compare-ArlResultTransactions.ps1 `
-            -TracePath contrib\arl\fixtures\post-result-poll-loop.ndjson `
-            -OutDir arl-toolkit-post-loop-test
-          if ((Get-Content arl-toolkit-post-loop-test\result-transaction-comparison.md -Raw) -notmatch 'post-result poll loop') {
-            throw 'result comparison did not report post-result poll loop'
-          }
-          New-Item -ItemType Directory -Force arl-lpt-watch-test | Out-Null
-          Set-Content -Path arl-lpt-watch-test\LPTCAP.PRN -Value "ARL PRINT TEST`r`n" -NoNewline -Encoding ASCII
-          pwsh -NoProfile -File contrib\arl\Watch-ArlLptCapture.ps1 `
-            -CapturePath "$PWD\arl-lpt-watch-test\LPTCAP.PRN" `
-            -SpoolDir "$PWD\arl-lpt-watch-test\print-jobs" `
-            -ParentPid 999999 `
-            -IdleMs 100 `
-            -PollMs 50 `
-            -AppendFormFeed
-          if (-not (Get-ChildItem arl-lpt-watch-test\print-jobs -Filter *.prn)) {
-            throw 'LPT watcher did not spool a print job'
-          }
-          $manifest = Get-ChildItem arl-lpt-watch-test\print-jobs -Filter *.json | Select-Object -First 1 | Get-Content -Raw | ConvertFrom-Json
-          if (-not $manifest.append_form_feed) {
-            throw 'LPT watcher manifest did not record append_form_feed'
-          }
-          pwsh -NoProfile -File contrib\arl\Start-ArlEmulator.ps1 `
-            -ProfilePath contrib\arl\profiles\arl3460-baseline.json `
-            -SelfTest
-          node contrib\arl\Validate-ArlChecksumCorpus.mjs
-          node contrib\arl\Run-ArlEmulatorOfflineMatrix.mjs 50
-          pwsh -NoProfile -File contrib\arl\Start-ArlTraceRun.ps1 `
-            -Session impact `
-            -RunRoot "$PWD\arl-toolkit-run" `
-            -DosboxExe "$PWD\missing-dosbox.exe" `
-            -NoLaunch
-          pwsh -NoProfile -File contrib\arl\Start-ArlTraceRun.ps1 `
-            -Session impact-emulator `
-            -RunRoot "$PWD\arl-toolkit-emu-run" `
-            -DosboxExe "$PWD\missing-dosbox.exe" `
-            -NoLaunch
-          pwsh -NoProfile -File contrib\arl\Start-ArlTraceRun.ps1 `
-            -Session tics-emulator `
-            -RunRoot "$PWD\arl-toolkit-emu-run" `
-            -DosboxExe "$PWD\missing-dosbox.exe" `
-            -NoLaunch
-          New-Item -ItemType Directory -Force arl-physical-launcher-test\IMPLUS | Out-Null
-          pwsh -NoProfile -File contrib\arl\Launch-ArlImpactPhysicalReference.ps1 `
-            -DosboxExe "$PWD\missing-dosbox.exe" `
-            -ArlRoot "$PWD\arl-physical-launcher-test" `
-            -ImplusPath "$PWD\arl-physical-launcher-test\IMPLUS" `
-            -RunRoot "$PWD\arl-physical-launcher-test\bypass" `
-            -NoLaunch
-          pwsh -NoProfile -File contrib\arl\Launch-ArlImpactPhysicalReference.ps1 `
-            -DosboxExe "$PWD\missing-dosbox.exe" `
-            -ArlRoot "$PWD\arl-physical-launcher-test" `
-            -ImplusPath "$PWD\arl-physical-launcher-test\IMPLUS" `
-            -RunRoot "$PWD\arl-physical-launcher-test\observe" `
-            -ObserveResults -NoLaunch
-          pwsh -NoProfile -File contrib\arl\Launch-ArlImpactPhysicalReference.ps1 `
-            -DosboxExe "$PWD\missing-dosbox.exe" `
-            -ArlRoot "$PWD\arl-physical-launcher-test" `
-            -ImplusPath "$PWD\arl-physical-launcher-test\IMPLUS" `
-            -RunRoot "$PWD\arl-physical-launcher-test\reactive" `
-            -ObserveResults -ReactiveRetryLow -NoLaunch
-          $physicalMetadata = Get-ChildItem arl-physical-launcher-test -Filter run-metadata.json -Recurse |
-            ForEach-Object { Get-Content $_.FullName -Raw | ConvertFrom-Json }
-          if ($physicalMetadata.Count -ne 3 -or @($physicalMetadata | Where-Object auto_print_lpt).Count -ne 0) {
-            throw 'Physical operator launchers must not auto-print per-burn LPT blocks by default'
-          }
-          pwsh -NoProfile -File contrib\arl\Launch-ArlImpactPhysicalReference.ps1 `
-            -DosboxExe "$PWD\missing-dosbox.exe" `
-            -ArlRoot "$PWD\arl-physical-launcher-test" `
-            -ImplusPath "$PWD\arl-physical-launcher-test\IMPLUS" `
-            -RunRoot "$PWD\arl-physical-launcher-test\legacy-debug-print" `
-            -LegacyDebugPrintLpt -NoLaunch
-          $debugMetadata = Get-ChildItem arl-physical-launcher-test\legacy-debug-print -Filter run-metadata.json -Recurse |
-            Select-Object -First 1 | Get-Content -Raw | ConvertFrom-Json
-          if (-not $debugMetadata.auto_print_lpt) {
-            throw 'LegacyDebugPrintLpt must remain an explicit diagnostic opt-in'
-          }
-          $bypassConfig = Get-ChildItem arl-physical-launcher-test\bypass -Recurse -Filter *.conf | Select-Object -First 1 | Get-Content -Raw
-          $observeConfig = Get-ChildItem arl-physical-launcher-test\observe -Recurse -Filter *.conf | Select-Object -First 1 | Get-Content -Raw
-          if ($bypassConfig -match 'arlresultobserve') { throw 'bypass config unexpectedly enables result observer' }
-          if ($observeConfig -notmatch 'arlresultobserve:1') { throw 'observe config does not enable result observer' }
-          $observeMetadata = Get-ChildItem arl-physical-launcher-test\observe -Recurse -Filter run-metadata.json | Select-Object -First 1 | Get-Content -Raw | ConvertFrom-Json
-          if (-not $observeMetadata.arl_result_observe) { throw 'observe metadata does not record the result observer' }
-          $reactiveConfig = Get-ChildItem arl-physical-launcher-test\reactive -Recurse -Filter *.conf | Select-Object -First 1 | Get-Content -Raw
-          if ($reactiveConfig -notmatch 'arlresultretrylow:1') { throw 'reactive config does not enable low-checksum retry' }
-          $reactiveMetadata = Get-ChildItem arl-physical-launcher-test\reactive -Recurse -Filter run-metadata.json | Select-Object -First 1 | Get-Content -Raw | ConvertFrom-Json
-          if (-not $reactiveMetadata.arl_result_retry_low) { throw 'reactive metadata does not record low-checksum retry' }
-
-      - name: Package ARL artifact
-        shell: bash
-        run: |
-          timestamp="$(date -u +%Y%m%d%H%M%S)"
-          short_sha="$(git rev-parse --short=12 HEAD)"
-          package_root="$PWD/package"
-          arl_root="$package_root/DOSBox-X-ARL"
-          exe_path="$PWD/bin/x64/Release SDL2/dosbox-x.exe"
-
-          rm -rf "$package_root"
-          mkdir -p "$arl_root/contrib/arl" "$package_root/arl-patches"
-
-          cp "$exe_path" "$arl_root/dosbox-x-arl.exe"
-          cp COPYING "$arl_root/COPYING"
-          cp README.md "$arl_root/README.md"
-          cp dosbox-x.reference.conf "$arl_root/dosbox-x.reference.conf"
-          cp dosbox-x.reference.full.conf "$arl_root/dosbox-x.reference.full.conf"
-          cp docs/ARL-TRACE.md "$arl_root/ARL-TRACE.md"
-          cp docs/ARL-LAB-HISTORY-2026-07.md "$arl_root/ARL-LAB-HISTORY-2026-07.md"
-          cp -R contrib/arl/. "$arl_root/contrib/arl/"
-          cp contrib/arl/dosbox-arl-trace.conf "$arl_root/dosbox-arl-trace.conf"
-          cp contrib/arl/Launch-ArlImpactStabilityTrace.ps1 "$arl_root/Launch-ArlImpactStabilityTrace.ps1"
-          cp contrib/arl/Launch-ArlImpactCycles6000Trace.ps1 "$arl_root/Launch-ArlImpactCycles6000Trace.ps1"
-          cp contrib/arl/Launch-ArlImpactCycles6000Trace.cmd "$arl_root/Launch-ArlImpactCycles6000Trace.cmd"
-          cp contrib/arl/Launch-ArlImpactCycles10000Trace.ps1 "$arl_root/Launch-ArlImpactCycles10000Trace.ps1"
-          cp contrib/arl/Launch-ArlImpactCycles10000Trace.cmd "$arl_root/Launch-ArlImpactCycles10000Trace.cmd"
-          cp contrib/arl/Launch-ArlImpactSafeSerialTrace.ps1 "$arl_root/Launch-ArlImpactSafeSerialTrace.ps1"
-          cp contrib/arl/Launch-ArlImpactSafeSerialTrace.cmd "$arl_root/Launch-ArlImpactSafeSerialTrace.cmd"
-          cp contrib/arl/Launch-ArlImpactUartDataTrace.ps1 "$arl_root/Launch-ArlImpactUartDataTrace.ps1"
-          cp contrib/arl/Launch-ArlImpactUartDataTrace.cmd "$arl_root/Launch-ArlImpactUartDataTrace.cmd"
-          cp contrib/arl/Launch-ArlImpactRx4000Trace.cmd "$arl_root/Launch-ArlImpactRx4000Trace.cmd"
-          cp contrib/arl/Launch-ArlImpactPhysicalReference.ps1 "$arl_root/Launch-ArlImpactPhysicalReference.ps1"
-          cp contrib/arl/Launch-ArlImpactDirectSerialBypass.cmd "$arl_root/Launch-ArlImpactDirectSerialBypass.cmd"
-          cp contrib/arl/Launch-ArlImpactObserveOnlyTrace.cmd "$arl_root/Launch-ArlImpactObserveOnlyTrace.cmd"
-          cp contrib/arl/Launch-ArlImpactReactiveSafeTrace.cmd "$arl_root/Launch-ArlImpactReactiveSafeTrace.cmd"
-          cp contrib/arl/Analyze-ArlTrace.ps1 "$arl_root/Analyze-ArlTrace.ps1"
-          cp contrib/arl/Analyze-LatestArlTrace.ps1 "$arl_root/Analyze-LatestArlTrace.ps1"
-          cp contrib/arl/Preserve-ArlTraceRun.ps1 "$arl_root/Preserve-ArlTraceRun.ps1"
-          cp contrib/arl/Print-ArlLptCapture.ps1 "$arl_root/Print-ArlLptCapture.ps1"
-          cp contrib/arl/Watch-ArlLptCapture.ps1 "$arl_root/Watch-ArlLptCapture.ps1"
-          cp contrib/arl/Compare-ArlResultTransactions.ps1 "$arl_root/Compare-ArlResultTransactions.ps1"
-
-          ./scripts/arl-export-patch-stack.sh "$UPSTREAM_TAG" "$package_root/arl-patches"
-
-          find "$arl_root" -type f -print0 | sort -z | xargs -0 sha256sum \
-            > "$package_root/SHA256SUMS.txt"
-
-          {
-            echo "upstream_tag=$UPSTREAM_TAG"
-            echo "upstream_base_commit=$(git rev-parse "$UPSTREAM_TAG")"
-            echo "head_commit=$(git rev-parse HEAD)"
-            echo "build_utc=$timestamp"
-            echo "artifact_layout=DOSBox-X-ARL/dosbox-x-arl.exe"
-            echo
-            echo "arl_patch_commits:"
-            git log --reverse --format='  %H %s' "$UPSTREAM_TAG..HEAD"
-          } > "$package_root/BUILD-MANIFEST.txt"
-
-          echo "ARL_ARTIFACT_NAME=dosbox-x-arl-${UPSTREAM_TAG#dosbox-x-v}-${short_sha}" >> "$GITHUB_ENV"
-
-      - name: Upload ARL artifact
-        # actions/upload-artifact v7.0.1
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: ${{ env.ARL_ARTIFACT_NAME }}
-          path: package
+          pwsh -NoProfile -File contrib\arl\tests\diag-instrument.ps1
+          & ${{ matrix.engine }} -NoProfile -ExecutionPolicy Bypass -File contrib\arl\Set-ArlOperatorDesktop.ps1 -SelfTest
+          Write-Host "exit=$LASTEXITCODE"
