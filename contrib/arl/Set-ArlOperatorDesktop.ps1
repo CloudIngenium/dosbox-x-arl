@@ -1068,6 +1068,14 @@ function Invoke-ArlAction {
     if ($Op -eq 'copy-file') { [void]$targets.Add($Destination) }
     elseif ($Op -like 'move-*') { [void]$targets.Add($Path); [void]$targets.Add($Destination) }
     else { [void]$targets.Add($Path); if ($TempPath) { [void]$targets.Add($TempPath) } }
+    # A plain mkdir also creates every missing parent and gives each folder it creates an owner, so each one is
+    # guarded like the leaf. Outermost first.
+    $newDirs = [System.Collections.Generic.List[string]]::new()
+    if ($Op -eq 'mkdir-plain' -and -not [string]::IsNullOrEmpty($Path)) {
+        $nd = $Path
+        while ($nd -and -not (Test-Path -LiteralPath $nd)) { $newDirs.Insert(0, $nd); $nd = [System.IO.Path]::GetDirectoryName($nd) }
+        foreach ($nd in $newDirs) { [void]$targets.Add($nd) }
+    }
     $allowed = @($P.WriteRoots)
     if ($Op -like 'mkdir*') { $allowed = $allowed + @(@{ Path = $P.Staging; AllowEqual = $true }) }
     $stRoot = $env:ARL_DESKTOP_SELFTEST_ROOT
@@ -1092,7 +1100,18 @@ function Invoke-ArlAction {
             if ($LASTEXITCODE -ne 0) { throw ('icacls setowner fallo (' + $LASTEXITCODE + '): ' + $Path) }
             if ((ConvertTo-ArlSddlKey (Get-Acl -LiteralPath $Path).Sddl) -ne (ConvertTo-ArlSddlKey $Sddl)) { throw ('la carpeta no quedo con los permisos pedidos: ' + $Path) }
         }
-        'mkdir-plain' { [void][System.IO.Directory]::CreateDirectory($Path) }
+        'mkdir-plain' {
+            # A new folder inherits its ACL but is owned by whoever creates it: run as SYSTEM (the host's scheduled
+            # task) the group folders under H, the icon folder and the archive's subfolders would stay SYSTEM's,
+            # C10 fails and the next run plans ACL resets. Every folder this call creates gets owner Administrators,
+            # set and read back by SID (the host names the group in Spanish). (M25 target: skipping this loop.)
+            [void][System.IO.Directory]::CreateDirectory($Path)
+            foreach ($od in $newDirs) {
+                & icacls $od /setowner ('*' + $script:SidBA) /C /Q | Out-Null
+                if ($LASTEXITCODE -ne 0) { throw ('icacls /setowner fallo (' + $LASTEXITCODE + '): ' + $od) }
+                if ((Get-ArlOwnerSid $od) -ne $script:SidBA) { throw ('la carpeta no quedo con dueno Administradores: ' + $od) }
+            }
+        }
         'move-file' {
             $a = 0
             while ($true) {

@@ -29,10 +29,12 @@
          (powershell.exe = Windows PowerShell 5.1, pwsh = 7). It must exit 0, report autoprueba-ok,
          and print a PASS line for each of the 22 controls C01-C21 + C04b.
 
-      3. Mutation (-Mutants, Windows + elevated): each of the 24 seeded mutants is applied to a
+      3. Mutation (-Mutants, Windows + elevated): each of the 25 seeded mutants is applied to a
          private copy of the script and its self-test is run under Windows PowerShell 5.1 with
          -Controls set to the control that owns it; each must be caught (exit 1 with a FAIL line for
-         that control), so a mutant counts as killed only by the control named for it.
+         that control), so a mutant counts as killed only by the control named for it. M25 drops the
+         owner Administradores from the folders the script creates: C10 catches it on an elevated
+         runner too, because the self-test applies with a default owner that is not Administrators.
 
     Run from anywhere:
       pwsh -NoProfile -File contrib/arl/tests/Test-SetArlOperatorDesktop.ps1
@@ -113,6 +115,7 @@ $mutantSpecs = @(
     @{ Id = 'M22'; Killer = 'C20'; Find = 'return (Test-ArlFieldsEqual -Actual (Read-ArlShortcut $Path) -Expected $want)'; Replace = 'return $false' }
     @{ Id = 'M23'; Killer = 'C21'; Find = 'if (Test-ArlUnder -Path $Target -Root $P.ArlRoot) {'; Replace = 'if ($false) {' }
     @{ Id = 'M24'; Killer = 'C12'; Find = 'return @($out | Sort-Object -Property { [string]$_.Ts })'; Replace = 'return @($out | Sort-Object -Property { [string]$_.Ts } -Descending)' }
+    @{ Id = 'M25'; Killer = 'C10'; Find = 'foreach ($od in $newDirs) {'; Replace = 'foreach ($od in @()) {' }
 )
 
 # ---- depth 1: files exist + parse + one occurrence of every mutant find -------------------------

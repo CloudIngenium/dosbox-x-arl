@@ -71,6 +71,14 @@ a run.
   the archive), the script also
   - resets every *moved* item and every *created* public shortcut so it inherits
     from its new parent folder, and sets its owner to `BUILTIN\Administrators`;
+  - gives every folder it creates (the admin folders, the group folders under
+    `Herramientas-Admin`, `iconos`, the archive's subfolders) owner
+    `BUILTIN\Administrators`, set and read back by SID `S-1-5-32-544` (the host
+    names the group `BUILTIN\Administradores`). A new object is owned by whoever
+    creates it, so without this an `-Apply` run as `NT AUTHORITY\SYSTEM` (a
+    scheduled task) would leave SYSTEM-owned folders that fail `C10` and make
+    the next run plan ACL resets; an elevated admin's folders already came out
+    owned by Administrators;
   - gives `Guia-Operador` `BU` read (the Piso login must open the card);
   - on `-Undo`, puts back the ACL and owner a moved item had before, and on
     folders whose ACL it changed, restores the DACL first and the owner as a
@@ -244,9 +252,16 @@ Undo is LIFO: `-Undo` reverses the newest reversible run (`applying`, `applied`,
 
 - `contrib/arl/tests/Test-SetArlOperatorDesktop.ps1` — static parse + control
   self-test (22 controls, `C01`-`C21` plus `C04b`); `-Mutants` runs the engine
-  mutation suite (24 mutants `M01`-`M24`). Each mutant runs its self-test with
+  mutation suite (25 mutants `M01`-`M25`). Each mutant runs its self-test with
   `-SelfTest -Controls <its control>`, so it counts as killed only when the
-  control named for it fails. `C20` kills the child inside an action
+  control named for it fails. `C10` checks the exact admin-only ACLs of
+  `Herramientas-Admin`, the archive root and the guide, and owner
+  Administrators (by SID) on every item under `Herramientas-Admin` and on
+  `iconos`. The apply it reads runs with the process token's default owner set
+  to the account itself (SYSTEM stays SYSTEM, an admin becomes its own user
+  SID), never Administrators, and a probe folder proves that took; so `C10`
+  catches a folder created without an owner whoever runs the self-test, and
+  `M25` (the owner step removed) dies on an elevated runner too. `C20` kills the child inside an action
   (`ARL_DESKTOP_FAIL_INSIDE_ACTION`: after a move, after a backup, after a
   shortcut lands but before its ACL reset) and checks that `-Undo` restores both
   desktops exactly. `C21` lays down the shortcuts Chispa's installers create,
