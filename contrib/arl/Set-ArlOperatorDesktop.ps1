@@ -2135,8 +2135,8 @@ function Invoke-ArlStGroup1([string]$T) {
     $guideOk = Test-ArlStGuideSddl $SP.Guide
     $badChildren = @(Get-ArlStChildrenNotAdmin $SP.Tools 'herramientas')
     $iconsOwner = if (Test-Path -LiteralPath $SP.Icons -PathType Container) { Get-ArlOwnerSid $SP.Icons } else { '' }
-    $iconsOk = ($iconsOwner -eq $script:SidBA) -and (Test-ArlChildSddl (Get-Acl -LiteralPath $SP.Icons).Sddl 'guia')
-    $c10 = $probeOk -and $toolsOk -and $archiveOk -and $guideOk -and ($badChildren.Count -eq 0) -and $iconsOk
+    $iconsDirOk = ($iconsOwner -eq $script:SidBA) -and (Test-ArlChildSddl (Get-Acl -LiteralPath $SP.Icons).Sddl 'guia')
+    $c10 = $probeOk -and $toolsOk -and $archiveOk -and $guideOk -and ($badChildren.Count -eq 0) -and $iconsDirOk
     Add-ArlStResult 'C10' 'permisos exactos en H, respaldo y guia' $c10 ('sonda=' + $ap.ProbeOwner + ' H=' + $toolsOk + ' respaldo=' + $archiveOk +
         ' guia=' + $guideOk + ' iconos=' + $iconsOwner + ' hijos-mal=[' + (@($badChildren | Select-Object -First 4) -join '; ') + ']')
 
