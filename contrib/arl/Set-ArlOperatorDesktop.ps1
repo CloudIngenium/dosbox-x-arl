@@ -1895,6 +1895,94 @@ function Add-ArlStUserWrite([string]$Path, [string]$Sid) {
     $acl.AddAccessRule($rule)
     Set-Acl -LiteralPath $Path -AclObject $acl
 }
+
+# --- default owner of new objects (C10) ------------------------------------------------------------------
+# Whoever creates a file or folder owns it unless the creator sets another owner. An elevated admin's token
+# hands new objects to BUILTIN\Administrators, so on a GitHub runner or an admin console a folder the script
+# forgets to give an owner still looks right; SYSTEM (the host's scheduled task) keeps them itself and C10
+# fails there. The self-test's apply therefore runs with the process token's default owner set to the
+# account's own SID (SYSTEM stays SYSTEM, an admin becomes its user SID), never Administrators, so C10 judges
+# the script and not the account running it. P/Invoke through Add-Type -MemberDefinition, like Import-ArlNative.
+function Import-ArlStTokenNative {
+    if ('ArlDesktop.StToken' -as [type]) { return }
+    $members = @'
+[DllImport("kernel32.dll")]
+public static extern IntPtr GetCurrentProcess();
+[DllImport("kernel32.dll", SetLastError = true)]
+public static extern bool CloseHandle(IntPtr hObject);
+[DllImport("advapi32.dll", SetLastError = true)]
+public static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
+[DllImport("advapi32.dll", SetLastError = true)]
+public static extern bool GetTokenInformation(IntPtr TokenHandle, int TokenInformationClass, IntPtr TokenInformation, int TokenInformationLength, out int ReturnLength);
+[DllImport("advapi32.dll", SetLastError = true)]
+public static extern bool SetTokenInformation(IntPtr TokenHandle, int TokenInformationClass, IntPtr TokenInformation, int TokenInformationLength);
+'@
+    Add-Type -Namespace ArlDesktop -Name StToken -MemberDefinition $members
+}
+
+# The default owner of this process's token (TokenOwner, class 4: a TOKEN_OWNER is one pointer to a SID).
+function Get-ArlStTokenOwner {
+    Import-ArlStTokenNative
+    $h = [IntPtr]::Zero
+    if (-not [ArlDesktop.StToken]::OpenProcessToken([ArlDesktop.StToken]::GetCurrentProcess(), 0x0008, [ref]$h)) {
+        throw ('OpenProcessToken fallo: ' + [System.Runtime.InteropServices.Marshal]::GetLastWin32Error())
+    }
+    $buf = [System.Runtime.InteropServices.Marshal]::AllocHGlobal(256)
+    try {
+        $len = 0
+        if (-not [ArlDesktop.StToken]::GetTokenInformation($h, 4, $buf, 256, [ref]$len)) {
+            throw ('GetTokenInformation fallo: ' + [System.Runtime.InteropServices.Marshal]::GetLastWin32Error())
+        }
+        return [System.Security.Principal.SecurityIdentifier]::new([System.Runtime.InteropServices.Marshal]::ReadIntPtr($buf))
+    } finally {
+        [System.Runtime.InteropServices.Marshal]::FreeHGlobal($buf)
+        [void][ArlDesktop.StToken]::CloseHandle($h)
+    }
+}
+
+# Sets this process's default owner for new objects (TOKEN_QUERY | TOKEN_ADJUST_DEFAULT). The SID is written
+# right after the pointer in the same buffer; the token keeps its own copy.
+function Set-ArlStTokenOwner([System.Security.Principal.SecurityIdentifier]$Sid) {
+    Import-ArlStTokenNative
+    $bin = [System.Array]::CreateInstance([byte], $Sid.BinaryLength)
+    $Sid.GetBinaryForm($bin, 0)
+    $size = [IntPtr]::Size + $bin.Length
+    $buf = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($size)
+    $h = [IntPtr]::Zero
+    try {
+        $sidAt = [IntPtr]::Add($buf, [IntPtr]::Size)
+        [System.Runtime.InteropServices.Marshal]::Copy($bin, 0, $sidAt, $bin.Length)
+        [System.Runtime.InteropServices.Marshal]::WriteIntPtr($buf, $sidAt)
+        if (-not [ArlDesktop.StToken]::OpenProcessToken([ArlDesktop.StToken]::GetCurrentProcess(), 0x0088, [ref]$h)) {
+            throw ('OpenProcessToken fallo: ' + [System.Runtime.InteropServices.Marshal]::GetLastWin32Error())
+        }
+        if (-not [ArlDesktop.StToken]::SetTokenInformation($h, 4, $buf, $size)) {
+            throw ('SetTokenInformation fallo (' + $Sid.Value + '): ' + [System.Runtime.InteropServices.Marshal]::GetLastWin32Error())
+        }
+    } finally {
+        if ($h -ne [IntPtr]::Zero) { [void][ArlDesktop.StToken]::CloseHandle($h) }
+        [System.Runtime.InteropServices.Marshal]::FreeHGlobal($buf)
+    }
+}
+
+# Runs one child of this script with the default owner described above; the child process starts with a copy
+# of this token. A probe folder made first proves it took (its owner comes back as the result's ProbeOwner,
+# which C10 requires not to be Administrators). The token's own default owner is put back afterwards.
+function Invoke-ArlStChildCreatorOwner([string]$T, [string[]]$Mode) {
+    $original = Get-ArlStTokenOwner
+    Set-ArlStTokenOwner ([System.Security.Principal.WindowsIdentity]::GetCurrent().User)
+    try {
+        $probe = Join-Path $T 'sonda-dueno'
+        New-Item -ItemType Directory -Path $probe | Out-Null
+        $probeOwner = Get-ArlOwnerSid $probe
+        Remove-Item -LiteralPath $probe -Force
+        $res = Invoke-ArlStChild $T $Mode
+        $res.ProbeOwner = $probeOwner
+        return $res
+    } finally {
+        Set-ArlStTokenOwner $original
+    }
+}
 # Copies a real icon-bearing binary into the fake toolkit so R4 (icon index extracts) can pass. shell32
 # icons live in SystemResources\shell32.dll.mun on Win10+, so prefer it; dosbox-x-arl.exe stands in for
 # any PE whose icon 0 extracts (powershell/regedit/explorer).
@@ -1999,8 +2087,9 @@ function Invoke-ArlStGroup1([string]$T) {
         (-not (Test-Path -LiteralPath $SP.ArchiveRoot)) -and (@(Compare-ArlStSnapshot $preDesktop (Get-ArlStSnapshot $SP.PublicDesktop)).Count -eq 0)
     Add-ArlStResult 'C01' 'ensayo sin cambios' $c01 ('exit=' + $dry.Exit + ' status=' + $(if ($dry.Result) { $dry.Result.status } else { 'nulo' }))
 
-    # C02: apply.
-    $ap = Invoke-ArlStChild $T @('-Apply')
+    # C02: apply. It runs with the default owner of new objects set to the account itself, never Administrators, the
+    # way a scheduled task runs it as SYSTEM (Invoke-ArlStChildCreatorOwner); C10 below reads what it left.
+    $ap = Invoke-ArlStChildCreatorOwner $T @('-Apply')
     $r = $ap.Result
     $finals = Get-ArlStFinalLeaves
     $finalsOk = $true; foreach ($f in $finals) { if (-not (Test-Path -LiteralPath (Join-Path $SP.PublicDesktop $f) -PathType Leaf)) { $finalsOk = $false } }
@@ -2017,10 +2106,20 @@ function Invoke-ArlStGroup1([string]$T) {
     $c02 = ($ap.Exit -eq 0) -and $finalsOk -and $iconsOk -and $cardOk -and $movedOk -and $diagGone -and $countsOk -and $coladaOk
     Add-ArlStResult 'C02' 'aplicar deja el escritorio final' $c02 ('exit=' + $ap.Exit + ' mover=' + $(if ($r) { $r.counts.mover } else { '?' }) + ' finals=' + $finalsOk + ' iconos=' + $iconsOk + ' colada=' + $coladaOk)
 
-    # C10: H, its children and the archive carry the exact admin-only SDDL; the guide adds BU read.
-    $c10 = (Test-ArlStAdminOnly $SP.Tools) -and (Test-ArlStAdminOnly $SP.ArchiveRoot) -and
-        (Test-ArlStGuideSddl $SP.Guide) -and (Test-ArlStChildrenAdmin $SP.Tools)
-    Add-ArlStResult 'C10' 'permisos exactos en H, respaldo y guia' $c10 ''
+    # C10: H, its children and the archive carry the exact admin-only SDDL; the guide adds BU read. Every child of H
+    # and the icon folder is owned by Administrators, compared by SID. The apply above ran with a default owner that
+    # is not Administrators (the probe proves it), so a folder the script creates without setting its owner fails
+    # here whoever runs the self-test: SYSTEM on the host's scheduled task, or an elevated admin.
+    $probeOk = [bool]$ap.ProbeOwner -and ($ap.ProbeOwner -ne $script:SidBA)
+    $toolsOk = Test-ArlStAdminOnly $SP.Tools
+    $archiveOk = Test-ArlStAdminOnly $SP.ArchiveRoot
+    $guideOk = Test-ArlStGuideSddl $SP.Guide
+    $badChildren = @(Get-ArlStChildrenNotAdmin $SP.Tools 'herramientas')
+    $iconsOwner = if (Test-Path -LiteralPath $SP.Icons -PathType Container) { Get-ArlOwnerSid $SP.Icons } else { '' }
+    $iconsOk = ($iconsOwner -eq $script:SidBA) -and (Test-ArlChildSddl (Get-Acl -LiteralPath $SP.Icons).Sddl 'guia')
+    $c10 = $probeOk -and $toolsOk -and $archiveOk -and $guideOk -and ($badChildren.Count -eq 0) -and $iconsOk
+    Add-ArlStResult 'C10' 'permisos exactos en H, respaldo y guia' $c10 ('sonda=' + $ap.ProbeOwner + ' H=' + $toolsOk + ' respaldo=' + $archiveOk +
+        ' guia=' + $guideOk + ' iconos=' + $iconsOwner + ' hijos-mal=[' + (@($badChildren | Select-Object -First 4) -join '; ') + ']')
 
     # C03: a second apply is a no-op and writes no new archive.
     $archivesBefore = @(Get-ChildItem -LiteralPath $SP.ArchiveRoot -Directory -Force -ErrorAction SilentlyContinue).Count
@@ -2060,13 +2159,17 @@ function Test-ArlStGuideSddl([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return $false }
     return (ConvertTo-ArlSddlKey (Get-Acl -LiteralPath $Path).Sddl) -eq (ConvertTo-ArlSddlKey $script:SddlGuide)
 }
-function Test-ArlStChildrenAdmin([string]$Root) {
+# Every item under $Root whose owner is not Administrators (S-1-5-32-544, by SID: SYSTEM does not count) or whose
+# ACL is not only inherited admin ACEs, as 'relative-path (owner SID)'. Empty when all are right.
+function Get-ArlStChildrenNotAdmin([string]$Root, [string]$Scope) {
+    $out = [System.Collections.Generic.List[string]]::new()
     foreach ($c in @(Get-ChildItem -LiteralPath $Root -Recurse -Force -ErrorAction SilentlyContinue)) {
         $o = Get-ArlOwnerSid $c.FullName
-        if (@($script:SidBA, $script:SidSY) -notcontains $o) { return $false }
-        if (-not (Test-ArlChildSddl (Get-Acl -LiteralPath $c.FullName).Sddl 'herramientas')) { return $false }
+        if (($o -ne $script:SidBA) -or (-not (Test-ArlChildSddl (Get-Acl -LiteralPath $c.FullName).Sddl $Scope))) {
+            [void]$out.Add($c.FullName.Substring($Root.Length) + ' (' + $o + ')')
+        }
     }
-    return $true
+    return @($out)
 }
 
 # The applied manifest of the current tree (there is exactly one after a clean apply).
